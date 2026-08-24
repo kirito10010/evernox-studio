@@ -1,0 +1,108 @@
+/* ============================================================
+   EverNox — 「碧空薄雾」玻璃配方 Mixins
+   纯 mixin 文件，无任何 CSS 输出，可被多处 @use 而不重复注入
+   ============================================================ */
+
+/* 主玻璃配方：半透明白底 + 高斯模糊 + 上沿高光边 + 细腻浅蓝阴影 */
+@mixin ev-glass($alpha: 0.66, $radius: var(--ev-radius-xl)) {
+  background: rgba(255, 255, 255, $alpha);
+  backdrop-filter: var(--ev-blur-md);
+  -webkit-backdrop-filter: var(--ev-blur-md);
+  border: 1px solid var(--ev-border-subtle);
+  border-top-color: var(--ev-border-gloss);
+  border-radius: $radius;
+  box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
+
+  /* 不支持 backdrop-filter 时降级为近实底，避免透出杂色 */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+
+/* 强玻璃：用于弹窗 / 下拉 / 浮层等需要更高可读性的场景 */
+@mixin ev-glass-strong($radius: var(--ev-radius-xl)) {
+  background: var(--ev-bg-glass-strong);
+  backdrop-filter: var(--ev-blur-lg);
+  -webkit-backdrop-filter: var(--ev-blur-lg);
+  border: 1px solid var(--ev-border-subtle);
+  border-top-color: var(--ev-border-gloss);
+  border-radius: $radius;
+  box-shadow: var(--ev-shadow-lg), var(--ev-inset-gloss);
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background: rgba(255, 255, 255, 0.96);
+  }
+}
+
+/* 顶部光泽条：制造「水润有光泽」的高光过渡，需父级 position: relative */
+@mixin ev-gloss-bar($height: 42%, $opacity: 0.5) {
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: $height;
+    background: var(--ev-grad-gloss);
+    opacity: $opacity;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+/* 轻盈悬浮：位移 ≤ 3px，阴影加深但保持低透明度 */
+@mixin ev-hover-lift($y: -3px) {
+  transition:
+    transform 0.3s var(--ev-ease-out),
+    box-shadow 0.3s var(--ev-ease-out),
+    border-color 0.3s var(--ev-ease-out),
+    background-color 0.3s var(--ev-ease-out);
+
+  &:hover {
+    transform: translateY($y);
+    border-color: var(--ev-border-hover);
+    box-shadow: var(--ev-shadow-lg), var(--ev-inset-gloss);
+  }
+}
+
+/* hover 扫光：白色高光斜掠而过 */
+@mixin ev-shimmer {
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.55),
+      transparent
+    );
+    transform: skewX(-16deg);
+    transition: left 0.6s var(--ev-ease-out);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &:hover::after {
+    left: 130%;
+  }
+}
+
+/* 焦点柔光环 */
+@mixin ev-focus-ring($color: rgba(47, 124, 246, 0.25)) {
+  outline: none;
+  box-shadow: 0 0 0 3px $color;
+}
+
+/* 图片/媒体容器：淡蓝渐变占位 + 内描边，防止浅色图片与浅色卡片糊在一起 */
+@mixin ev-media-frame($radius: var(--ev-radius-lg)) {
+  position: relative;
+  overflow: hidden;
+  border-radius: $radius;
+  background: linear-gradient(135deg, var(--ev-mist) 0%, #ffffff 100%);
+  box-shadow: inset 0 0 0 1px var(--ev-border-default), var(--ev-shadow-xs);
+}

@@ -1,0 +1,28 @@
+# sensitive config (plaintext secrets) - never commit
+evernox-backend/config/application.yml
+
+# runtime data (uploaded images)
+evernox-backend/data/
+
+# JWT key pair (duplicate copy at repo root)
+/jwt-keys/
+
+# frontend build artifacts and dependencies
+evernox-frontend/node_modules/
+evernox-frontend/dist/
+
+# nginx binary distribution (deployment, not source)
+/nginx-1.30.4/
+
+# comate local spec docs
+/.comate/
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

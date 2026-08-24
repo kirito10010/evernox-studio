@@ -1,0 +1,103 @@
+server:
+  port: 11002
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: evernox-backend
+  profiles:
+    active: dev
+    
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/evernox_backend?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${EVERNOX_DB_USERNAME:root}
+    password: ${EVERNOX_DB_PASSWORD}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      pool-name: EverNoxHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      # 启动时最多等 60 秒让 MySQL 就绪，避免开机时序竞争导致后端直接崩
+      initialization-fail-timeout: 60000
+      
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 10000ms
+
+  # 邮件发送（邮箱找回密码）。账号/授权码走外置 config/application.yml 覆盖，
+  # 此处只放非敏感项与占位符。
+  mail:
+    host: smtp.163.com
+    port: 465
+    protocol: smtps
+    default-encoding: UTF-8
+    username: ${EVERNOX_MAIL_USERNAME}
+    password: ${EVERNOX_MAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: "true"
+      mail.smtp.ssl.enable: "true"
+      mail.smtp.ssl.required: "true"
+      
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: true
+
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
+
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # 不打印 SQL：日志一旦外泄会连表结构与查询条件一起暴露
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath:mapper/*.xml
+
+jwt:
+  access-token-expiration: 3600000
+  refresh-token-expiration: 604800000
+  issuer: evernox
+
+evernox:
+  data-dir: ./data
+  thumbnail:
+    max-width: 400
+    quality: 0.7
+  security:
+    # 允许跨域的前端来源白名单，多个用逗号分隔
+    allowed-origins: ${EVERNOX_ALLOWED_ORIGINS:http://localhost:5211}
+  # 图片落盘编解码配置
+  # 警告: 一旦库中已有图片数据，secret / salt / iterations 都不可再修改，
+  #       改动后已存文件将全部无法解码。
+  # 因此这两项只能改「来源」不能改「值」：必须通过环境变量传入原值。
+  codec:
+    secret: ${EVERNOX_CODEC_SECRET}
+    salt: ${EVERNOX_CODEC_SALT}
+    iterations: 100000
+
+logging:
+  level:
+    com.evernox: info
+    org.springframework.security: info

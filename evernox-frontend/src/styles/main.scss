@@ -1,0 +1,837 @@
+/* ============================================================
+   EverNox — 「碧空薄雾」设计系统
+   Blue-white glassmorphism · misty gradients · subtle light & shadow
+   ============================================================ */
+
+@use './mixins' as *;
+
+/* ---------- Design Tokens ---------- */
+:root {
+  /* Background layers — cool white → pale sky */
+  --ev-bg-deep:         #eef5fd;
+  --ev-bg-surface:      #f7fbff;
+  --ev-bg-elevated:     #ffffff;
+  --ev-bg-glass:        rgba(255, 255, 255, 0.66);
+  --ev-bg-glass-strong: rgba(255, 255, 255, 0.82);
+  --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
+  --ev-bg-tint:         rgba(47, 124, 246, 0.05);
+  --ev-bg-tint-strong:  rgba(47, 124, 246, 0.10);
+
+  /* Palette — clear blue → aqua */
+  --ev-primary:       #2f7cf6;
+  --ev-primary-hover: #1f6ae8;
+  --ev-primary-soft:  #7fb2fb;
+  --ev-aqua:          #4fc3e8;
+  --ev-aqua-soft:     #a5e4f2;
+  --ev-mist:          #cfe6ff;
+  --ev-danger:        #f2637f;
+  --ev-success:       #34c9a3;
+  --ev-warning:       #f5b942;
+
+  /* Legacy aliases — 旧变量名指向新色值，保证历史引用不失效 */
+  --ev-aurora-violet:  #2f7cf6;
+  --ev-aurora-cyan:    #4fc3e8;
+  --ev-aurora-emerald: #7fd8e8;
+  --ev-accent-rose:    #f2637f;
+
+  /* Gradients */
+  --ev-grad-aurora:       linear-gradient(135deg, #2f7cf6 0%, #4fc3e8 55%, #7fd8e8 100%);
+  --ev-grad-aurora-soft:  linear-gradient(135deg, rgba(47,124,246,.14) 0%, rgba(79,195,232,.10) 50%, rgba(165,228,242,.14) 100%);
+  --ev-grad-violet-pink:  linear-gradient(135deg, #2f7cf6 0%, #6f8cf8 100%);
+  --ev-grad-cyan-emerald: linear-gradient(135deg, #4fc3e8 0%, #7fd8e8 100%);
+  --ev-grad-gloss:        linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,.25) 42%, rgba(255,255,255,0) 100%);
+  --ev-grad-mesh:
+    radial-gradient(ellipse 80% 60% at 12% 8%,   rgba(47,124,246,.16), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 88% 12%,  rgba(79,195,232,.14), transparent 60%),
+    radial-gradient(ellipse 90% 70% at 50% 100%, rgba(165,228,242,.18), transparent 65%);
+
+  /* Text — deep indigo instead of pure black */
+  --ev-text-primary:    #12304f;
+  --ev-text-secondary:  #4c6b8a;
+  --ev-text-muted:      #8aa3bb;
+  --ev-text-on-accent:  #ffffff;
+
+  /* Borders — barely-there blue */
+  --ev-border-subtle:  rgba(47, 124, 246, 0.08);
+  --ev-border-default: rgba(47, 124, 246, 0.14);
+  --ev-border-hover:   rgba(47, 124, 246, 0.34);
+  --ev-border-active:  rgba(47, 124, 246, 0.55);
+  --ev-border-gloss:   rgba(255, 255, 255, 0.75);
+
+  /* Shadows — layered, low-opacity blue */
+  --ev-shadow-xs:    0 1px 2px rgba(18, 48, 79, 0.04);
+  --ev-shadow-sm:    0 2px 8px rgba(18, 48, 79, 0.05);
+  --ev-shadow-card:  0 1px 2px rgba(18, 48, 79, 0.04),
+                     0 8px 24px -8px rgba(47, 124, 246, 0.12);
+  --ev-shadow-lg:    0 2px 4px rgba(18, 48, 79, 0.04),
+                     0 12px 32px -10px rgba(47, 124, 246, 0.16),
+                     0 24px 60px -20px rgba(47, 124, 246, 0.14);
+  --ev-shadow-float: 0 20px 50px -16px rgba(47, 124, 246, 0.24);
+  --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                     inset 0 -1px 0 rgba(47, 124, 246, 0.05);
+
+  /* Glow — soft, never dirty on light surfaces */
+  --ev-glow-violet:  0 8px 28px -8px rgba(47, 124, 246, 0.32);
+  --ev-glow-cyan:    0 8px 28px -8px rgba(79, 195, 232, 0.30);
+  --ev-glow-rose:    0 8px 28px -8px rgba(242, 99, 127, 0.28);
+  --ev-glow-emerald: 0 8px 28px -8px rgba(127, 216, 232, 0.28);
+
+  /* Blur presets */
+  --ev-blur-sm: blur(12px) saturate(150%);
+  --ev-blur-md: blur(20px) saturate(160%);
+  --ev-blur-lg: blur(32px) saturate(170%);
+
+  /* Radii */
+  --ev-radius-sm:   8px;
+  --ev-radius-md:   12px;
+  --ev-radius-lg:   16px;
+  --ev-radius-xl:   20px;
+  --ev-radius-2xl:  24px;
+  --ev-radius-pill: 999px;
+
+  /* Transitions */
+  --ev-ease-out:    cubic-bezier(0.4, 0, 0.2, 1);
+  --ev-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---------- Reset ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ev-text-primary);
+  background-color: var(--ev-bg-deep);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Prevent el-row negative gutter overflow */
+.el-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* ---------- Keyframe Animations ---------- */
+
+/* Misty mesh background drift（背景专用，周期拉长以保持轻盈） */
+@keyframes aurora-drift {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 50% 0%; }
+  50%  { background-position: 100% 50%; }
+  75%  { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Floating particle */
+@keyframes float-particle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.18; }
+  25%      { transform: translateY(-30px) translateX(10px); opacity: 0.42; }
+  50%      { transform: translateY(-15px) translateX(-8px); opacity: 0.30; }
+  75%      { transform: translateY(-40px) translateX(5px); opacity: 0.48; }
+}
+
+/* Breathing glow — 亮色下透明度收敛，避免发灰 */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.18; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(1.04); }
+}
+
+/* Shimmer sweep across card */
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%) skewX(-15deg); }
+  100% { transform: translateX(200%) skewX(-15deg); }
+}
+
+/* Skeleton loading shimmer */
+@keyframes ev-skeleton {
+  0%   { background-position: -180% 0; }
+  100% { background-position: 180% 0; }
+}
+
+/* Page transitions */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes page-leave {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Gradient border rotation */
+@keyframes border-rotate {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ev-mist);
+  border-radius: var(--ev-radius-pill);
+  transition: background 0.25s var(--ev-ease-out);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ev-primary-soft);
+}
+
+/* ---------- Links ---------- */
+a {
+  color: var(--ev-primary);
+  text-decoration: none;
+  transition: color 0.25s var(--ev-ease-out);
+  position: relative;
+
+  &:hover {
+    color: var(--ev-primary-hover);
+  }
+}
+
+/* ---------- Focus ring ---------- */
+:focus-visible {
+  @include ev-focus-ring;
+}
+
+/* 表单控件的焦点由输入框自身样式表达，不叠加蓝色柔光环 */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+.el-input__inner:focus,
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible,
+.el-select__wrapper:focus,
+.el-select__wrapper:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ---------- Text selection ---------- */
+::selection {
+  background: rgba(47, 124, 246, 0.18);
+  color: var(--ev-text-primary);
+}
+
+::-moz-selection {
+  background: rgba(47, 124, 246, 0.18);
+  color: var(--ev-text-primary);
+}
+
+/* ---------- Page Transition Classes ---------- */
+.page-fade-enter-active {
+  animation: page-enter 0.35s var(--ev-ease-out) both;
+}
+
+.page-fade-leave-active {
+  animation: page-leave 0.25s var(--ev-ease-out) both;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ============================================================
+   Element Plus — Light Glass Overrides
+   ============================================================ */
+
+/* --- Input / Textarea --- */
+.el-input__wrapper,
+.el-textarea__inner {
+  background-color: rgba(255, 255, 255, 0.78) !important;
+  box-shadow:
+    0 0 0 1px var(--ev-border-default) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(18, 48, 79, 0.03) !important;
+  border-radius: var(--ev-radius-md) !important;
+  transition: all 0.3s var(--ev-ease-out) !important;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    box-shadow:
+      0 0 0 1px var(--ev-border-hover) inset,
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 2px rgba(18, 48, 79, 0.04) !important;
+  }
+}
+
+.el-input__wrapper {
+  &.is-focus {
+    background-color: #ffffff !important;
+    box-shadow:
+      0 0 0 1px var(--ev-border-default) inset,
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+  }
+
+
+
+  .el-input__inner {
+    color: var(--ev-text-primary) !important;
+
+    &::placeholder {
+      color: var(--ev-text-muted) !important;
+    }
+  }
+
+  .el-input__prefix,
+  .el-input__suffix {
+    color: var(--ev-text-muted) !important;
+  }
+
+  .el-input__prefix-inner .el-icon,
+  .el-input__suffix-inner .el-icon {
+    color: var(--ev-text-muted);
+    transition: color 0.25s var(--ev-ease-out);
+  }
+
+  &.is-focus {
+    .el-input__prefix-inner .el-icon {
+      color: var(--ev-primary);
+    }
+  }
+}
+
+/* 高度交给 Element Plus 的尺寸系统，避免外部 padding 叠加导致抖动 */
+.el-input--large .el-input__wrapper {
+  padding: 1px 14px !important;
+}
+
+.el-input--default .el-input__wrapper {
+  padding: 1px 12px !important;
+}
+
+/* 错误态纳入主题：柔和玫红 */
+.el-form-item.is-error {
+  .el-input__wrapper,
+  .el-textarea__inner {
+    background-color: rgba(255, 255, 255, 0.86) !important;
+    box-shadow: 0 0 0 1.5px var(--ev-danger) inset !important;
+  }
+}
+
+/* 浏览器自动填充：用超大 inset 阴影顶掉强制底色 */
+.el-input__inner:-webkit-autofill,
+.el-input__inner:-webkit-autofill:hover,
+.el-input__inner:-webkit-autofill:focus,
+.el-input__inner:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--ev-text-primary) !important;
+  -webkit-box-shadow: inset 0 0 0 1000px rgba(255, 255, 255, 0.94) !important;
+  caret-color: var(--ev-text-primary);
+  transition: background-color 9999s ease-out 0s !important;
+}
+
+.el-textarea__inner {
+  color: var(--ev-text-primary) !important;
+  padding: 10px 14px !important;
+
+  &::placeholder {
+    color: var(--ev-text-muted) !important;
+  }
+
+  &:focus {
+    background-color: #ffffff !important;
+    box-shadow:
+      0 0 0 1px var(--ev-border-default) inset,
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+  }
+}
+
+/* --- Select --- */
+.el-select__wrapper {
+  background-color: var(--ev-bg-glass-light) !important;
+  box-shadow: 0 0 0 1px var(--ev-border-default) inset !important;
+  border-radius: var(--ev-radius-md) !important;
+  color: var(--ev-text-primary) !important;
+
+  &.is-focused {
+    background-color: rgba(255, 255, 255, 0.92) !important;
+    box-shadow:
+      0 0 0 1px var(--ev-border-default) inset,
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+  }
+}
+
+.el-select-dropdown__item {
+  color: var(--ev-text-secondary) !important;
+  border-radius: var(--ev-radius-sm) !important;
+
+  &:hover {
+    background: var(--ev-bg-tint) !important;
+    color: var(--ev-text-primary) !important;
+  }
+
+  &.is-selected {
+    color: var(--ev-primary) !important;
+    background: var(--ev-bg-tint-strong) !important;
+    font-weight: 600 !important;
+  }
+}
+
+/* --- Buttons --- */
+.el-button {
+  border-radius: var(--ev-radius-md) !important;
+  transition: all 0.3s var(--ev-ease-out) !important;
+}
+
+.el-button--primary {
+  background: var(--ev-grad-aurora) !important;
+  border: none !important;
+  color: var(--ev-text-on-accent) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  box-shadow: var(--ev-glow-violet), var(--ev-inset-gloss) !important;
+  position: relative;
+  overflow: hidden;
+  @include ev-shimmer;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -10px rgba(47, 124, 246, 0.42),
+                var(--ev-inset-gloss) !important;
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.is-disabled,
+  &.is-disabled:hover {
+    background: var(--ev-mist) !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    transform: none;
+  }
+}
+
+.el-button--default {
+  background: var(--ev-bg-glass) !important;
+  border: 1px solid var(--ev-border-default) !important;
+  color: var(--ev-text-secondary) !important;
+  backdrop-filter: var(--ev-blur-sm);
+  -webkit-backdrop-filter: var(--ev-blur-sm);
+  box-shadow: var(--ev-shadow-xs) !important;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border-color: var(--ev-border-hover) !important;
+    color: var(--ev-primary) !important;
+    transform: translateY(-1px);
+    box-shadow: var(--ev-shadow-sm) !important;
+  }
+}
+
+.el-button--danger {
+  background: linear-gradient(135deg, #f2637f 0%, #f58aa0 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: var(--ev-glow-rose), var(--ev-inset-gloss) !important;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -10px rgba(242, 99, 127, 0.4) !important;
+  }
+}
+
+.el-button--success {
+  background: linear-gradient(135deg, #34c9a3 0%, #6fdcc0 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: var(--ev-glow-emerald), var(--ev-inset-gloss) !important;
+}
+
+.el-button.is-text,
+.el-button.is-link {
+  background: transparent !important;
+  border: none !important;
+  color: var(--ev-text-secondary) !important;
+  box-shadow: none !important;
+
+  &:hover {
+    color: var(--ev-primary) !important;
+    background: var(--ev-bg-tint) !important;
+  }
+}
+
+.el-button.is-circle {
+  border-radius: var(--ev-radius-pill) !important;
+}
+
+/* --- Card --- */
+.el-card {
+  @include ev-glass(0.66, var(--ev-radius-lg));
+  color: var(--ev-text-primary) !important;
+  background: var(--ev-bg-glass) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  transition: all 0.3s var(--ev-ease-out) !important;
+
+  &:hover {
+    border-color: var(--ev-border-hover) !important;
+    box-shadow: var(--ev-shadow-lg), var(--ev-inset-gloss) !important;
+  }
+
+  .el-card__header {
+    border-bottom: 1px solid var(--ev-border-subtle) !important;
+    color: var(--ev-text-primary) !important;
+  }
+}
+
+/* --- Dialog --- */
+.el-dialog {
+  @include ev-glass-strong(var(--ev-radius-2xl));
+  background: var(--ev-bg-glass-strong) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  box-shadow: var(--ev-shadow-float), var(--ev-inset-gloss) !important;
+
+  .el-dialog__title {
+    color: var(--ev-text-primary) !important;
+    font-weight: 700 !important;
+  }
+
+  .el-dialog__body {
+    color: var(--ev-text-secondary) !important;
+  }
+
+  .el-dialog__headerbtn .el-dialog__close {
+    color: var(--ev-text-muted) !important;
+
+    &:hover {
+      color: var(--ev-primary) !important;
+    }
+  }
+}
+
+.el-overlay {
+  background-color: rgba(18, 48, 79, 0.22) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* --- Drawer --- */
+.el-drawer {
+  background: var(--ev-bg-glass-strong) !important;
+  backdrop-filter: var(--ev-blur-lg);
+  -webkit-backdrop-filter: var(--ev-blur-lg);
+
+  .el-drawer__title {
+    color: var(--ev-text-primary) !important;
+  }
+}
+
+/* --- Popper / Tooltip --- */
+.el-popper.is-light,
+.el-popper.is-dark {
+  background: var(--ev-bg-glass-strong) !important;
+  color: var(--ev-text-primary) !important;
+  border: 1px solid var(--ev-border-default) !important;
+  border-radius: var(--ev-radius-md) !important;
+  backdrop-filter: var(--ev-blur-md);
+  -webkit-backdrop-filter: var(--ev-blur-md);
+  box-shadow: var(--ev-shadow-lg) !important;
+
+  .el-popper__arrow::before {
+    background: var(--ev-bg-glass-strong) !important;
+    border-color: var(--ev-border-default) !important;
+  }
+}
+
+/* --- Dropdown --- */
+.el-dropdown-menu {
+  background: var(--ev-bg-glass-strong) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  backdrop-filter: var(--ev-blur-md) !important;
+  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  border-radius: var(--ev-radius-md) !important;
+  padding: 6px !important;
+  box-shadow: var(--ev-shadow-lg) !important;
+
+  .el-dropdown-menu__item {
+    color: var(--ev-text-secondary) !important;
+    border-radius: var(--ev-radius-sm) !important;
+    margin: 2px 0 !important;
+    transition: all 0.2s ease !important;
+
+    &:hover,
+    &:focus {
+      background: var(--ev-bg-tint) !important;
+      color: var(--ev-primary) !important;
+    }
+
+    &--divided {
+      border-top: 1px solid var(--ev-border-subtle) !important;
+    }
+  }
+}
+
+/* --- Message / MessageBox / Notification --- */
+.el-message,
+.el-notification {
+  background: var(--ev-bg-glass-strong) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  backdrop-filter: var(--ev-blur-md) !important;
+  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  border-radius: var(--ev-radius-md) !important;
+  box-shadow: var(--ev-shadow-lg) !important;
+
+  .el-message__content,
+  .el-notification__content,
+  .el-notification__title {
+    color: var(--ev-text-primary) !important;
+  }
+}
+
+.el-message-box {
+  @include ev-glass-strong(var(--ev-radius-xl));
+  background: var(--ev-bg-glass-strong) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  box-shadow: var(--ev-shadow-float) !important;
+
+  .el-message-box__title,
+  .el-message-box__content {
+    color: var(--ev-text-primary) !important;
+  }
+
+  .el-message-box__headerbtn .el-message-box__close {
+    color: var(--ev-text-muted) !important;
+  }
+}
+
+/* --- Avatar --- */
+.el-avatar {
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: var(--ev-shadow-sm) !important;
+  background: var(--ev-grad-aurora) !important;
+  color: var(--ev-text-on-accent) !important;
+}
+
+/* --- Form --- */
+.el-form-item__label {
+  color: var(--ev-text-secondary) !important;
+}
+
+.el-form-item__error {
+  font-size: 12px !important;
+  color: var(--ev-danger) !important;
+}
+
+/* --- Menu (sidebar) --- */
+.el-menu {
+  border-right: none !important;
+  background: transparent !important;
+}
+
+.el-menu-item,
+.el-sub-menu__title {
+  color: var(--ev-text-secondary) !important;
+  border-radius: var(--ev-radius-md) !important;
+
+  &:hover {
+    background: var(--ev-bg-tint) !important;
+    color: var(--ev-primary) !important;
+  }
+
+  &.is-active {
+    color: var(--ev-primary) !important;
+    background: var(--ev-bg-tint-strong) !important;
+    font-weight: 600 !important;
+  }
+}
+
+.el-menu--popup {
+  background: var(--ev-bg-glass-strong) !important;
+  border: 1px solid var(--ev-border-subtle) !important;
+  border-radius: var(--ev-radius-md) !important;
+  backdrop-filter: var(--ev-blur-md) !important;
+  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  padding: 6px !important;
+  min-width: 160px !important;
+  box-shadow: var(--ev-shadow-lg) !important;
+}
+
+/* --- Pagination --- */
+.el-pagination {
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: var(--ev-text-secondary);
+  --el-pagination-button-color: var(--ev-text-secondary);
+  --el-pagination-hover-color: var(--ev-primary);
+  color: var(--ev-text-secondary) !important;
+
+  .btn-prev,
+  .btn-next,
+  .el-pager li {
+    background: var(--ev-bg-glass-light) !important;
+    border: 1px solid var(--ev-border-subtle) !important;
+    border-radius: var(--ev-radius-sm) !important;
+    color: var(--ev-text-secondary) !important;
+    transition: all 0.25s var(--ev-ease-out) !important;
+
+    &:hover {
+      color: var(--ev-primary) !important;
+      border-color: var(--ev-border-hover) !important;
+      background: rgba(255, 255, 255, 0.8) !important;
+    }
+  }
+
+  .el-pager li.is-active {
+    background: var(--ev-grad-aurora) !important;
+    border-color: transparent !important;
+    color: var(--ev-text-on-accent) !important;
+    box-shadow: var(--ev-glow-violet) !important;
+  }
+}
+
+/* --- Tag --- */
+.el-tag {
+  background: var(--ev-bg-tint) !important;
+  border: 1px solid var(--ev-border-default) !important;
+  color: var(--ev-primary) !important;
+  border-radius: var(--ev-radius-pill) !important;
+
+  &.el-tag--danger {
+    background: rgba(242, 99, 127, 0.10) !important;
+    border-color: rgba(242, 99, 127, 0.24) !important;
+    color: var(--ev-danger) !important;
+  }
+
+  &.el-tag--success {
+    background: rgba(52, 201, 163, 0.10) !important;
+    border-color: rgba(52, 201, 163, 0.24) !important;
+    color: var(--ev-success) !important;
+  }
+}
+
+/* --- Switch --- */
+.el-switch {
+  --el-switch-off-color: var(--ev-mist);
+  --el-switch-on-color: var(--ev-primary);
+}
+
+/* --- Progress --- */
+.el-progress-bar__outer {
+  background-color: var(--ev-mist) !important;
+}
+
+.el-progress-bar__inner {
+  background: var(--ev-grad-aurora) !important;
+}
+
+.el-progress__text {
+  color: var(--ev-text-secondary) !important;
+}
+
+/* --- Checkbox / Radio --- */
+.el-checkbox,
+.el-radio {
+  --el-checkbox-checked-bg-color: var(--ev-primary);
+  --el-checkbox-checked-input-border-color: var(--ev-primary);
+  --el-radio-input-border-color-hover: var(--ev-primary);
+  color: var(--ev-text-secondary) !important;
+
+  .el-checkbox__label,
+  .el-radio__label {
+    color: var(--ev-text-secondary) !important;
+  }
+
+  .el-checkbox__inner,
+  .el-radio__inner {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border-color: var(--ev-border-hover) !important;
+  }
+
+  &.is-checked {
+    .el-checkbox__inner,
+    .el-radio__inner {
+      background: var(--ev-primary) !important;
+      border-color: var(--ev-primary) !important;
+    }
+  }
+}
+
+/* --- Empty --- */
+.el-empty {
+  .el-empty__description p {
+    color: var(--ev-text-muted) !important;
+  }
+}
+
+/* --- Upload --- */
+.el-upload-dragger {
+  background: var(--ev-bg-glass-light) !important;
+  border: 1.5px dashed var(--ev-border-hover) !important;
+  border-radius: var(--ev-radius-lg) !important;
+  color: var(--ev-text-secondary) !important;
+  transition: all 0.3s var(--ev-ease-out) !important;
+
+  &:hover {
+    border-color: var(--ev-primary) !important;
+    background: var(--ev-bg-tint) !important;
+  }
+}
+
+/* --- Loading --- */
+.el-loading-mask {
+  background-color: rgba(255, 255, 255, 0.62) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.el-loading-spinner .path {
+  stroke: var(--ev-primary) !important;
+}
+
+.el-loading-spinner .el-loading-text {
+  color: var(--ev-text-secondary) !important;
+}
+
+/* --- Skeleton --- */
+.el-skeleton__item {
+  background: linear-gradient(90deg, var(--ev-mist) 25%, #ffffff 37%, var(--ev-mist) 63%) !important;
+  background-size: 400% 100% !important;
+}
+
+/* --- Divider --- */
+.el-divider {
+  border-color: var(--ev-border-subtle) !important;
+
+  .el-divider__text {
+    background: transparent !important;
+    color: var(--ev-text-muted) !important;
+  }
+}

@@ -3,7 +3,11 @@ import type {
   AdminUserCreateRequest,
   AdminUserListParams,
   AdminUserUpdateRequest,
+  RechargePointsRequest,
+  RedemptionCode,
+  RedemptionCodeGenerateRequest,
   Result,
+  SetSuperMemberRequest,
   UserInfoResponse,
   UserStats,
 } from '@/types/user'
@@ -68,4 +72,26 @@ export const deleteAdminUser = (id: number): Promise<Result<void>> => {
 /** 批量删除 */
 export const deleteAdminUsers = (ids: number[]): Promise<Result<void>> => {
   return del(`/admin/user/batch?ids=${ids.join(',')}`)
+}
+
+/** 充值积分 */
+export const rechargePoints = (data: RechargePointsRequest): Promise<Result<void>> => {
+  return post('/admin/points/recharge', data)
+}
+
+/** 设置超级会员时长 */
+export const setSuperMember = (data: SetSuperMemberRequest): Promise<Result<void>> => {
+  return post('/admin/points/set-super-member', data)
+}
+
+/** 生成卡密 */
+export const generateRedemptionCodes = (
+  data: RedemptionCodeGenerateRequest
+): Promise<Result<RedemptionCode[]>> => {
+  return post('/admin/redemption/generate', data)
+}
+
+/** 卡密列表 */
+export const getRedemptionCodes = (): Promise<Result<RedemptionCode[]>> => {
+  return get('/admin/redemption/list')
 }

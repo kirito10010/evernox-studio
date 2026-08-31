@@ -81,6 +81,8 @@ public class SecurityConfig {
                 
                 // 管理员接口：URL 级防线，与控制器类级 @PreAuthorize 形成纵深
                 // 必须写在 anyRequest() 之前，Spring Security 先命中先生效
+                // 组织积分管理开放给 admin + super_member
+                .requestMatchers("/admin/org/**").hasAnyRole("admin", "super_member")
                 .requestMatchers("/admin/**").hasRole("admin")
 
                 // 其他请求需要认证

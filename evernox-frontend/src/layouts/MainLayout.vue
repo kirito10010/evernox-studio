@@ -87,6 +87,10 @@
               <el-icon><QuestionFilled /></el-icon>
               <template #title>忍者测验</template>
             </el-menu-item>
+            <el-menu-item index="/naruto/org-points">
+              <el-icon><DataAnalysis /></el-icon>
+              <template #title>组织积分</template>
+            </el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu index="workspace">
@@ -135,6 +139,17 @@
             </el-menu-item>
           </el-sub-menu>
 
+          <el-sub-menu index="super-member">
+            <template #title>
+              <el-icon><StarFilled /></el-icon>
+              <span>超级会员</span>
+            </template>
+            <el-menu-item index="/super-member/org">
+              <el-icon><DataAnalysis /></el-icon>
+              <template #title>组织积分</template>
+            </el-menu-item>
+          </el-sub-menu>
+
           <el-sub-menu v-if="userStore.isAdmin" index="admin">
             <template #title>
               <el-icon><Setting /></el-icon>
@@ -167,6 +182,14 @@
             <el-menu-item index="/admin/quiz">
               <el-icon><QuestionFilled /></el-icon>
               <template #title>忍者测验管理</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/points">
+              <el-icon><Money /></el-icon>
+              <template #title>积分与会员管理</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/redemption">
+              <el-icon><Ticket /></el-icon>
+              <template #title>卡密管理</template>
             </el-menu-item>
           </el-sub-menu>
         </el-menu>
@@ -211,6 +234,9 @@
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item command="profile">
+                    <el-icon><User /></el-icon>个人信息
+                  </el-dropdown-item>
                   <el-dropdown-item command="logout">
                     <el-icon><SwitchButton /></el-icon>退出登录
                   </el-dropdown-item>
@@ -261,7 +287,9 @@ const toggleCollapse = () => {
 }
 
 const handleCommand = (command: string) => {
-  if (command === 'logout') {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
     userStore.logout()
     router.push('/login')
   }

@@ -70,4 +70,14 @@ public class User {
      * 最后登录时间
      */
     private LocalDateTime lastLoginAt;
+
+    /**
+     * 超级会员到期时间
+     */
+    private LocalDateTime superMemberExpiresAt;
+
+    /**
+     * 上次签到时间
+     */
+    private LocalDateTime lastSigninAt;
 }

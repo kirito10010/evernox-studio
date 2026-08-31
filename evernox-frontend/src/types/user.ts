@@ -8,6 +8,7 @@ export interface User {
   createdAt: string
   updatedAt: string
   lastLoginAt?: string
+  superMemberExpiresAt?: string
 }
 
 export interface UserInfoResponse {
@@ -19,6 +20,8 @@ export interface UserInfoResponse {
   points: number
   createdAt: string
   lastLoginAt?: string
+  superMemberExpiresAt?: string
+  lastSigninAt?: string
 }
 
 export interface LoginRequest {
@@ -63,7 +66,7 @@ export const UserRoleMap: Record<UserRole, string> = {
   member: '普通成员',
 }
 
-export const UserRoleColor: Record<UserRole, string> = {
+export const UserRoleColor: Record<UserRole, 'danger' | 'warning' | 'info'> = {
   admin: 'danger',
   super_member: 'warning',
   member: 'info',
@@ -107,4 +110,31 @@ export interface UserStats {
   members: number
   superMembers: number
   disabled: number
+}
+
+export interface RechargePointsRequest {
+  userId: number
+  points: number
+  description?: string
+}
+
+export interface SetSuperMemberRequest {
+  userId: number
+  days: number
+}
+
+export interface RedemptionCode {
+  id: number
+  code: string
+  days: number
+  status: number
+  usedBy: number | null
+  username: string | null
+  usedAt: string | null
+  createdAt: string | null
+}
+
+export interface RedemptionCodeGenerateRequest {
+  days: number
+  count: number
 }

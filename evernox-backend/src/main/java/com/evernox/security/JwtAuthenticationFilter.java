@@ -2,6 +2,7 @@ package com.evernox.security;
 
 import com.evernox.common.Result;
 import com.evernox.common.ResultCode;
+import com.evernox.common.UserRole;
 import com.evernox.entity.User;
 import com.evernox.repository.UserRepository;
 import com.evernox.security.JwtTokenProvider.JwtTokenExpiredException;
@@ -63,7 +64,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         return;
                     }
 
-                    String role = user.getRole();
+                    String role = UserRole.effective(user.getRole(), user.getSuperMemberExpiresAt());
 
                     // 创建认证信息
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

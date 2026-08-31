@@ -58,6 +58,16 @@ public class UserInfoResponse {
     private LocalDateTime lastLoginAt;
 
     /**
+     * 超级会员到期时间
+     */
+    private LocalDateTime superMemberExpiresAt;
+
+    /**
+     * 上次签到时间
+     */
+    private LocalDateTime lastSigninAt;
+
+    /**
      * 从 User 实体转换
      */
     public static UserInfoResponse from(User user) {
@@ -74,6 +84,8 @@ public class UserInfoResponse {
                 .points(user.getPoints())
                 .createdAt(user.getCreatedAt())
                 .lastLoginAt(user.getLastLoginAt())
+                .superMemberExpiresAt(user.getSuperMemberExpiresAt())
+                .lastSigninAt(user.getLastSigninAt())
                 .build();
     }
 }

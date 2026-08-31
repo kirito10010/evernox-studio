@@ -30,6 +30,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Home',
         redirect: '/image-host',
       },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/Profile.vue'),
+        meta: { title: '个人信息' },
+      },
       // 图床管理
       {
         path: 'image-host',
@@ -99,6 +105,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/naruto/Quiz.vue'),
         meta: { title: '忍者测验' },
       },
+      {
+        path: 'naruto/org-points',
+        name: 'OrgPoints',
+        component: () => import('@/views/naruto/OrgPoints.vue'),
+        meta: { title: '组织积分' },
+      },
       // 个人工作台
       {
         path: 'workspace/notes',
@@ -155,6 +167,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/topic/TopicCircleDetail.vue'),
         meta: { title: '圈子详情' },
       },
+      // 超级会员
+      {
+        path: 'super-member/org',
+        name: 'SuperMemberOrg',
+        component: () => import('@/views/super-member/SuperMemberOrg.vue'),
+        meta: { title: '组织积分' },
+      },
       // 管理员
       {
         path: 'admin/users',
@@ -198,6 +217,24 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/AdminQuiz.vue'),
         meta: { title: '忍者测验管理', requiresAdmin: true },
       },
+      {
+        path: 'admin/org',
+        name: 'AdminOrg',
+        component: () => import('@/views/admin/AdminOrg.vue'),
+        meta: { title: '组织积分', requiresOrgManage: true },
+      },
+      {
+        path: 'admin/points',
+        name: 'AdminPoints',
+        component: () => import('@/views/admin/AdminPoints.vue'),
+        meta: { title: '积分与会员管理', requiresAdmin: true },
+      },
+      {
+        path: 'admin/redemption',
+        name: 'AdminRedemption',
+        component: () => import('@/views/admin/AdminRedemption.vue'),
+        meta: { title: '卡密管理', requiresAdmin: true },
+      },
     ],
   },
   {
@@ -222,6 +259,8 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
     next('/login')
   } else if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    next('/')
+  } else if (to.meta.requiresOrgManage && !(userStore.isAdmin || userStore.isSuperMember)) {
     next('/')
   } else if ((to.path === '/login' || to.path === '/register') && userStore.isLoggedIn) {
     next('/')

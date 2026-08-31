@@ -1,6 +1,7 @@
 package com.evernox.controller;
 
 import com.evernox.common.Result;
+import com.evernox.common.UserRole;
 import com.evernox.dto.AuthResponse;
 import com.evernox.dto.LoginRequest;
 import com.evernox.dto.PasswordResetConfirmRequest;
@@ -95,7 +96,9 @@ public class AuthController {
             return Result.fail(404, "用户不存在");
         }
         
-        return Result.success(UserInfoResponse.from(user));
+        UserInfoResponse resp = UserInfoResponse.from(user);
+        resp.setRole(UserRole.effective(user.getRole(), user.getSuperMemberExpiresAt()));
+        return Result.success(resp);
     }
 
     /**

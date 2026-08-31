@@ -18,12 +18,44 @@ CREATE TABLE IF NOT EXISTS `user` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `last_login_at` DATETIME NULL COMMENT '最后登录时间',
+    `super_member_expires_at` DATETIME NULL COMMENT '超级会员到期时间',
+    `last_signin_at` DATETIME NULL COMMENT '上次签到时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`),
     UNIQUE KEY `uk_email` (`email`),
     KEY `idx_role` (`role`),
     KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+
+-- 用户积分流水
+CREATE TABLE IF NOT EXISTS `user_points_log` (
+    `id`          BIGINT NOT NULL AUTO_INCREMENT COMMENT '流水ID',
+    `user_id`     BIGINT NOT NULL COMMENT '用户ID',
+    `amount`      INT NOT NULL COMMENT '变动值(正加负减)',
+    `balance`     INT NOT NULL COMMENT '变动后余额',
+    `type`        VARCHAR(30) NOT NULL COMMENT '类型: signin/recharge',
+    `description` VARCHAR(200) NULL COMMENT '说明',
+    `created_by`  BIGINT NULL COMMENT '操作人(充值时为管理员id)',
+    `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户积分流水';
+
+-- 超级会员卡密
+CREATE TABLE IF NOT EXISTS `redemption_code` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '卡密ID',
+    `code`       VARCHAR(32) NOT NULL COMMENT '卡密',
+    `days`       INT NOT NULL COMMENT '时长天数: 7或30',
+    `status`     TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0未使用/1已使用',
+    `used_by`    BIGINT NULL COMMENT '使用账户ID',
+    `used_at`    DATETIME NULL COMMENT '使用时间',
+    `created_by` BIGINT NULL COMMENT '生成管理员ID',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_code` (`code`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='超级会员卡密';
 
 -- 图片表
 CREATE TABLE IF NOT EXISTS `image` (
@@ -532,3 +564,119 @@ ALTER TABLE `hyol_ninja` ADD COLUMN IF NOT EXISTS `avatar_url3` VARCHAR(256) NUL
 -- 不插入任何账号记录。管理员通过注册普通账号后手动提权产生：
 -- UPDATE `user` SET `role` = 'admin' WHERE `username` = '你的账号';
 -- 改完需重新登录，role 写在 JWT 里，旧 token 仍是原角色。
+
+-- 组织
+CREATE TABLE IF NOT EXISTS `org_organization` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '组织ID',
+    `name`       VARCHAR(50) NOT NULL COMMENT '组织名称',
+    `owner_id`   BIGINT NULL COMMENT '创建者管理员ID(user.id)',
+    `deleted`    TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织';
+
+-- 组织成员关系（平台用户 ↔ 组织，用于看板可见性与加入审批）
+CREATE TABLE IF NOT EXISTS `org_user_member` (
+    `id`              BIGINT NOT NULL AUTO_INCREMENT COMMENT '关系ID',
+    `organization_id` BIGINT NOT NULL COMMENT '组织ID',
+    `user_id`         BIGINT NOT NULL COMMENT '平台用户ID',
+    `status`          TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0待审批/1已加入/2已拒绝',
+    `applied_at`      DATETIME NULL COMMENT '申请时间',
+    `reviewed_at`     DATETIME NULL COMMENT '审批时间',
+    `reviewed_by`     BIGINT NULL COMMENT '审批管理员ID',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_org_user` (`organization_id`, `user_id`),
+    KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织成员关系(平台用户)';
+
+-- 组织成员（火影忍者OL 组织积分）
+CREATE TABLE IF NOT EXISTS `org_member` (
+    `id`              BIGINT NOT NULL AUTO_INCREMENT COMMENT '成员ID',
+    `organization_id` BIGINT NOT NULL COMMENT '所属组织ID',
+    `name`            VARCHAR(50) NOT NULL COMMENT '玩家名',
+    `position`        VARCHAR(50) NULL COMMENT '职务',
+    `status`          TINYINT NOT NULL DEFAULT 1 COMMENT '成员状态: 1在组织/0已离开',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_name` (`name`),
+    KEY `idx_organization` (`organization_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织成员';
+
+-- 组织积分换算比（每个组织一行）
+CREATE TABLE IF NOT EXISTS `org_points_config` (
+    `id`                      BIGINT NOT NULL AUTO_INCREMENT COMMENT '配置ID',
+    `organization_id`         BIGINT NOT NULL COMMENT '所属组织ID',
+    `ninja_battle_points`     DECIMAL(14,5) NOT NULL DEFAULT 20 COMMENT '忍战次数: 每1次积分',
+    `ninja_battle_enabled`    TINYINT NOT NULL DEFAULT 1 COMMENT '忍战次数: 是否启用 0否/1是',
+    `total_power_points`      DECIMAL(14,5) NOT NULL DEFAULT 0.00005 COMMENT '总战力: 每1战力积分',
+    `total_power_enabled`     TINYINT NOT NULL DEFAULT 1 COMMENT '总战力: 是否启用 0否/1是',
+    `power_increase_points`   DECIMAL(14,5) NOT NULL DEFAULT 0 COMMENT '战力增幅: 每1战力积分',
+    `power_increase_enabled`  TINYINT NOT NULL DEFAULT 1 COMMENT '战力增幅: 是否启用 0否/1是',
+    `copper_points`           DECIMAL(14,5) NOT NULL DEFAULT 0.02 COMMENT '铜币贡献: 每1积分',
+    `copper_enabled`          TINYINT NOT NULL DEFAULT 1 COMMENT '铜币贡献: 是否启用 0否/1是',
+    `beast_points`            DECIMAL(14,5) NOT NULL DEFAULT 0.01 COMMENT '通灵兽献祭: 每1积分',
+    `beast_enabled`           TINYINT NOT NULL DEFAULT 1 COMMENT '通灵兽献祭: 是否启用 0否/1是',
+    `renegade_points`         DECIMAL(14,5) NOT NULL DEFAULT 3 COMMENT '叛忍: 每1次积分',
+    `renegade_enabled`        TINYINT NOT NULL DEFAULT 1 COMMENT '叛忍: 是否启用 0否/1是',
+    `renegade_leader_bonus`   DECIMAL(14,5) NOT NULL DEFAULT 50 COMMENT '叛忍车头额外积分',
+    `renegade_leader_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '叛忍车头: 是否启用 0否/1是',
+    `no_package_adjustment`   DECIMAL(14,5) NOT NULL DEFAULT 0 COMMENT '未领礼包玩家积分继承调整(可正可负)',
+    `ninja_battle_visible`    TINYINT NOT NULL DEFAULT 1 COMMENT '忍战次数: 是否显示列 0否/1是',
+    `total_power_visible`     TINYINT NOT NULL DEFAULT 1 COMMENT '总战力: 是否显示列 0否/1是',
+    `power_increase_visible`  TINYINT NOT NULL DEFAULT 1 COMMENT '战力增幅: 是否显示列 0否/1是',
+    `copper_visible`          TINYINT NOT NULL DEFAULT 1 COMMENT '铜币贡献: 是否显示列 0否/1是',
+    `beast_visible`           TINYINT NOT NULL DEFAULT 1 COMMENT '通灵兽献祭: 是否显示列 0否/1是',
+    `renegade_visible`        TINYINT NOT NULL DEFAULT 1 COMMENT '叛忍: 是否显示列 0否/1是',
+    `renegade_leader_visible` TINYINT NOT NULL DEFAULT 1 COMMENT '叛忍车头: 是否显示列 0否/1是',
+    `updated_at`              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_organization` (`organization_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织积分换算比配置';
+
+-- 组织奖励礼包
+CREATE TABLE IF NOT EXISTS `org_reward_package` (
+    `id`              BIGINT NOT NULL AUTO_INCREMENT COMMENT '礼包ID',
+    `organization_id` BIGINT NOT NULL COMMENT '所属组织ID',
+    `name`            VARCHAR(50) NOT NULL COMMENT '礼包名称',
+    `deduction_ratio` DECIMAL(5,4) NOT NULL DEFAULT 0 COMMENT '扣除比例(0~1)',
+    `sort_order`      INT NOT NULL DEFAULT 0 COMMENT '排序',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_organization` (`organization_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织奖励礼包';
+
+-- 组织每周成员记录
+CREATE TABLE IF NOT EXISTS `org_week_record` (
+    `id`                    BIGINT NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    `organization_id`       BIGINT NULL COMMENT '组织ID快照',
+    `organization_name`     VARCHAR(50) NULL COMMENT '组织名称快照',
+    `week_date`             DATE NOT NULL COMMENT '本周周日',
+    `member_id`             BIGINT NULL COMMENT '成员ID(成员删除后置空，保留快照)',
+    `member_name`           VARCHAR(50) NOT NULL COMMENT '玩家名快照',
+    `position`              VARCHAR(50) NULL COMMENT '职务快照',
+    `ninja_battle_count`    INT NULL COMMENT '忍战次数',
+    `total_power`           INT NULL COMMENT '总战力',
+    `power_increase`        INT NULL COMMENT '战力增幅',
+    `copper_contribution`   INT NULL COMMENT '铜币贡献',
+    `beast_sacrifice`       INT NULL COMMENT '通灵兽献祭',
+    `renegade_count`        INT NULL COMMENT '叛忍次数',
+    `is_renegade_leader`    TINYINT NOT NULL DEFAULT 0 COMMENT '是否叛忍车头: 0否/1是',
+    `last_week_points`      DECIMAL(14,5) NOT NULL DEFAULT 0 COMMENT '上周剩余积分',
+    `this_week_points`      DECIMAL(14,5) NULL COMMENT '本周积分',
+    `total_points`          DECIMAL(14,5) NULL COMMENT '总积分',
+    `deduction_ratio`       DECIMAL(5,4) NULL COMMENT '扣除比例(来自礼包)',
+    `points_after_deduction` DECIMAL(14,5) NULL COMMENT '扣除后总积分',
+    `reward_package_id`     BIGINT NULL COMMENT '奖励礼包ID',
+    `reward_package_name`   VARCHAR(50) NULL COMMENT '礼包名称快照',
+    `created_at`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_week_member` (`week_date`, `member_id`),
+    KEY `idx_week_date` (`week_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织每周成员记录';

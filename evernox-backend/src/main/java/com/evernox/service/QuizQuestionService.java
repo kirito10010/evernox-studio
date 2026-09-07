@@ -23,7 +23,8 @@ public interface QuizQuestionService {
 
     // ==================== 管理员侧 ====================
 
-    IPage<QuizQuestionResponse> list(int page, int size, Integer status, String keyword);
+    IPage<QuizQuestionResponse> list(int page, int size, Integer status, String keyword,
+                                     String startDate, String endDate, String sortField, String sortOrder);
 
     QuizQuestionResponse create(QuizQuestionRequest request);
 

@@ -36,11 +36,21 @@ export const deleteAnnouncementTag = (id: number): Promise<Result<void>> => {
 
 // ========== 管理员 - 公告 ==========
 
+/** 拼接查询串，跳过空值 */
+const buildQuery = (params: Record<string, unknown>): string => {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    search.append(key, String(value))
+  }
+  const qs = search.toString()
+  return qs ? `?${qs}` : ''
+}
+
 export const getAdminAnnouncementList = (
   params: AnnouncementAdminListParams
 ): Promise<Result<PageResult<AnnouncementResponse>>> => {
-  const kw = params.keyword ? `&keyword=${encodeURIComponent(params.keyword)}` : ''
-  return get(`/admin/announcement/list?page=${params.page}&size=${params.size}${kw}`)
+  return get(`/admin/announcement/list${buildQuery({ ...params })}`)
 }
 
 export const createAnnouncement = (

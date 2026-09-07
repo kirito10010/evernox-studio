@@ -86,6 +86,12 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  const setPoints = (points: number) => {
+    if (userInfo.value) {
+      userInfo.value.points = points
+    }
+  }
+
   return {
     token,
     refreshToken: refreshTokenValue,
@@ -100,5 +106,6 @@ export const useUserStore = defineStore('user', () => {
     register,
     logout,
     fetchUserInfo,
+    setPoints,
   }
 })

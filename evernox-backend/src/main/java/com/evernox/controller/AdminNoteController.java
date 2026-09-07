@@ -29,14 +29,20 @@ public class AdminNoteController {
     private final AdminNoteService adminNoteService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    /** 笔记列表：支持状态与关键词 */
+    /** 笔记列表：支持状态、关键词、作者、时间区间与排序 */
     @GetMapping("/list")
     public Result<IPage<NoteResponse>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(adminNoteService.listNotes(page, size, status, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(adminNoteService.listNotes(
+                page, size, status, keyword, username, startDate, endDate, sortField, sortOrder));
     }
 
     /** 详情（含正文），审批前阅读用 */

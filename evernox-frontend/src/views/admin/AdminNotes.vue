@@ -26,6 +26,14 @@
         @input="onKeywordInput"
         @clear="applyFilters"
       />
+      <el-input
+        v-model="username"
+        class="filter-item"
+        placeholder="作者"
+        clearable
+        @input="onUsernameInput"
+        @clear="applyFilters"
+      />
       <el-select
         v-if="activeTab === 'all'"
         v-model="statusFilter"
@@ -35,6 +43,26 @@
         @change="applyFilters"
       >
         <el-option v-for="(label, value) in NoteStatusMap" :key="value" :label="label" :value="Number(value)" />
+      </el-select>
+      <el-date-picker
+        v-model="dateRange"
+        type="daterange"
+        value-format="YYYY-MM-DD"
+        range-separator="~"
+        start-placeholder="提交起"
+        end-placeholder="止"
+        class="filter-date"
+        @change="applyFilters"
+      />
+      <el-select v-model="sortField" class="filter-item" placeholder="默认排序" @change="applyFilters">
+        <el-option label="默认排序" value="" />
+        <el-option label="提交时间" value="submittedAt" />
+        <el-option label="更新时间" value="updatedAt" />
+        <el-option label="创建时间" value="createdAt" />
+      </el-select>
+      <el-select v-model="sortOrder" class="filter-order" @change="applyFilters">
+        <el-option label="降序" value="desc" />
+        <el-option label="升序" value="asc" />
       </el-select>
     </div>
 
@@ -53,7 +81,9 @@
           <el-tag :type="statusTagType(row.status)" size="small">{{ NoteStatusMap[row.status] }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="submittedAt" label="提交时间" width="170" />
+      <el-table-column label="提交时间" width="170">
+        <template #default="{ row }">{{ formatDateTime(row.submittedAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openPreview(row as Note)">查看</el-button>
@@ -78,7 +108,7 @@
     <el-drawer v-model="previewVisible" :title="preview?.title || '笔记预览'" size="720px" @closed="preview = null">
       <div v-if="preview" class="preview-meta">
         <span>作者 {{ preview.ownerName || '—' }}</span>
-        <span>提交于 {{ preview.submittedAt || '—' }}</span>
+        <span>提交于 {{ formatDateTime(preview.submittedAt) }}</span>
       </div>
       <RichTextViewer v-if="preview && previewVisible" :html="preview.content || ''" :loader="decryptImage" />
       <el-empty v-else-if="!previewLoading" description="空白笔记" />
@@ -113,15 +143,26 @@ const activeTab = ref('pending')
 const notes = ref<Note[]>([])
 const loading = ref(false)
 const keyword = ref('')
+const username = ref('')
 const statusFilter = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const dateRange = ref<[string, string] | null>(null)
+const sortField = ref<'submittedAt' | 'updatedAt' | 'createdAt' | ''>('')
+const sortOrder = ref<'asc' | 'desc'>('desc')
 const stats = ref<NoteStats>({ mine: null, pending: null, published: null, rejected: null })
 
 const previewVisible = ref(false)
 const previewLoading = ref(false)
 const preview = ref<Note | null>(null)
+
+const formatDateTime = (value: string | null): string => {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const statusTagType = (status: number) => {
   switch (status) {
@@ -143,6 +184,11 @@ const loadNotes = async () => {
       size: pageSize.value,
       status: activeTab.value === 'pending' ? NoteStatus.PENDING : statusFilter.value,
       keyword: keyword.value.trim() || undefined,
+      username: username.value.trim() || undefined,
+      startDate: dateRange.value?.[0],
+      endDate: dateRange.value?.[1],
+      sortField: sortField.value || undefined,
+      sortOrder: sortField.value ? sortOrder.value : undefined,
     })
     notes.value = res.data?.records || []
     total.value = res.data?.total || 0
@@ -175,6 +221,12 @@ let keywordTimer: ReturnType<typeof setTimeout> | null = null
 const onKeywordInput = () => {
   if (keywordTimer) clearTimeout(keywordTimer)
   keywordTimer = setTimeout(applyFilters, 300)
+}
+
+let usernameTimer: ReturnType<typeof setTimeout> | null = null
+const onUsernameInput = () => {
+  if (usernameTimer) clearTimeout(usernameTimer)
+  usernameTimer = setTimeout(applyFilters, 300)
 }
 
 const openPreview = async (note: Note) => {
@@ -255,7 +307,11 @@ onMounted(() => {
   void loadStats()
 })
 
-onUnmounted(clearCache)
+onUnmounted(() => {
+  clearCache()
+  if (keywordTimer) clearTimeout(keywordTimer)
+  if (usernameTimer) clearTimeout(usernameTimer)
+})
 </script>
 <style scoped lang="scss">
 .admin-notes {
@@ -308,6 +364,12 @@ onUnmounted(clearCache)
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+
+  :deep(.filter-date) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .search {
@@ -316,6 +378,10 @@ onUnmounted(clearCache)
 
 .filter-item {
   width: 150px;
+}
+
+.filter-order {
+  width: 110px;
 }
 
 .note-cell {

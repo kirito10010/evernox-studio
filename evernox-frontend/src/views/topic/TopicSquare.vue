@@ -1,8 +1,11 @@
 <template>
   <div class="topic-square">
-    <div class="page-header">
-      <h2>广场</h2>
-      <p>所有话题圈的帖子都在这里</p>
+    <div class="square-hero">
+      <div class="hero-text">
+        <h2>广场</h2>
+        <p>所有话题圈的帖子都在这里</p>
+      </div>
+      <div class="hero-badge">🔥 实时热帖 · 发现同好</div>
     </div>
 
     <div class="square-layout">
@@ -154,18 +157,37 @@ onBeforeUnmount(clearCache)
 
 <style scoped lang="scss">
 .topic-square {
-  .page-header {
-    h2 {
-      margin: 0;
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--ev-text-primary);
+  .square-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 24px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(47, 124, 246, 0.1), rgba(79, 195, 232, 0.08));
+    border: 1px solid var(--ev-border-subtle);
+    margin-bottom: 4px;
+
+    .hero-text {
+      h2 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--ev-text-primary);
+      }
+
+      p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--ev-text-muted);
+      }
     }
 
-    p {
-      margin: 6px 0 0;
-      font-size: 13px;
-      color: var(--ev-text-muted);
+    .hero-badge {
+      font-size: 12px;
+      color: var(--ev-primary);
+      background: rgba(47, 124, 246, 0.1);
+      padding: 6px 12px;
+      border-radius: 999px;
     }
   }
 
@@ -173,7 +195,8 @@ onBeforeUnmount(clearCache)
     display: flex;
     gap: 20px;
     align-items: flex-start;
-    margin-top: 18px;
+    margin: 18px auto 0;
+    max-width: 1100px;
   }
 
   .square-main {
@@ -229,16 +252,37 @@ onBeforeUnmount(clearCache)
 
     .rank-card {
       padding: 14px 16px;
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--el-bg-color);
       border: 1px solid var(--ev-border-subtle);
       margin-bottom: 14px;
+      box-shadow: var(--ev-shadow-xs);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--ev-shadow-sm);
+      }
 
       .rank-title {
+        position: relative;
+        padding-left: 12px;
         font-size: 14px;
         font-weight: 600;
         color: var(--ev-text-primary);
         margin-bottom: 10px;
+
+        &::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 16px;
+          border-radius: 2px;
+          background: var(--ev-grad-aurora);
+        }
       }
 
       .rank-list {

@@ -15,10 +15,11 @@ public interface AdminSiteService {
 
     /** 全量站点列表 */
     IPage<SiteLinkResponse> listSites(int page, int size, Integer status, Long userId,
-                                      String keyword, String sortField, String sortOrder);
+                                      String keyword, String username, String startDate, String endDate,
+                                      String sortField, String sortOrder);
 
-    /** 审批通过：打标签 + 转公开 */
-    void approve(Long id, List<Long> tagIds, Long adminId);
+    /** 审批通过：打标签 + 设权重 + 转公开 */
+    void approve(Long id, List<Long> tagIds, Integer weight, Long adminId);
 
     /** 审批驳回：必须写原因 */
     void reject(Long id, String reason, Long adminId);
@@ -28,6 +29,9 @@ public interface AdminSiteService {
 
     /** 调整已公开站点的标签 */
     void updateTags(Long id, List<Long> tagIds);
+
+    /** 调整已公开站点的权重 */
+    void updateWeight(Long id, Integer weight);
 
     /** 标签库列表（带关联站点数） */
     List<SiteTagResponse> listTags();

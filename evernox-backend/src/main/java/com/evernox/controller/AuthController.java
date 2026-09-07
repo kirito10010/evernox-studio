@@ -13,14 +13,17 @@ import com.evernox.security.JwtTokenProvider;
 import com.evernox.service.AuthService;
 import com.evernox.service.PasswordResetService;
 import com.evernox.service.UserService;
+import com.evernox.service.VisitLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * 认证控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -30,6 +33,7 @@ public class AuthController {
     private final UserService userService;
     private final PasswordResetService passwordResetService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final VisitLogService visitLogService;
 
     /**
      * 用户注册
@@ -45,8 +49,19 @@ public class AuthController {
      */
     @PostMapping("/login")
     public Result<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
-        AuthResponse response = authService.login(request, resolveClientIp(servletRequest));
+        String ip = resolveClientIp(servletRequest);
+        AuthResponse response = authService.login(request, ip);
+        recordLoginEvent(response, ip, servletRequest.getHeader("User-Agent"));
         return Result.success("登录成功", response);
+    }
+
+    private void recordLoginEvent(AuthResponse response, String ip, String userAgent) {
+        try {
+            Long userId = jwtTokenProvider.getUserIdFromToken(response.getAccessToken());
+            visitLogService.recordLogin(userId, ip, userAgent);
+        } catch (Exception e) {
+            log.warn("记录登录事件失败: {}", e.getMessage());
+        }
     }
 
     /**

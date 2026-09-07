@@ -9,7 +9,9 @@ import com.evernox.dto.NoteStatsResponse;
  */
 public interface AdminNoteService {
 
-    IPage<NoteResponse> listNotes(int page, int size, Integer status, String keyword);
+    IPage<NoteResponse> listNotes(int page, int size, Integer status, String keyword,
+                                  String username, String startDate, String endDate,
+                                  String sortField, String sortOrder);
 
     /** 详情：管理员可看任意笔记正文，用于审批前阅读 */
     NoteResponse getById(Long id);

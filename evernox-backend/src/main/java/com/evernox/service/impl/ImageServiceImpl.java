@@ -8,10 +8,13 @@ import com.evernox.config.StorageConfig;
 import com.evernox.dto.ImageResponse;
 import com.evernox.dto.ImageUploadRequest;
 import com.evernox.dto.StorageStatsResponse;
+import com.evernox.dto.UserOptionResponse;
+import com.evernox.entity.Album;
 import com.evernox.entity.Image;
 import com.evernox.entity.ImageAlbum;
 import com.evernox.entity.User;
 import com.evernox.exception.BusinessException;
+import com.evernox.repository.AlbumRepository;
 import com.evernox.repository.ImageAlbumRepository;
 import com.evernox.repository.ImageRepository;
 import com.evernox.repository.UserRepository;
@@ -32,9 +35,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -63,6 +69,7 @@ public class ImageServiceImpl implements ImageService {
     private final ImageRepository imageRepository;
     private final ImageAlbumRepository imageAlbumRepository;
     private final UserRepository userRepository;
+    private final AlbumRepository albumRepository;
     private final StorageConfig storageConfig;
     private final ImageCodec imageCodec;
 
@@ -173,35 +180,147 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
-    public IPage<ImageResponse> getUserImages(Long userId, Page<Image> page) {
+    public IPage<ImageResponse> getUserImages(Long userId, Page<Image> page,
+                                              String orientation, String resolution,
+                                              Long albumId, Boolean inAlbum) {
         LambdaQueryWrapper<Image> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Image::getUserId, userId)
                .eq(Image::getPurpose, StorageConfig.PURPOSE_PHOTO)
                .orderByDesc(Image::getCreatedAt);
+        applyFilters(wrapper, orientation, resolution, albumId, inAlbum);
 
-        IPage<Image> result = imageRepository.selectPage(page, wrapper);
-
-        return result.convert(image -> {
-            ImageResponse resp = ImageResponse.from(image);
-            resp.setUploaderName(getUsername(userId));
-            return resp;
-        });
+        IPage<ImageResponse> result = imageRepository.selectPage(page, wrapper)
+                .convert(image -> {
+                    ImageResponse resp = ImageResponse.from(image);
+                    resp.setUploaderName(getUsername(userId));
+                    return resp;
+                });
+        fillAlbumNames(result.getRecords());
+        return result;
     }
 
     @Override
-    public IPage<ImageResponse> getPublicImages(Page<Image> page) {
+    public IPage<ImageResponse> getPublicImages(Page<Image> page,
+                                                String orientation, String resolution,
+                                                Long albumId, Boolean inAlbum, Long authorId,
+                                                Integer seed) {
         LambdaQueryWrapper<Image> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Image::getVisibility, 1)
-               .eq(Image::getPurpose, StorageConfig.PURPOSE_PHOTO)
-               .orderByDesc(Image::getCreatedAt);
+               .eq(Image::getPurpose, StorageConfig.PURPOSE_PHOTO);
+        if (seed != null && seed >= 0) {
+            wrapper.last("ORDER BY RAND(" + seed + ")");
+        } else {
+            wrapper.orderByDesc(Image::getCreatedAt);
+        }
+        if (authorId != null) {
+            wrapper.eq(Image::getUserId, authorId);
+        }
+        applyFilters(wrapper, orientation, resolution, albumId, inAlbum);
 
-        IPage<Image> result = imageRepository.selectPage(page, wrapper);
+        IPage<ImageResponse> result = imageRepository.selectPage(page, wrapper)
+                .convert(image -> {
+                    ImageResponse resp = ImageResponse.from(image);
+                    resp.setUploaderName(getUsername(image.getUserId()));
+                    return resp;
+                });
+        fillAlbumNames(result.getRecords());
+        return result;
+    }
 
-        return result.convert(image -> {
-            ImageResponse resp = ImageResponse.from(image);
-            resp.setUploaderName(getUsername(image.getUserId()));
-            return resp;
-        });
+    @Override
+    public List<UserOptionResponse> getPublicImageAuthors() {
+        QueryWrapper<Image> wrapper = new QueryWrapper<>();
+        wrapper.select("DISTINCT user_id")
+               .eq("visibility", 1)
+               .eq("purpose", StorageConfig.PURPOSE_PHOTO);
+        List<Map<String, Object>> rows = imageRepository.selectMaps(wrapper);
+        List<UserOptionResponse> result = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Object uid = row.get("user_id");
+            if (uid instanceof Number number) {
+                Long userId = number.longValue();
+                result.add(UserOptionResponse.builder()
+                        .id(userId)
+                        .username(getUsername(userId))
+                        .build());
+            }
+        }
+        return result;
+    }
+
+    /** 应用方向 / 分辨率 / 相册筛选 */
+    private void applyFilters(LambdaQueryWrapper<Image> wrapper,
+                              String orientation, String resolution,
+                              Long albumId, Boolean inAlbum) {
+        if ("landscape".equals(orientation)) {
+            wrapper.apply("width > height");
+        } else if ("portrait".equals(orientation)) {
+            wrapper.apply("height > width");
+        } else if ("square".equals(orientation)) {
+            wrapper.apply("width = height");
+        }
+
+        if ("sd".equals(resolution)) {
+            wrapper.apply("LEAST(width, height) < 720");
+        } else if ("hd".equals(resolution)) {
+            wrapper.apply("LEAST(width, height) >= 720 AND LEAST(width, height) < 1080");
+        } else if ("uhd".equals(resolution)) {
+            wrapper.apply("LEAST(width, height) >= 1080");
+        }
+
+        if (albumId != null) {
+            List<Long> imageIds = imageIdsByAlbum(albumId);
+            if (imageIds.isEmpty()) {
+                wrapper.in(Image::getId, -1L);
+            } else {
+                wrapper.in(Image::getId, imageIds);
+            }
+        } else if (Boolean.FALSE.equals(inAlbum)) {
+            List<Long> imageIds = allImageIdsInAlbums();
+            if (imageIds.isEmpty()) {
+                // 没有任何图片在相册，则全部都属于未分类，无需过滤
+            } else {
+                wrapper.notIn(Image::getId, imageIds);
+            }
+        }
+    }
+
+    private List<Long> imageIdsByAlbum(Long albumId) {
+        return imageAlbumRepository.selectList(new LambdaQueryWrapper<ImageAlbum>()
+                .eq(ImageAlbum::getAlbumId, albumId))
+                .stream().map(ImageAlbum::getImageId).toList();
+    }
+
+    private List<Long> allImageIdsInAlbums() {
+        return imageAlbumRepository.selectList(new LambdaQueryWrapper<ImageAlbum>()
+                .select(ImageAlbum::getImageId))
+                .stream().map(ImageAlbum::getImageId).distinct().toList();
+    }
+
+    private void fillAlbumNames(List<ImageResponse> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return;
+        }
+        List<Long> imageIds = responses.stream().map(ImageResponse::getId).toList();
+        List<ImageAlbum> relations = imageAlbumRepository.selectList(new LambdaQueryWrapper<ImageAlbum>()
+                .in(ImageAlbum::getImageId, imageIds));
+        if (relations.isEmpty()) {
+            return;
+        }
+        List<Long> albumIds = relations.stream().map(ImageAlbum::getAlbumId).distinct().toList();
+        Map<Long, String> albumNames = albumRepository.selectList(new LambdaQueryWrapper<Album>()
+                .in(Album::getId, albumIds))
+                .stream().collect(Collectors.toMap(Album::getId, Album::getName));
+        Map<Long, List<String>> namesByImage = new HashMap<>();
+        for (ImageAlbum r : relations) {
+            String name = albumNames.get(r.getAlbumId());
+            if (name != null) {
+                namesByImage.computeIfAbsent(r.getImageId(), k -> new ArrayList<>()).add(name);
+            }
+        }
+        for (ImageResponse resp : responses) {
+            resp.setAlbumNames(namesByImage.getOrDefault(resp.getId(), List.of()));
+        }
     }
 
     @Override

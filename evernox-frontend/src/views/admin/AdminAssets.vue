@@ -905,7 +905,7 @@ onUnmounted(() => {
   border-radius: var(--ev-radius-xl);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   backdrop-filter: var(--ev-blur-md);
   -webkit-backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
@@ -945,7 +945,7 @@ onUnmounted(() => {
 .filter-bar,
 .table-wrap,
 .table-footer {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 16px;
@@ -1005,12 +1005,10 @@ onUnmounted(() => {
   .filter-keyword { flex: 3 1 190px; min-width: 0; }
   .filter-select { flex: 1 1 120px; min-width: 0; max-width: 170px; }
   .filter-order { flex: 1 1 88px; min-width: 0; max-width: 110px; }
-  .filter-date {
-    flex: 2 1 200px;
-    min-width: 0;
-    /* 覆盖 el-date-editor--daterange 的固定 350px */
-    width: auto !important;
-    max-width: 250px;
+  :deep(.filter-date) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
   }
   .filter-reset { flex: 0 0 auto; }
 }
@@ -1054,7 +1052,7 @@ onUnmounted(() => {
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--ev-border-subtle);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--ev-bg-glass-light);
 }
 
 .cover-cell {
@@ -1155,7 +1153,7 @@ onUnmounted(() => {
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--ev-border-subtle);
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--ev-bg-glass-light);
 }
 
 .drawer-meta {

@@ -1,8 +1,10 @@
 package com.evernox.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.evernox.common.ResultCode;
 import com.evernox.dto.TopicCircleRequest;
 import com.evernox.dto.TopicCircleResponse;
 import com.evernox.dto.TopicCommentResponse;
@@ -19,12 +21,15 @@ import com.evernox.repository.UserRepository;
 import com.evernox.service.AdminTopicService;
 import com.evernox.service.TopicCircleService;
 import com.evernox.service.TopicPostService;
+import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,6 +46,22 @@ public class AdminTopicServiceImpl implements AdminTopicService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_BATCH_SIZE = 200;
 
+    /** 排序字段白名单 */
+    private static final Map<String, String> POST_SORT_COLUMNS = Map.of(
+            "createdAt", "created_at",
+            "likeCount", "like_count",
+            "commentCount", "comment_count",
+            "favoriteCount", "favorite_count"
+    );
+    private static final Map<String, String> COMMENT_SORT_COLUMNS = Map.of(
+            "createdAt", "created_at"
+    );
+    private static final Map<String, String> CIRCLE_SORT_COLUMNS = Map.of(
+            "createdAt", "created_at",
+            "postCount", "post_count",
+            "memberCount", "member_count"
+    );
+
     private final TopicCircleService circleService;
     private final TopicPostService postService;
     private final TopicCircleRepository circleRepository;
@@ -51,12 +72,34 @@ public class AdminTopicServiceImpl implements AdminTopicService {
     // ==================== 帖子 ====================
 
     @Override
-    public IPage<TopicPostResponse> listPosts(int page, int size, String keyword) {
-        LambdaQueryWrapper<TopicPost> wrapper = new LambdaQueryWrapper<>();
+    public IPage<TopicPostResponse> listPosts(int page, int size, String keyword, String username, Long circleId,
+                                              String startDate, String endDate, String sortField, String sortOrder) {
+        QueryWrapper<TopicPost> wrapper = new QueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(TopicPost::getTitle, keyword.trim());
+            wrapper.like("title", keyword.trim());
         }
-        wrapper.orderByDesc(TopicPost::getCreatedAt).orderByDesc(TopicPost::getId);
+        if (circleId != null) {
+            wrapper.eq("circle_id", circleId);
+        }
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userIdsByUsername(username);
+            if (uids.isEmpty()) {
+                return emptyPosts(page, size);
+            }
+            wrapper.in("user_id", uids);
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("created_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("created_at", end.plusDays(1).atStartOfDay());
+        }
+
+        String column = SortColumnResolver.resolve(POST_SORT_COLUMNS, sortField, "created_at");
+        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
+        wrapper.orderByDesc("id");
 
         IPage<TopicPost> raw = postRepository.selectPage(newPage(page, size), wrapper);
         Map<Long, String> circleNames = circleNameMap(raw.getRecords());
@@ -71,6 +114,12 @@ public class AdminTopicServiceImpl implements AdminTopicService {
             return resp;
         }).toList());
         return result;
+    }
+
+    private Page<TopicPostResponse> emptyPosts(int page, int size) {
+        Page<TopicPostResponse> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
     }
 
     @Override
@@ -93,12 +142,31 @@ public class AdminTopicServiceImpl implements AdminTopicService {
     // ==================== 评论 ====================
 
     @Override
-    public IPage<TopicCommentResponse> listComments(int page, int size, String keyword) {
-        LambdaQueryWrapper<TopicComment> wrapper = new LambdaQueryWrapper<>();
+    public IPage<TopicCommentResponse> listComments(int page, int size, String keyword, String username,
+                                                    String startDate, String endDate, String sortField, String sortOrder) {
+        QueryWrapper<TopicComment> wrapper = new QueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(TopicComment::getContent, keyword.trim());
+            wrapper.like("content", keyword.trim());
         }
-        wrapper.orderByDesc(TopicComment::getCreatedAt).orderByDesc(TopicComment::getId);
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userIdsByUsername(username);
+            if (uids.isEmpty()) {
+                return emptyComments(page, size);
+            }
+            wrapper.in("user_id", uids);
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("created_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("created_at", end.plusDays(1).atStartOfDay());
+        }
+
+        String column = SortColumnResolver.resolve(COMMENT_SORT_COLUMNS, sortField, "created_at");
+        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
+        wrapper.orderByDesc("id");
 
         IPage<TopicComment> raw = commentRepository.selectPage(newPage(page, size), wrapper);
         Map<Long, String> authorNames = usernameMap(raw.getRecords().stream().map(TopicComment::getUserId).distinct().toList());
@@ -115,6 +183,12 @@ public class AdminTopicServiceImpl implements AdminTopicService {
             return resp;
         }).toList());
         return result;
+    }
+
+    private Page<TopicCommentResponse> emptyComments(int page, int size) {
+        Page<TopicCommentResponse> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
     }
 
     @Override
@@ -145,12 +219,31 @@ public class AdminTopicServiceImpl implements AdminTopicService {
     // ==================== 圈子 ====================
 
     @Override
-    public IPage<TopicCircleResponse> listCircles(int page, int size, String keyword) {
-        LambdaQueryWrapper<TopicCircle> wrapper = new LambdaQueryWrapper<>();
+    public IPage<TopicCircleResponse> listCircles(int page, int size, String keyword, String username,
+                                                  String startDate, String endDate, String sortField, String sortOrder) {
+        QueryWrapper<TopicCircle> wrapper = new QueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(TopicCircle::getName, keyword.trim());
+            wrapper.like("name", keyword.trim());
         }
-        wrapper.orderByDesc(TopicCircle::getId);
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userIdsByUsername(username);
+            if (uids.isEmpty()) {
+                return emptyCircles(page, size);
+            }
+            wrapper.in("owner_id", uids);
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("created_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("created_at", end.plusDays(1).atStartOfDay());
+        }
+
+        String column = SortColumnResolver.resolve(CIRCLE_SORT_COLUMNS, sortField, "created_at");
+        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
+        wrapper.orderByDesc("id");
 
         IPage<TopicCircle> raw = circleRepository.selectPage(newPage(page, size), wrapper);
         Map<Long, String> ownerNames = usernameMap(raw.getRecords().stream().map(TopicCircle::getOwnerId).distinct().toList());
@@ -162,6 +255,12 @@ public class AdminTopicServiceImpl implements AdminTopicService {
             return resp;
         }).toList());
         return result;
+    }
+
+    private Page<TopicCircleResponse> emptyCircles(int page, int size) {
+        Page<TopicCircleResponse> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
     }
 
     @Override
@@ -228,6 +327,26 @@ public class AdminTopicServiceImpl implements AdminTopicService {
         }
         return userRepository.selectBatchIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getUsername));
+    }
+
+    /** 用户名模糊匹配 → 用户ID集合 */
+    private List<Long> userIdsByUsername(String username) {
+        return userRepository.selectList(new LambdaQueryWrapper<User>()
+                        .like(User::getUsername, username.trim()))
+                .stream()
+                .map(User::getId)
+                .toList();
+    }
+
+    private LocalDate parseDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
     }
 
     private <T> Page<T> newPage(int page, int size) {

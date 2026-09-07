@@ -25,6 +25,7 @@ public class SiteLinkResponse {
     private String description;
     private Long coverImageId;
     private Integer status;
+    private Integer weight;
     private String rejectReason;
     private LocalDateTime submittedAt;
     private LocalDateTime reviewedAt;
@@ -49,6 +50,7 @@ public class SiteLinkResponse {
                 .description(site.getDescription())
                 .coverImageId(site.getCoverImageId())
                 .status(site.getStatus())
+                .weight(site.getWeight())
                 .rejectReason(site.getRejectReason())
                 .submittedAt(site.getSubmittedAt())
                 .reviewedAt(site.getReviewedAt())

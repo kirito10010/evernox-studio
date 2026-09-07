@@ -2,7 +2,9 @@ package com.evernox.controller;
 
 import com.evernox.common.Result;
 import com.evernox.dto.OrgImportResponse;
-import com.evernox.dto.OrgMemberImportResponse;
+import com.evernox.dto.OrgMemberImportApplyRequest;
+import com.evernox.dto.OrgMemberImportApplyResponse;
+import com.evernox.dto.OrgMemberImportPreviewResponse;
 import com.evernox.dto.OrgMemberRequest;
 import com.evernox.dto.OrgMemberResponse;
 import com.evernox.dto.OrgMembershipApplicationResponse;
@@ -99,11 +101,16 @@ public class AdminOrgController {
         return Result.success("操作成功", null);
     }
 
-    @PostMapping("/members/import")
-    public Result<OrgMemberImportResponse> importMembers(
+    @PostMapping("/members/import/preview")
+    public Result<OrgMemberImportPreviewResponse> previewMembers(
             @RequestParam("file") MultipartFile file,
             @RequestParam Long organizationId) {
-        return Result.success("导入完成", excelImportService.importMembers(file, organizationId));
+        return Result.success(excelImportService.previewMembers(file, organizationId));
+    }
+
+    @PostMapping("/members/import/apply")
+    public Result<OrgMemberImportApplyResponse> applyMembers(@RequestBody OrgMemberImportApplyRequest request) {
+        return Result.success("导入完成", excelImportService.applyMembers(request));
     }
 
     // ==================== 加入审批 ====================
@@ -111,6 +118,11 @@ public class AdminOrgController {
     @GetMapping("/applications")
     public Result<List<OrgMembershipApplicationResponse>> applications(HttpServletRequest http) {
         return Result.success(membershipService.listApplications(getUserId(http)));
+    }
+
+    @GetMapping("/applications/count")
+    public Result<Long> applicationCount(HttpServletRequest http) {
+        return Result.success(membershipService.countApplications(getUserId(http)));
     }
 
     @PostMapping("/applications/{id}/approve")

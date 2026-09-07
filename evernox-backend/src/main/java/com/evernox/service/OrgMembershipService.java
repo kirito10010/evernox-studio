@@ -20,6 +20,8 @@ public interface OrgMembershipService {
 
     List<OrgMembershipApplicationResponse> listApplications(Long adminId);
 
+    long countApplications(Long adminId);
+
     void approve(Long adminId, Long id);
 
     void reject(Long adminId, Long id);

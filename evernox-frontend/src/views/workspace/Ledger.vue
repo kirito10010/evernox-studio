@@ -28,28 +28,37 @@
       </el-button>
     </div>
 
-    <!-- 曲线图 -->
-    <div class="card chart-card">
-      <div class="card-head">
-        <div class="card-title">消费趋势</div>
-        <div class="chart-tools">
-          <el-select v-model="selectedMonth" placeholder="选择月份" clearable class="month-select" @change="onMonthChange">
-            <el-option label="本月" value="current" />
-            <el-option v-for="m in months" :key="m" :label="formatMonth(m)" :value="m" />
-          </el-select>
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            value-format="YYYY-MM-DD"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            class="range-picker"
-            @change="onRangeChange"
-          />
+    <!-- 图表：趋势 + 分类占比 -->
+    <div class="chart-row">
+      <div class="card chart-card">
+        <div class="card-head">
+          <div class="card-title">消费趋势</div>
+          <div class="chart-tools">
+            <el-select v-model="selectedMonth" placeholder="选择月份" clearable class="month-select" @change="onMonthChange">
+              <el-option label="本月" value="current" />
+              <el-option v-for="m in months" :key="m" :label="formatMonth(m)" :value="m" />
+            </el-select>
+            <el-date-picker
+              v-model="dateRange"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              class="range-picker"
+              @change="onRangeChange"
+            />
+          </div>
         </div>
+        <ExpenseChart :points="chartPoints" :start-date="chartStart" :end-date="chartEnd" />
       </div>
-      <ExpenseChart :points="chartPoints" :start-date="chartStart" :end-date="chartEnd" />
+
+      <div class="card chart-card">
+        <div class="card-head">
+          <div class="card-title">消费分类占比</div>
+        </div>
+        <ExpensePieChart :points="chartPoints" />
+      </div>
     </div>
 
     <!-- 最近消费 -->
@@ -72,7 +81,7 @@
     </div>
 
     <!-- 消费记录弹窗 -->
-    <el-dialog v-model="recordsVisible" title="消费记录" width="760px">
+    <el-dialog v-model="recordsVisible" title="消费记录" width="1100px" align-center body-class="ev-dialog-body">
       <div class="records-toolbar">
         <el-button type="primary" @click="openRecordForm()">
           <el-icon style="margin-right: 4px"><Plus /></el-icon>记账
@@ -130,7 +139,7 @@
     </el-dialog>
 
     <!-- 记一笔 / 编辑消费弹窗 -->
-    <el-dialog v-model="recordFormVisible" :title="editingId ? '编辑消费' : '记一笔'" width="460px">
+    <el-dialog v-model="recordFormVisible" :title="editingId ? '编辑消费' : '记一笔'" width="520px" align-center>
       <el-form label-width="80px">
         <el-form-item label="日期">
           <el-date-picker v-model="form.expenseDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -157,7 +166,7 @@
     </el-dialog>
 
     <!-- 消费类型弹窗 -->
-    <el-dialog v-model="categoryDialogVisible" title="消费类型" width="480px">
+    <el-dialog v-model="categoryDialogVisible" title="消费类型" width="640px" align-center>
       <div class="cat-add-row">
         <el-input v-model="newCategoryName" placeholder="新类型名称" maxlength="50" @keyup.enter="handleAddCategory" />
         <el-button type="primary" :loading="addingCategory" @click="handleAddCategory">添加</el-button>
@@ -187,6 +196,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ExpenseChart from '@/components/ExpenseChart.vue'
+import ExpensePieChart from '@/components/ExpensePieChart.vue'
 import {
   createCategory,
   createRecord,
@@ -548,6 +558,17 @@ onMounted(async () => {
   gap: 14px;
 }
 
+.chart-row {
+  display: grid;
+  grid-template-columns: 2.4fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -599,7 +620,7 @@ onMounted(async () => {
 .card {
   border: 1px solid var(--ev-border-subtle, rgba(47, 124, 246, 0.08));
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--ev-bg-glass);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: 0 1px 2px rgba(18, 48, 79, 0.04), 0 8px 24px -8px rgba(47, 124, 246, 0.12);
@@ -626,14 +647,16 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+
+  :deep(.range-picker) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .month-select {
   width: 140px;
-}
-
-.range-picker {
-  width: 260px;
 }
 
 .record-list {
@@ -650,7 +673,7 @@ onMounted(async () => {
   padding: 10px 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
 
   &:hover {
     border-color: var(--el-color-primary-light-5);
@@ -711,14 +734,16 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+
+  :deep(.f-range) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .f-cat {
   width: 130px;
-}
-
-.f-range {
-  width: 240px;
 }
 
 .f-keyword {
@@ -730,8 +755,6 @@ onMounted(async () => {
   flex-direction: column;
   gap: 6px;
   min-height: 200px;
-  max-height: 420px;
-  overflow-y: auto;
 }
 
 .pagination-wrap {
@@ -763,7 +786,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 320px;
+  max-height: 420px;
   overflow-y: auto;
 }
 
@@ -774,7 +797,7 @@ onMounted(async () => {
   padding: 8px 12px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
 }
 
 .cat-name {

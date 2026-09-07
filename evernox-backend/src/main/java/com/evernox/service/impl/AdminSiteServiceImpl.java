@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.evernox.common.SiteStatus;
+import com.evernox.common.ResultCode;
 import com.evernox.dto.SiteLinkResponse;
 import com.evernox.dto.SiteStatsResponse;
 import com.evernox.dto.SiteTagRequest;
@@ -13,10 +14,12 @@ import com.evernox.dto.SiteTagResponse;
 import com.evernox.entity.SiteLink;
 import com.evernox.entity.SiteLinkTag;
 import com.evernox.entity.SiteTag;
+import com.evernox.entity.User;
 import com.evernox.exception.BusinessException;
 import com.evernox.repository.SiteLinkRepository;
 import com.evernox.repository.SiteLinkTagRepository;
 import com.evernox.repository.SiteTagRepository;
+import com.evernox.repository.UserRepository;
 import com.evernox.service.AdminSiteService;
 import com.evernox.service.ImageService;
 import com.evernox.util.SortColumnResolver;
@@ -27,7 +30,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,18 +55,21 @@ public class AdminSiteServiceImpl implements AdminSiteService {
             "createdAt", "created_at",
             "submittedAt", "submitted_at",
             "reviewedAt", "reviewed_at",
-            "title", "title"
+            "title", "title",
+            "weight", "weight"
     );
 
     private final SiteLinkRepository siteLinkRepository;
     private final SiteTagRepository siteTagRepository;
     private final SiteLinkTagRepository siteLinkTagRepository;
+    private final UserRepository userRepository;
     private final ImageService imageService;
     private final SiteAssembler siteAssembler;
 
     @Override
     public IPage<SiteLinkResponse> listSites(int page, int size, Integer status, Long userId,
-                                            String keyword, String sortField, String sortOrder) {
+                                            String keyword, String username, String startDate, String endDate,
+                                            String sortField, String sortOrder) {
         QueryWrapper<SiteLink> wrapper = new QueryWrapper<>();
         if (status != null) {
             wrapper.eq("status", status);
@@ -74,6 +82,25 @@ public class AdminSiteServiceImpl implements AdminSiteService {
             // 嵌套 and(...)：平铺的 or 会把上面的 status/user_id 条件短路掉
             wrapper.and(w -> w.like("title", kw).or().like("url", kw).or().like("description", kw));
         }
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userRepository.selectList(new LambdaQueryWrapper<User>()
+                            .like(User::getUsername, username.trim()))
+                    .stream()
+                    .map(User::getId)
+                    .toList();
+            if (uids.isEmpty()) {
+                return siteAssembler.convert(emptyPage(page, size));
+            }
+            wrapper.in("user_id", uids);
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("submitted_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("submitted_at", end.plusDays(1).atStartOfDay());
+        }
         String column = SortColumnResolver.resolve(SORT_COLUMNS, sortField, "submitted_at");
         wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
         wrapper.orderByDesc("id");
@@ -82,9 +109,26 @@ public class AdminSiteServiceImpl implements AdminSiteService {
         return siteAssembler.convert(siteLinkRepository.selectPage(pageParam, wrapper));
     }
 
+    private Page<SiteLink> emptyPage(int page, int size) {
+        Page<SiteLink> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
+    }
+
+    private LocalDate parseDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
+    }
+
     @Override
     @Transactional
-    public void approve(Long id, List<Long> tagIds, Long adminId) {
+    public void approve(Long id, List<Long> tagIds, Integer weight, Long adminId) {
         SiteLink site = requireSite(id);
         if (site.getStatus() != SiteStatus.PENDING) {
             throw new BusinessException("该分享不在待审批状态");
@@ -96,6 +140,7 @@ public class AdminSiteServiceImpl implements AdminSiteService {
                 .eq(SiteLink::getId, id)
                 .eq(SiteLink::getStatus, SiteStatus.PENDING)
                 .set(SiteLink::getStatus, SiteStatus.PUBLIC)
+                .set(SiteLink::getWeight, weight == null ? 0 : weight)
                 .set(SiteLink::getReviewedBy, adminId)
                 .set(SiteLink::getReviewedAt, LocalDateTime.now())
                 .set(SiteLink::getUpdatedAt, LocalDateTime.now())
@@ -107,7 +152,7 @@ public class AdminSiteServiceImpl implements AdminSiteService {
         replaceTags(id, validTagIds);
         // 转公开后封面必须能被其他用户读取
         imageService.setVisibilityBySystem(site.getCoverImageId(), 1);
-        log.info("网站分享审批通过: id={}, admin={}, tags={}", id, adminId, validTagIds);
+        log.info("网站分享审批通过: id={}, admin={}, tags={}, weight={}", id, adminId, validTagIds, weight);
     }
 
     @Override
@@ -155,6 +200,20 @@ public class AdminSiteServiceImpl implements AdminSiteService {
     public void updateTags(Long id, List<Long> tagIds) {
         requireSite(id);
         replaceTags(id, requireExistingTags(tagIds));
+    }
+
+    @Override
+    @Transactional
+    public void updateWeight(Long id, Integer weight) {
+        SiteLink site = requireSite(id);
+        if (site.getStatus() != SiteStatus.PUBLIC) {
+            throw new BusinessException("仅已公开站点可设置权重");
+        }
+        siteLinkRepository.update(null, new LambdaUpdateWrapper<SiteLink>()
+                .eq(SiteLink::getId, id)
+                .set(SiteLink::getWeight, weight == null ? 0 : weight)
+                .set(SiteLink::getUpdatedAt, LocalDateTime.now()));
+        log.info("网站分享权重调整: id={}, weight={}", id, weight);
     }
 
     @Override
@@ -241,10 +300,10 @@ public class AdminSiteServiceImpl implements AdminSiteService {
         return site;
     }
 
-    /** 标签必须非空且全部存在，公开前打标是硬要求 */
+    /** 标签可选；传空表示无标签通过/改标签成无标签。非空时校验全部存在。 */
     private Set<Long> requireExistingTags(List<Long> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
-            throw new BusinessException("请至少选择一个标签");
+            return Set.of();
         }
         Set<Long> unique = new LinkedHashSet<>(tagIds);
         long existing = siteTagRepository.selectCount(

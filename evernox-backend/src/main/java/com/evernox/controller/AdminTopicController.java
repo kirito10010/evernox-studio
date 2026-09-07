@@ -34,8 +34,15 @@ public class AdminTopicController {
     public Result<IPage<TopicPostResponse>> listPosts(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(adminTopicService.listPosts(page, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) Long circleId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(adminTopicService.listPosts(
+                page, size, keyword, username, circleId, startDate, endDate, sortField, sortOrder));
     }
 
     @DeleteMapping("/post/{id}")
@@ -56,8 +63,14 @@ public class AdminTopicController {
     public Result<IPage<TopicCommentResponse>> listComments(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(adminTopicService.listComments(page, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(adminTopicService.listComments(
+                page, size, keyword, username, startDate, endDate, sortField, sortOrder));
     }
 
     @DeleteMapping("/comment/{id}")
@@ -78,8 +91,14 @@ public class AdminTopicController {
     public Result<IPage<TopicCircleResponse>> listCircles(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(adminTopicService.listCircles(page, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(adminTopicService.listCircles(
+                page, size, keyword, username, startDate, endDate, sortField, sortOrder));
     }
 
     @PostMapping("/circle")

@@ -1,8 +1,10 @@
 package com.evernox.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.evernox.common.ResultCode;
 import com.evernox.config.StorageConfig;
 import com.evernox.dto.AnnouncementRequest;
 import com.evernox.dto.AnnouncementResponse;
@@ -22,6 +24,7 @@ import com.evernox.repository.ImageRepository;
 import com.evernox.repository.UserRepository;
 import com.evernox.service.AnnouncementService;
 import com.evernox.service.ImageService;
+import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -29,7 +32,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +57,12 @@ public class AnnouncementServiceImpl implements AnnouncementService {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_BATCH_SIZE = 200;
+
+    /** 排序字段白名单 */
+    private static final Map<String, String> SORT_COLUMNS = Map.of(
+            "createdAt", "created_at",
+            "title", "title"
+    );
 
     private final AnnouncementRepository announcementRepository;
     private final AnnouncementTagRepository tagRepository;
@@ -135,12 +146,39 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     }
 
     @Override
-    public IPage<AnnouncementResponse> listAdmin(int page, int size, String keyword) {
-        LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<>();
+    public IPage<AnnouncementResponse> listAdmin(int page, int size, String keyword, Long tagId,
+                                                 String username, String startDate, String endDate,
+                                                 String sortField, String sortOrder) {
+        QueryWrapper<Announcement> wrapper = new QueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(Announcement::getTitle, keyword.trim());
+            wrapper.like("title", keyword.trim());
         }
-        wrapper.orderByDesc(Announcement::getCreatedAt).orderByDesc(Announcement::getId);
+        if (tagId != null) {
+            wrapper.eq("tag_id", tagId);
+        }
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userRepository.selectList(new LambdaQueryWrapper<User>()
+                            .like(User::getUsername, username.trim()))
+                    .stream()
+                    .map(User::getId)
+                    .toList();
+            if (uids.isEmpty()) {
+                return emptyPage(page, size);
+            }
+            wrapper.in("created_by", uids);
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("created_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("created_at", end.plusDays(1).atStartOfDay());
+        }
+
+        String column = SortColumnResolver.resolve(SORT_COLUMNS, sortField, "created_at");
+        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
+        wrapper.orderByDesc("id");
 
         IPage<Announcement> raw = announcementRepository.selectPage(newPage(page, size), wrapper);
         Map<Long, AnnouncementTag> tagMap = tagMap(raw.getRecords());
@@ -154,6 +192,23 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             return dto;
         }).toList());
         return result;
+    }
+
+    private Page<AnnouncementResponse> emptyPage(int page, int size) {
+        Page<AnnouncementResponse> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
+    }
+
+    private LocalDate parseDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
     }
 
     // ==================== 用户 ====================

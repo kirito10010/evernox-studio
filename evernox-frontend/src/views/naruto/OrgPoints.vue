@@ -81,6 +81,12 @@
       <div class="full-chart-scroll">
         <div ref="fullChartEl" class="full-chart-body" :style="{ height: fullChartHeight }"></div>
       </div>
+      <template #footer>
+        <el-button type="primary" @click="exportFullChart">
+          <el-icon style="margin-right: 4px"><Download /></el-icon>导出图片
+        </el-button>
+        <el-button @click="chartDialogVisible = false">关闭</el-button>
+      </template>
     </el-dialog>
 
     <el-dialog v-model="applyDialogVisible" title="申请加入组织" width="420px">
@@ -389,6 +395,25 @@ const renderFullChart = () => {
   fullChart.setOption(buildOption(sorted), true)
 }
 
+/** 把当前完整图表导出为 PNG 图片下载 */
+const exportFullChart = () => {
+  if (!fullChart) {
+    ElMessage.warning('图表尚未加载')
+    return
+  }
+  const url = fullChart.getDataURL({
+    type: 'png',
+    pixelRatio: 2,
+    backgroundColor: '#ffffff',
+  })
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `组织积分图表-${selectedWeek.value || '全部'}.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 watch(chartDialogVisible, (val) => {
   if (val) {
     nextTick(renderFullChart)
@@ -490,7 +515,7 @@ onBeforeUnmount(() => {
     position: relative;
     height: 320px;
     margin-bottom: 16px;
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--ev-bg-glass);
     border: 1px solid var(--ev-border-subtle);
     border-radius: 16px;
     padding: 12px;

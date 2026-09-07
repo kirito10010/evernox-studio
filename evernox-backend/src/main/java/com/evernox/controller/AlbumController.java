@@ -85,9 +85,11 @@ public class AlbumController {
     @GetMapping("/public")
     public Result<IPage<AlbumResponse>> getPublicAlbums(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Integer seed) {
         Page<Album> pageParam = new Page<>(page, size);
-        IPage<AlbumResponse> result = albumService.getPublicAlbums(pageParam);
+        IPage<AlbumResponse> result = albumService.getPublicAlbums(pageParam, userId, seed);
         return Result.success(result);
     }
 

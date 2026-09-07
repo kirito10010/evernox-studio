@@ -243,7 +243,7 @@ const formatDate = (dateStr: string): string => {
   }
 
   :deep(.el-button.is-circle) {
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--ev-bg-glass);
     border: 1px solid var(--ev-border-default);
     color: var(--ev-text-secondary);
     box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -347,7 +347,7 @@ const formatDate = (dateStr: string): string => {
 /* Info */
 .detail-info {
   .info-header {
-    background: rgba(255, 255, 255, 0.66);
+    background: var(--ev-bg-glass);
     border: 1px solid var(--ev-border-subtle);
     border-top-color: var(--ev-border-gloss);
     border-radius: 18px;

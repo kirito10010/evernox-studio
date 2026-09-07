@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.evernox.dto.ImageResponse;
 import com.evernox.dto.ImageUploadRequest;
 import com.evernox.dto.StorageStatsResponse;
+import com.evernox.dto.UserOptionResponse;
 import com.evernox.entity.Image;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,12 +27,22 @@ public interface ImageService {
     /**
      * 获取当前用户图片列表（分页）
      */
-    IPage<ImageResponse> getUserImages(Long userId, Page<Image> page);
+    IPage<ImageResponse> getUserImages(Long userId, Page<Image> page,
+                                       String orientation, String resolution,
+                                       Long albumId, Boolean inAlbum);
 
     /**
      * 获取公开图片列表（分页）
      */
-    IPage<ImageResponse> getPublicImages(Page<Image> page);
+    IPage<ImageResponse> getPublicImages(Page<Image> page,
+                                         String orientation, String resolution,
+                                         Long albumId, Boolean inAlbum, Long authorId,
+                                         Integer seed);
+
+    /**
+     * 获取有公开图片的作者列表（用户ID + 用户名）
+     */
+    java.util.List<UserOptionResponse> getPublicImageAuthors();
 
     /**
      * 获取图片详情

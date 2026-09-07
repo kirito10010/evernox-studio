@@ -4,7 +4,12 @@ import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.evernox.dto.OrgImportResponse;
-import com.evernox.dto.OrgMemberImportResponse;
+import com.evernox.dto.OrgMemberImportApplyRequest;
+import com.evernox.dto.OrgMemberImportApplyResponse;
+import com.evernox.dto.OrgMemberImportCandidate;
+import com.evernox.dto.OrgMemberImportPreviewResponse;
+import com.evernox.dto.OrgMemberResponse;
+import com.evernox.dto.OrgMemberImportUpdateCandidate;
 import com.evernox.entity.OrgMember;
 import com.evernox.entity.OrgWeekRecord;
 import com.evernox.exception.BusinessException;
@@ -21,10 +26,12 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 组织积分 Excel 导入服务
@@ -42,35 +49,25 @@ public class OrgExcelImportService {
 
     /** 表头字段类型 */
     private enum Field {
-        NAME, POSITION, NINJA_BATTLE, TOTAL_POWER, POWER_INCREASE, COPPER, BEAST, RENEGADE, RENEGADE_LEADER
+        NAME, POSITION, NINJA_BATTLE, TOTAL_POWER, COPPER, BEAST, RENEGADE, RENEGADE_LEADER
     }
 
     private static final Map<String, Field> HEADER_MAP = new HashMap<>();
     static {
-        HEADER_MAP.put("玩家名称", Field.NAME);
-        HEADER_MAP.put("玩家名", Field.NAME);
+        // 玩家名（成员导入 / 周记录导入共用）
         HEADER_MAP.put("成员", Field.NAME);
-        HEADER_MAP.put("名字", Field.NAME);
-        HEADER_MAP.put("玩家", Field.NAME);
+        HEADER_MAP.put("角色名字", Field.NAME);
+        HEADER_MAP.put("名称", Field.NAME);
+        HEADER_MAP.put("玩家名", Field.NAME);
+        // 职务（成员导入）
         HEADER_MAP.put("职务", Field.POSITION);
         HEADER_MAP.put("职位", Field.POSITION);
-        HEADER_MAP.put("忍战次数", Field.NINJA_BATTLE);
-        HEADER_MAP.put("忍战活动次数", Field.NINJA_BATTLE);
-        HEADER_MAP.put("忍战", Field.NINJA_BATTLE);
-        HEADER_MAP.put("总战力", Field.TOTAL_POWER);
-        HEADER_MAP.put("战力", Field.TOTAL_POWER);
-        HEADER_MAP.put("战力增幅", Field.POWER_INCREASE);
-        HEADER_MAP.put("战力增长", Field.POWER_INCREASE);
-        HEADER_MAP.put("战力增加", Field.POWER_INCREASE);
-        HEADER_MAP.put("铜币贡献", Field.COPPER);
-        HEADER_MAP.put("铜币捐献", Field.COPPER);
-        HEADER_MAP.put("铜币", Field.COPPER);
-        HEADER_MAP.put("通灵兽献祭", Field.BEAST);
-        HEADER_MAP.put("通灵兽", Field.BEAST);
-        HEADER_MAP.put("通灵", Field.BEAST);
-        HEADER_MAP.put("叛忍次数", Field.RENEGADE);
-        HEADER_MAP.put("叛忍", Field.RENEGADE);
-        HEADER_MAP.put("叛忍车头", Field.RENEGADE_LEADER);
+        // 周记录活动字段
+        HEADER_MAP.put("参战次数", Field.NINJA_BATTLE);
+        HEADER_MAP.put("战斗力", Field.TOTAL_POWER);
+        HEADER_MAP.put("捐献贡献", Field.COPPER);
+        HEADER_MAP.put("献祭通灵查克拉", Field.BEAST);
+        HEADER_MAP.put("缉拿叛忍数", Field.RENEGADE);
         HEADER_MAP.put("车头", Field.RENEGADE_LEADER);
     }
 
@@ -143,9 +140,8 @@ public class OrgExcelImportService {
                 .build();
     }
 
-    @Transactional
     @SuppressWarnings("null")
-    public OrgMemberImportResponse importMembers(MultipartFile file, Long organizationId) {
+    public OrgMemberImportPreviewResponse previewMembers(MultipartFile file, Long organizationId) {
         if (organizationId == null) {
             throw new BusinessException("请选择组织");
         }
@@ -175,39 +171,166 @@ public class OrgExcelImportService {
             throw new BusinessException("未找到玩家名称列，请确保表头包含「玩家名称」");
         }
 
-        List<String> importedNames = new ArrayList<>();
-        List<String> skippedNames = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
+        // Excel 去重取第一次出现的名字/职务
+        LinkedHashMap<String, String> excelNames = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {
             String name = str(row.get(nameKey));
-            if (name.isEmpty() || seen.contains(name)) {
+            if (name.isBlank() || name.length() > 50) {
                 continue;
             }
-            seen.add(name);
             String position = positionKey == null ? null : str(row.get(positionKey));
-            if (position != null && position.isEmpty()) {
+            if (position != null && position.isBlank()) {
                 position = null;
             }
-            if (name.length() > 50 || (position != null && position.length() > 50)
-                    || memberRepository.selectCount(new LambdaQueryWrapper<OrgMember>()
-                            .eq(OrgMember::getName, name)) > 0) {
-                skippedNames.add(name);
+            if (position != null && position.length() > 50) {
                 continue;
             }
-            OrgMember member = OrgMember.builder()
-                    .organizationId(organizationId)
-                    .name(name)
-                    .position(position)
-                    .status(1)
-                    .build();
-            memberRepository.insert(member);
-            importedNames.add(name);
+            excelNames.putIfAbsent(name, position);
         }
-        log.info("组织成员导入: organizationId={}, imported={}, skipped={}",
-                organizationId, importedNames.size(), skippedNames.size());
-        return OrgMemberImportResponse.builder()
-                .importedNames(importedNames)
-                .skippedNames(skippedNames)
+
+        List<OrgMember> members = memberRepository.selectList(
+                new LambdaQueryWrapper<OrgMember>().eq(OrgMember::getOrganizationId, organizationId));
+        Map<String, OrgMember> memberByName = members.stream()
+                .collect(Collectors.toMap(OrgMember::getName, m -> m, (a, b) -> a));
+
+        List<OrgMemberImportCandidate> toAdd = new ArrayList<>();
+        List<String> unchanged = new ArrayList<>();
+        List<OrgMemberResponse> toRestore = new ArrayList<>();
+        List<OrgMemberImportUpdateCandidate> toUpdate = new ArrayList<>();
+        for (Map.Entry<String, String> e : excelNames.entrySet()) {
+            String name = e.getKey();
+            String excelPos = e.getValue();
+            OrgMember member = memberByName.get(name);
+            if (member == null) {
+                toAdd.add(OrgMemberImportCandidate.builder().name(name).position(excelPos).build());
+                continue;
+            }
+            if (member.getStatus() != null && member.getStatus() == 0) {
+                // 已离开成员再次出现 → 恢复候选（仅恢复状态，职务不变）
+                toRestore.add(OrgMemberResponse.from(member));
+                continue;
+            }
+            if (excelPos == null) {
+                // Excel 未提供职务：不触发替换，视为无变动
+                unchanged.add(name);
+                continue;
+            }
+            String oldPos = normalize(member.getPosition());
+            if (excelPos.equals(oldPos)) {
+                unchanged.add(name);
+            } else {
+                toUpdate.add(OrgMemberImportUpdateCandidate.builder()
+                        .memberId(member.getId())
+                        .name(name)
+                        .oldPosition(member.getPosition())
+                        .newPosition(excelPos)
+                        .build());
+            }
+        }
+
+        List<OrgMemberResponse> toLeave = members.stream()
+                .filter(m -> m.getStatus() != null && m.getStatus() == 1)
+                .filter(m -> !excelNames.containsKey(m.getName()))
+                .map(OrgMemberResponse::from)
+                .toList();
+
+        log.info("组织成员导入预览: organizationId={}, toAdd={}, unchanged={}, toRestore={}, toUpdate={}, toLeave={}",
+                organizationId, toAdd.size(), unchanged.size(), toRestore.size(), toUpdate.size(), toLeave.size());
+        return OrgMemberImportPreviewResponse.builder()
+                .toAdd(toAdd)
+                .unchangedNames(unchanged)
+                .toRestore(toRestore)
+                .toUpdate(toUpdate)
+                .toLeave(toLeave)
+                .build();
+    }
+
+    @Transactional
+    @SuppressWarnings("null")
+    public OrgMemberImportApplyResponse applyMembers(OrgMemberImportApplyRequest request) {
+        Long organizationId = request.getOrganizationId();
+        if (organizationId == null) {
+            throw new BusinessException("请选择组织");
+        }
+        if (organizationRepository.selectById(organizationId) == null) {
+            throw new BusinessException("所属组织不存在");
+        }
+
+        Set<String> existing = memberRepository.selectList(
+                        new LambdaQueryWrapper<OrgMember>().eq(OrgMember::getOrganizationId, organizationId))
+                .stream().map(OrgMember::getName).collect(Collectors.toSet());
+
+        List<String> added = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        if (request.getAdd() != null) {
+            for (OrgMemberImportCandidate c : request.getAdd()) {
+                String name = c.getName() == null ? "" : c.getName().trim();
+                String position = c.getPosition();
+                if (name.isBlank() || name.length() > 50 || existing.contains(name)) {
+                    skipped.add(name);
+                    continue;
+                }
+                memberRepository.insert(OrgMember.builder()
+                        .organizationId(organizationId)
+                        .name(name)
+                        .position(position)
+                        .status(1)
+                        .build());
+                existing.add(name);
+                added.add(name);
+            }
+        }
+
+        List<String> updated = new ArrayList<>();
+        if (request.getUpdates() != null) {
+            for (OrgMemberImportUpdateCandidate u : request.getUpdates()) {
+                if (u.getMemberId() == null) {
+                    continue;
+                }
+                OrgMember m = memberRepository.selectById(u.getMemberId());
+                if (m == null || !organizationId.equals(m.getOrganizationId())) {
+                    continue;
+                }
+                m.setPosition(u.getNewPosition());
+                memberRepository.updateById(m);
+                updated.add(m.getName());
+            }
+        }
+
+        List<String> restored = new ArrayList<>();
+        if (request.getRestoreIds() != null) {
+            for (Long id : request.getRestoreIds()) {
+                OrgMember m = memberRepository.selectById(id);
+                if (m == null || !organizationId.equals(m.getOrganizationId())) {
+                    continue;
+                }
+                m.setStatus(1);
+                memberRepository.updateById(m);
+                restored.add(m.getName());
+            }
+        }
+
+        List<String> left = new ArrayList<>();
+        if (request.getLeaveIds() != null) {
+            for (Long id : request.getLeaveIds()) {
+                OrgMember m = memberRepository.selectById(id);
+                if (m == null || !organizationId.equals(m.getOrganizationId())) {
+                    continue;
+                }
+                m.setStatus(0);
+                memberRepository.updateById(m);
+                left.add(m.getName());
+            }
+        }
+
+        log.info("组织成员导入应用: organizationId={}, added={}, updated={}, restored={}, left={}, skipped={}",
+                organizationId, added.size(), updated.size(), restored.size(), left.size(), skipped.size());
+        return OrgMemberImportApplyResponse.builder()
+                .addedNames(added)
+                .updatedNames(updated)
+                .restoredNames(restored)
+                .leftNames(left)
+                .skippedNames(skipped)
                 .build();
     }
 
@@ -227,7 +350,6 @@ public class OrgExcelImportService {
             switch (e.getValue()) {
                 case NINJA_BATTLE -> record.setNinjaBattleCount(toInt(v));
                 case TOTAL_POWER -> record.setTotalPower(toInt(v));
-                case POWER_INCREASE -> record.setPowerIncrease(toInt(v));
                 case COPPER -> record.setCopperContribution(toInt(v));
                 case BEAST -> record.setBeastSacrifice(toInt(v));
                 case RENEGADE -> record.setRenegadeCount(toInt(v));
@@ -305,5 +427,9 @@ public class OrgExcelImportService {
 
     private LocalDate computeSunday(LocalDate date) {
         return date.plusDays(7 - date.getDayOfWeek().getValue());
+    }
+
+    private String normalize(String s) {
+        return s == null ? null : s.trim().isEmpty() ? null : s.trim();
     }
 }

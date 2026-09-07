@@ -47,9 +47,8 @@ spring:
       
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
-      
+
   sql:
     init:
       mode: always
@@ -70,6 +69,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+      # 全局给列名加反引号，避免 force/rank 等 MySQL 保留字导致 SQL 语法错误
+      column-format: '`%s`'
       logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0

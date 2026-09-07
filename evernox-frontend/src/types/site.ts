@@ -40,6 +40,7 @@ export interface SiteLink {
   description: string | null
   coverImageId: number | null
   status: number
+  weight: number
   rejectReason: string | null
   submittedAt: string | null
   reviewedAt: string | null
@@ -78,6 +79,9 @@ export interface AdminSiteListParams {
   status?: number | null
   userId?: number | null
   keyword?: string
-  sortField?: 'createdAt' | 'submittedAt' | 'reviewedAt' | 'title'
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'submittedAt' | 'reviewedAt' | 'title' | 'weight'
   sortOrder?: 'asc' | 'desc'
 }

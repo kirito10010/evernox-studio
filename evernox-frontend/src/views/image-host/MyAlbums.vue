@@ -141,45 +141,56 @@
     <!-- Album Detail Dialog -->
     <el-dialog
       v-model="detailDialogVisible"
-      :title="selectedAlbum?.name"
       width="85vw"
-      top="5vh"
+      align-center
       class="detail-dialog"
     >
-      <div class="album-detail" v-if="selectedAlbum">
-        <div class="detail-header">
-          <div>
-            <h2>{{ selectedAlbum.name }}</h2>
-            <p v-if="selectedAlbum.description">{{ selectedAlbum.description }}</p>
-            <span class="detail-meta">{{ selectedAlbum.imageCount }} 张照片 · {{ selectedAlbum.visibility === 1 ? '公开' : '私密' }}</span>
-          </div>
+      <template #header>
+        <div class="dialog-title">
+          <span class="dialog-title-name">{{ selectedAlbum?.name }}</span>
+          <span v-if="selectedAlbum?.description" class="dialog-title-desc">{{ selectedAlbum.description }}</span>
+          <span class="dialog-title-meta">{{ selectedAlbum?.imageCount }} 张照片 · {{ selectedAlbum?.visibility === 1 ? '公开' : '私密' }}</span>
         </div>
+      </template>
+      <div class="album-detail" v-if="selectedAlbum">
 
-        <div v-if="detailImages.length > 0" class="detail-masonry" ref="detailGridRef">
-          <div class="detail-masonry-col" v-for="(col, colIndex) in detailColumns" :key="colIndex">
-            <div
-              v-for="img in col"
-              :key="img.id"
-              class="detail-image-card"
-              @click="openLightbox(img)"
-            >
-              <LazyImage
-                :image-id="img.id"
-                :loader="loadThumb"
-                :ratio="aspectRatioOf(img)"
-                :alt="img.originalName"
-              />
-              <div class="detail-image-actions">
-                <el-button :icon="DocumentCopy" size="small" circle @click.stop="handleCopyUrl(img)" title="复制URL" />
-                <el-button
-                  type="danger"
-                  :icon="Delete"
-                  size="small"
-                  circle
-                  @click.stop="handleRemoveImage(img)"
+        <div v-if="detailImages.length > 0" class="detail-scroll">
+          <div class="detail-masonry" :ref="setDetailGrid">
+            <div class="detail-masonry-col" v-for="(col, colIndex) in detailColumns" :key="colIndex">
+              <div
+                v-for="img in col"
+                :key="img.id"
+                class="detail-image-card"
+                @click="openLightbox(img)"
+              >
+                <LazyImage
+                  :image-id="img.id"
+                  :loader="loadThumb"
+                  :ratio="aspectRatioOf(img)"
+                  :alt="img.originalName"
                 />
+                <div class="detail-image-actions">
+                  <el-button :icon="DocumentCopy" size="small" circle @click.stop="handleCopyUrl(img)" title="复制URL" />
+                  <el-button
+                    type="danger"
+                    :icon="Delete"
+                    size="small"
+                    circle
+                    @click.stop="handleRemoveImage(img)"
+                  />
+                </div>
               </div>
             </div>
+          </div>
+
+          <div class="detail-footer">
+            <div v-if="detailHasMore" :ref="setDetailSentinel" class="load-sentinel"></div>
+            <div v-if="detailLoadingMore" class="footer-tip">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>加载中...</span>
+            </div>
+            <el-button v-else-if="detailHasMore && !supportsObserver" text @click="loadDetailImages">加载更多</el-button>
+            <span v-else-if="!detailHasMore" class="footer-tip">已全部加载</span>
           </div>
         </div>
 
@@ -190,16 +201,6 @@
         <div v-if="detailLoading" class="detail-loading">
           <el-icon :size="28" class="is-loading"><Loading /></el-icon>
           <span>加载中...</span>
-        </div>
-
-        <div class="detail-footer" v-if="detailImages.length > 0">
-          <div v-if="detailHasMore" ref="detailSentinelRef" class="load-sentinel"></div>
-          <div v-if="detailLoadingMore" class="footer-tip">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>加载中...</span>
-          </div>
-          <el-button v-else-if="detailHasMore && !supportsObserver" text @click="loadDetailImages">加载更多</el-button>
-          <span v-else-if="!detailHasMore" class="footer-tip">已全部加载</span>
         </div>
       </div>
     </el-dialog>
@@ -268,7 +269,7 @@ const detailLoading = ref(false)
 const detailLoadingMore = ref(false)
 /** 已加载批次数，下一次请求的页号是它 +1 */
 const detailBatchIndex = ref(0)
-const DETAIL_BATCH_SIZE = 48
+const DETAIL_BATCH_SIZE = 24
 const detailTotal = ref(0)
 const detailHasMore = computed(() => detailImages.value.length < detailTotal.value)
 const supportsObserver = typeof IntersectionObserver !== 'undefined'
@@ -279,6 +280,9 @@ let detailToken = 0
 const detailRatioOf = (img: ImageResponse) => (img.width && img.height ? img.width / img.height : 1)
 const { gridRef: detailGridRef, columns: detailColumns } = useMasonry(detailImages, detailRatioOf, { minColumnWidth: 240 })
 const { sentinelRef: detailSentinelRef, recheck: detailRecheck } = useInfiniteScroll(() => void loadDetailImages())
+/** 用函数形式的 ref 回填组合式返回的 ref，避免改名后的 ref 只在模板里以字符串形式出现 */
+const setDetailGrid = (el: unknown) => { detailGridRef.value = el as HTMLElement | null }
+const setDetailSentinel = (el: unknown) => { detailSentinelRef.value = el as HTMLElement | null }
 
 const lightboxVisible = ref(false)
 const lightboxImage = ref<ImageResponse | null>(null)
@@ -546,7 +550,7 @@ const formatDate = (dateStr: string): string => {
   border-radius: var(--ev-radius-xl);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   backdrop-filter: var(--ev-blur-md);
   -webkit-backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
@@ -590,7 +594,7 @@ const formatDate = (dateStr: string): string => {
 }
 
 .album-card {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 18px;
@@ -658,7 +662,7 @@ const formatDate = (dateStr: string): string => {
     right: 0;
     bottom: 0;
     height: 52px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--ev-bg-glass-strong);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
@@ -720,6 +724,7 @@ const formatDate = (dateStr: string): string => {
     margin-bottom: 12px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -827,41 +832,53 @@ const formatDate = (dateStr: string): string => {
 }
 
 .album-detail {
-  padding: 24px;
+  padding: 16px 20px;
 }
 
-.detail-header {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--ev-border-subtle);
+.dialog-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 24px;
 
-  h2 {
-    font-size: 22px;
+  .dialog-title-name {
+    font-size: 18px;
     font-weight: 700;
     color: var(--ev-text-primary);
-    margin-bottom: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
-  p {
-    font-size: 14px;
-    color: var(--ev-text-secondary);
-    margin-bottom: 6px;
+  .dialog-title-desc {
+    font-size: 13px;
+    color: var(--ev-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
-  .detail-meta {
+  .dialog-title-meta {
     font-size: 12px;
     color: var(--ev-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: auto;
   }
 }
 
 /* Detail Masonry Layout */
+.detail-scroll {
+  max-height: 75vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .detail-masonry {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  max-height: 55vh;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 .detail-masonry-col {

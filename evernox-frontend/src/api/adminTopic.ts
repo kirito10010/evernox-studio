@@ -1,7 +1,15 @@
 import { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
-import type { TopicCircle, TopicCircleRequest, TopicComment, TopicPost } from '@/types/topic'
+import type {
+  AdminTopicCircleListParams,
+  AdminTopicCommentListParams,
+  AdminTopicPostListParams,
+  TopicCircle,
+  TopicCircleRequest,
+  TopicComment,
+  TopicPost,
+} from '@/types/topic'
 
 const buildQuery = (params: Record<string, unknown>): string => {
   const search = new URLSearchParams()
@@ -15,12 +23,10 @@ const buildQuery = (params: Record<string, unknown>): string => {
 
 // ========== 帖子 ==========
 
-export const getAdminTopicPosts = (params: {
-  page: number
-  size: number
-  keyword?: string
-}): Promise<Result<PageResult<TopicPost>>> => {
-  return get(`/admin/topic/post/list${buildQuery(params)}`)
+export const getAdminTopicPosts = (
+  params: AdminTopicPostListParams
+): Promise<Result<PageResult<TopicPost>>> => {
+  return get(`/admin/topic/post/list${buildQuery({ ...params })}`)
 }
 
 export const deleteAdminTopicPost = (id: number): Promise<Result<void>> => {
@@ -33,12 +39,10 @@ export const batchDeleteAdminTopicPosts = (ids: number[]): Promise<Result<void>>
 
 // ========== 评论 ==========
 
-export const getAdminTopicComments = (params: {
-  page: number
-  size: number
-  keyword?: string
-}): Promise<Result<PageResult<TopicComment>>> => {
-  return get(`/admin/topic/comment/list${buildQuery(params)}`)
+export const getAdminTopicComments = (
+  params: AdminTopicCommentListParams
+): Promise<Result<PageResult<TopicComment>>> => {
+  return get(`/admin/topic/comment/list${buildQuery({ ...params })}`)
 }
 
 export const deleteAdminTopicComment = (id: number): Promise<Result<void>> => {
@@ -51,12 +55,10 @@ export const batchDeleteAdminTopicComments = (ids: number[]): Promise<Result<voi
 
 // ========== 圈子 ==========
 
-export const getAdminTopicCircles = (params: {
-  page: number
-  size: number
-  keyword?: string
-}): Promise<Result<PageResult<TopicCircle>>> => {
-  return get(`/admin/topic/circle/list${buildQuery(params)}`)
+export const getAdminTopicCircles = (
+  params: AdminTopicCircleListParams
+): Promise<Result<PageResult<TopicCircle>>> => {
+  return get(`/admin/topic/circle/list${buildQuery({ ...params })}`)
 }
 
 export const createAdminTopicCircle = (data: TopicCircleRequest): Promise<Result<TopicCircle>> => {

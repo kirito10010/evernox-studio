@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
   width: 460px;
   max-width: 94vw;
   padding: 40px 44px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ev-bg-glass-strong);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 24px;

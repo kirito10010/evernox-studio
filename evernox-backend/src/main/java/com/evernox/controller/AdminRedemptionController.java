@@ -1,5 +1,6 @@
 package com.evernox.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.evernox.common.Result;
 import com.evernox.dto.RedemptionCodeResponse;
 import com.evernox.security.JwtTokenProvider;
@@ -8,10 +9,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,8 +40,31 @@ public class AdminRedemptionController {
     }
 
     @GetMapping("/list")
-    public Result<List<RedemptionCodeResponse>> list() {
-        return Result.success(redemptionCodeService.list());
+    public Result<IPage<RedemptionCodeResponse>> list(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(redemptionCodeService.list(
+                page, size, keyword, days, status, username, startDate, endDate, sortField, sortOrder));
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        redemptionCodeService.delete(id);
+        return Result.success();
+    }
+
+    @DeleteMapping("/batch")
+    public Result<Void> deleteBatch(@RequestParam List<Long> ids) {
+        redemptionCodeService.deleteBatch(ids);
+        return Result.success();
     }
 
     private Long getUserId(HttpServletRequest request) {

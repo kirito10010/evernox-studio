@@ -33,9 +33,9 @@ public interface AlbumService {
     IPage<AlbumResponse> getUserAlbums(Long userId, Page<Album> page);
 
     /**
-     * 获取公开相册列表
+     * 获取公开相册列表（可选按作者过滤）
      */
-    IPage<AlbumResponse> getPublicAlbums(Page<Album> page);
+    IPage<AlbumResponse> getPublicAlbums(Page<Album> page, Long userId, Integer seed);
 
     /**
      * 获取相册详情（含图片列表）

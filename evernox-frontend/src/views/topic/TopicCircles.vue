@@ -252,13 +252,17 @@ load()
   .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 18px;
+    padding: 22px 24px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(47, 124, 246, 0.1), rgba(79, 195, 232, 0.08));
+    border: 1px solid var(--ev-border-subtle);
 
     h2 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 22px;
+      font-weight: 800;
       color: var(--ev-text-primary);
     }
 
@@ -280,6 +284,8 @@ load()
     display: flex;
     gap: 20px;
     align-items: flex-start;
+    max-width: 1100px;
+    margin: 0 auto;
   }
 
   .circles-main {
@@ -299,16 +305,37 @@ load()
 
   .aside-card {
     padding: 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--el-bg-color);
     border: 1px solid var(--ev-border-subtle);
+    box-shadow: var(--ev-shadow-xs);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--ev-shadow-sm);
+    }
   }
 
   .aside-title {
+    position: relative;
+    padding-left: 12px;
     font-size: 14px;
     font-weight: 600;
     color: var(--ev-text-primary);
     margin-bottom: 12px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 16px;
+      border-radius: 2px;
+      background: var(--ev-grad-aurora);
+    }
   }
 
   .aside-tips {
@@ -357,15 +384,17 @@ load()
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--el-bg-color);
     border: 1px solid var(--ev-border-subtle);
     cursor: pointer;
-    transition: box-shadow 0.25s var(--ev-ease-out), border-color 0.25s var(--ev-ease-out);
+    box-shadow: var(--ev-shadow-xs);
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 
     &:hover {
-      border-color: var(--el-color-primary-light-5);
-      box-shadow: var(--ev-shadow-sm);
+      border-color: var(--ev-border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--ev-shadow-md);
     }
 
     .circle-avatar {
@@ -379,6 +408,7 @@ load()
       font-size: 20px;
       font-weight: 600;
       color: #fff;
+      box-shadow: 0 2px 8px rgba(18, 48, 79, 0.14);
     }
 
     .circle-body {

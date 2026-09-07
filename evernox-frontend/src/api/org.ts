@@ -3,7 +3,9 @@ import type { Result } from '@/types/user'
 import type {
   OrgImportResult,
   OrgMember,
-  OrgMemberImportResult,
+  OrgMemberImportApplyRequest,
+  OrgMemberImportApplyResult,
+  OrgMemberImportPreviewResult,
   OrgMemberRequest,
   OrgMembershipApplication,
   OrgOrganization,
@@ -54,16 +56,22 @@ export const updateOrgMemberStatus = (id: number, status: number): Promise<Resul
   return put(`/admin/org/members/${id}/status?status=${status}`)
 }
 
-export const importOrgMembers = (
+export const previewOrgMembers = (
   file: File,
   organizationId: number
-): Promise<Result<OrgMemberImportResult>> => {
+): Promise<Result<OrgMemberImportPreviewResult>> => {
   const formData = new FormData()
   formData.append('file', file)
-  return post(`/admin/org/members/import?organizationId=${organizationId}`, formData, {
+  return post(`/admin/org/members/import/preview?organizationId=${organizationId}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
   })
+}
+
+export const applyOrgMembers = (
+  data: OrgMemberImportApplyRequest
+): Promise<Result<OrgMemberImportApplyResult>> => {
+  return post('/admin/org/members/import/apply', data)
 }
 
 // ==================== 积分换算比 ====================
@@ -159,6 +167,10 @@ export const deleteOrgWeek = (organizationId: number, weekDate: string): Promise
 
 export const getOrgApplications = (): Promise<Result<OrgMembershipApplication[]>> => {
   return get('/admin/org/applications')
+}
+
+export const getOrgApplicationCount = (): Promise<Result<number>> => {
+  return get('/admin/org/applications/count')
 }
 
 export const approveOrgApplication = (id: number): Promise<Result<void>> => {

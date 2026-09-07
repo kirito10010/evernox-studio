@@ -1,7 +1,7 @@
 import { get, post } from '@/utils/request'
 import type { PageResult } from '@/api/image'
 import type { Result } from '@/types/user'
-import type { Note, NoteStats } from '@/types/note'
+import type { AdminNoteListParams, Note, NoteStats } from '@/types/note'
 
 /** 拼接查询串，跳过空值 */
 const buildQuery = (params: Record<string, unknown>): string => {
@@ -15,12 +15,9 @@ const buildQuery = (params: Record<string, unknown>): string => {
 }
 
 /** 笔记审批列表 */
-export const getAdminNotes = (params: {
-  page: number
-  size: number
-  status?: number | null
-  keyword?: string
-}): Promise<Result<PageResult<Note>>> => {
+export const getAdminNotes = (
+  params: AdminNoteListParams
+): Promise<Result<PageResult<Note>>> => {
   return get(`/admin/note/list${buildQuery({ ...params })}`)
 }
 

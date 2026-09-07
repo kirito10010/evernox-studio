@@ -30,8 +30,13 @@ public class AdminQuizController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(quizService.list(page, size, status, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(quizService.list(
+                page, size, status, keyword, startDate, endDate, sortField, sortOrder));
     }
 
     @PostMapping

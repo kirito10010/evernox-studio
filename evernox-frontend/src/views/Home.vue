@@ -330,7 +330,7 @@ const featureColors = [
 .stat-card {
   position: relative;
   padding: 22px 20px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: var(--ev-radius-lg);
@@ -465,7 +465,7 @@ const featureColors = [
 .feature-card {
   position: relative;
   padding: 22px 20px 22px 24px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: var(--ev-radius-md);

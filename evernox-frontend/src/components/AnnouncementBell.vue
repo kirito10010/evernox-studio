@@ -171,9 +171,9 @@ onBeforeUnmount(() => {
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--ev-bg-glass);
     border: 1px solid var(--ev-border-default);
-    box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: var(--ev-shadow-xs), var(--ev-inset-gloss);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
     &:hover {
       color: var(--ev-primary);
       border-color: var(--ev-border-hover);
-      background: rgba(255, 255, 255, 0.9);
+      background: var(--ev-bg-elevated);
       box-shadow: var(--ev-glow-violet);
     }
   }

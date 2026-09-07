@@ -138,3 +138,23 @@ export interface RedemptionCodeGenerateRequest {
   days: number
   count: number
 }
+
+export interface RedemptionCodeListParams {
+  page: number
+  size: number
+  keyword?: string
+  days?: number | null
+  status?: number | null
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'usedAt' | 'days'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface ApprovalSummary {
+  sitePending: number
+  notePending: number
+  quizPending: number
+  total?: number
+}

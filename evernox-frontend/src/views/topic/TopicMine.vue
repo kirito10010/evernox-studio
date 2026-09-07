@@ -1,7 +1,10 @@
 <template>
   <div class="topic-mine">
     <div class="page-header">
-      <h2>我的</h2>
+      <div class="hero-text">
+        <h2>我的</h2>
+        <p>{{ activeTab === 'posts' ? '我发布的帖子' : '我收藏的帖子' }}</p>
+      </div>
     </div>
 
     <el-tabs v-model="activeTab" @tab-change="onTabChange">
@@ -90,13 +93,23 @@ onBeforeUnmount(clearCache)
 <style scoped lang="scss">
 .topic-mine {
   .page-header {
-    margin-bottom: 6px;
+    margin-bottom: 12px;
+    padding: 22px 24px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(47, 124, 246, 0.1), rgba(79, 195, 232, 0.08));
+    border: 1px solid var(--ev-border-subtle);
 
     h2 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 22px;
+      font-weight: 800;
       color: var(--ev-text-primary);
+    }
+
+    p {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--ev-text-muted);
     }
   }
 

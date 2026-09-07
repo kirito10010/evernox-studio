@@ -74,15 +74,29 @@ const formatTime = (value?: string) => {
 
 <style scoped lang="scss">
 .post-card {
-  padding: 14px 16px;
+  position: relative;
+  padding: 14px 16px 14px 20px;
   background: var(--el-bg-color);
   border: 1px solid var(--ev-border-subtle);
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: box-shadow 0.25s var(--ev-ease-out);
+  box-shadow: var(--ev-shadow-xs);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 
   &:hover {
-    box-shadow: var(--ev-shadow-sm);
+    transform: translateY(-2px);
+    box-shadow: var(--ev-shadow-md);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 16px;
+    bottom: 16px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--ev-grad-aurora);
   }
 
   .post-head {
@@ -94,7 +108,7 @@ const formatTime = (value?: string) => {
 
     .head-author {
       font-weight: 600;
-      color: var(--ev-text-primary);
+      color: var(--ev-primary);
     }
 
     .head-circle {
@@ -108,7 +122,7 @@ const formatTime = (value?: string) => {
 
   .post-title {
     margin-top: 8px;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--ev-text-primary);
   }

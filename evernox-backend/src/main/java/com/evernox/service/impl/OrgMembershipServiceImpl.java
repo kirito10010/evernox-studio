@@ -116,7 +116,8 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
                     .build());
         }
         log.info("组织加入申请: userId={}, organizationId={}", userId, organizationId);
-        notifyOwner(org);
+        User applicant = userRepository.selectById(userId);
+        notifyOwner(org, applicant == null ? null : applicant.getUsername());
     }
 
     @Override
@@ -188,6 +189,25 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
     }
 
     @Override
+    @SuppressWarnings("null")
+    public long countApplications(Long adminId) {
+        if (adminId == null) {
+            return 0;
+        }
+        List<Long> orgIds = organizationRepository.selectList(new LambdaQueryWrapper<OrgOrganization>()
+                .eq(OrgOrganization::getOwnerId, adminId)).stream()
+                .map(OrgOrganization::getId)
+                .toList();
+        if (orgIds.isEmpty()) {
+            return 0;
+        }
+        Long count = memberRepository.selectCount(new LambdaQueryWrapper<OrgUserMember>()
+                .in(OrgUserMember::getOrganizationId, orgIds)
+                .eq(OrgUserMember::getStatus, 0));
+        return count == null ? 0 : count;
+    }
+
+    @Override
     @Transactional
     public void approve(Long adminId, Long id) {
         OrgUserMember app = requireOwned(adminId, id);
@@ -221,7 +241,7 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
         return app;
     }
 
-    private void notifyOwner(OrgOrganization org) {
+    private void notifyOwner(OrgOrganization org, String applicantName) {
         if (org.getOwnerId() == null) {
             log.warn("组织无创建者，跳过申请提醒: organizationId={}", org.getId());
             return;
@@ -238,7 +258,9 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
             helper.setFrom(Objects.requireNonNull(from));
             helper.setTo(email);
             helper.setSubject("【EverNox】组织加入申请提醒");
-            helper.setText("有用户申请加入您创建的组织「" + org.getName() + "」，请前往后台审批。", false);
+            String who = applicantName == null || applicantName.isBlank()
+                    ? "有用户" : "用户「" + applicantName + "」";
+            helper.setText(who + "申请加入您创建的组织「" + org.getName() + "」，请前往后台审批。", false);
             mailSender.send(message);
             log.info("已发送组织申请提醒邮件: owner={}", email);
         } catch (Exception e) {

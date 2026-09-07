@@ -7,6 +7,7 @@ import com.evernox.dto.ImageDimensionsRequest;
 import com.evernox.dto.ImageResponse;
 import com.evernox.dto.ImageUploadRequest;
 import com.evernox.dto.StorageStatsResponse;
+import com.evernox.dto.UserOptionResponse;
 import com.evernox.entity.Image;
 import com.evernox.security.JwtTokenProvider;
 import com.evernox.service.ImageService;
@@ -56,10 +57,15 @@ public class ImageController {
     public Result<IPage<ImageResponse>> getUserImages(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String orientation,
+            @RequestParam(required = false) String resolution,
+            @RequestParam(required = false) Long albumId,
+            @RequestParam(required = false) Boolean inAlbum,
             HttpServletRequest request) {
         Long userId = getUserId(request);
         Page<Image> pageParam = new Page<>(page, size);
-        IPage<ImageResponse> result = imageService.getUserImages(userId, pageParam);
+        IPage<ImageResponse> result = imageService.getUserImages(
+                userId, pageParam, orientation, resolution, albumId, inAlbum);
         return Result.success(result);
     }
 
@@ -69,10 +75,25 @@ public class ImageController {
     @GetMapping("/public")
     public Result<IPage<ImageResponse>> getPublicImages(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String orientation,
+            @RequestParam(required = false) String resolution,
+            @RequestParam(required = false) Long albumId,
+            @RequestParam(required = false) Boolean inAlbum,
+            @RequestParam(required = false) Long authorId,
+            @RequestParam(required = false) Integer seed) {
         Page<Image> pageParam = new Page<>(page, size);
-        IPage<ImageResponse> result = imageService.getPublicImages(pageParam);
+        IPage<ImageResponse> result = imageService.getPublicImages(
+                pageParam, orientation, resolution, albumId, inAlbum, authorId, seed);
         return Result.success(result);
+    }
+
+    /**
+     * 获取有公开图片的作者列表 — 无需认证
+     */
+    @GetMapping("/public/authors")
+    public Result<java.util.List<UserOptionResponse>> getPublicImageAuthors() {
+        return Result.success(imageService.getPublicImageAuthors());
     }
 
     /**

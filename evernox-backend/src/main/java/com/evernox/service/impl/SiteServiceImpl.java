@@ -21,6 +21,7 @@ import com.evernox.repository.SiteLinkRepository;
 import com.evernox.repository.SiteLinkTagRepository;
 import com.evernox.repository.SiteTagRepository;
 import com.evernox.repository.UserRepository;
+import com.evernox.service.AdminApprovalService;
 import com.evernox.service.ImageService;
 import com.evernox.service.SiteService;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class SiteServiceImpl implements SiteService {
     private final UserRepository userRepository;
     private final ImageService imageService;
     private final SiteAssembler siteAssembler;
+    private final AdminApprovalService adminApprovalService;
 
     @Override
     @Transactional
@@ -128,6 +130,7 @@ public class SiteServiceImpl implements SiteService {
             throw new BusinessException("该分享状态已变化，请刷新后重试");
         }
         log.info("网站分享申请公开: id={}, user={}", id, userId);
+        adminApprovalService.notifyPending("网站分享");
     }
 
     @Override
@@ -175,7 +178,7 @@ public class SiteServiceImpl implements SiteService {
             }
             wrapper.in(SiteLink::getId, siteIds);
         }
-        wrapper.orderByDesc(SiteLink::getReviewedAt).orderByDesc(SiteLink::getId);
+        wrapper.orderByDesc(SiteLink::getWeight).orderByDesc(SiteLink::getReviewedAt).orderByDesc(SiteLink::getId);
         return siteAssembler.convert(siteLinkRepository.selectPage(newPage(page, size), wrapper));
     }
 

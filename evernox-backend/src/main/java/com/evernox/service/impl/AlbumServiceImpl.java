@@ -134,10 +134,17 @@ public class AlbumServiceImpl implements AlbumService {
     }
 
     @Override
-    public IPage<AlbumResponse> getPublicAlbums(Page<Album> page) {
+    public IPage<AlbumResponse> getPublicAlbums(Page<Album> page, Long userId, Integer seed) {
         LambdaQueryWrapper<Album> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Album::getVisibility, 1)
-               .orderByDesc(Album::getCreatedAt);
+        wrapper.eq(Album::getVisibility, 1);
+        if (seed != null && seed >= 0) {
+            wrapper.last("ORDER BY RAND(" + seed + ")");
+        } else {
+            wrapper.orderByDesc(Album::getCreatedAt);
+        }
+        if (userId != null) {
+            wrapper.eq(Album::getUserId, userId);
+        }
 
         IPage<Album> result = albumRepository.selectPage(page, wrapper);
 

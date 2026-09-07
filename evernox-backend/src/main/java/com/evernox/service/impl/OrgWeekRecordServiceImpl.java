@@ -26,7 +26,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 组织每周成员记录服务实现
@@ -124,8 +126,25 @@ public class OrgWeekRecordServiceImpl implements OrgWeekRecordService {
         List<OrgWeekRecord> records = recordRepository.selectList(new LambdaQueryWrapper<OrgWeekRecord>()
                 .eq(OrgWeekRecord::getOrganizationId, organizationId)
                 .eq(OrgWeekRecord::getWeekDate, weekDate));
+
+        // 先算战力增幅：上周(weekDate-7天)同成员总战力差值
+        LocalDate prevWeek = weekDate.minusWeeks(1);
+        Map<Long, OrgWeekRecord> prevByMember = recordRepository.selectList(
+                        new LambdaQueryWrapper<OrgWeekRecord>()
+                                .eq(OrgWeekRecord::getOrganizationId, organizationId)
+                                .eq(OrgWeekRecord::getWeekDate, prevWeek))
+                .stream()
+                .filter(r -> r.getMemberId() != null)
+                .collect(Collectors.toMap(OrgWeekRecord::getMemberId, r -> r, (a, b) -> a));
+
         int updated = 0;
         for (OrgWeekRecord record : records) {
+            OrgWeekRecord prev = record.getMemberId() == null ? null : prevByMember.get(record.getMemberId());
+            if (prev != null && record.getTotalPower() != null && prev.getTotalPower() != null) {
+                record.setPowerIncrease(record.getTotalPower() - prev.getTotalPower());
+            } else {
+                record.setPowerIncrease(null);
+            }
             applyCalculation(record, config);
             recordRepository.updateById(record);
             updated++;
@@ -211,6 +230,7 @@ public class OrgWeekRecordServiceImpl implements OrgWeekRecordService {
 
     @SuppressWarnings("null")
     private BigDecimal carryOver(Long memberId, LocalDate weekDate, OrgPointsConfig config) {
+        // 向后回溯最近一个有数据的周：上周无数据则找上上周，依次往前，完全无数据才为 0
         OrgWeekRecord prev = recordRepository.selectOne(new LambdaQueryWrapper<OrgWeekRecord>()
                 .eq(OrgWeekRecord::getMemberId, memberId)
                 .lt(OrgWeekRecord::getWeekDate, weekDate)

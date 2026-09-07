@@ -1,5 +1,6 @@
 package com.evernox.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.evernox.dto.RedemptionCodeResponse;
 
 import java.util.List;
@@ -15,6 +16,14 @@ public interface RedemptionCodeService {
     /** 兑换卡密：标记已使用并给用户续费超级会员 */
     void redeem(Long userId, String code);
 
-    /** 后台列出全部卡密 */
-    List<RedemptionCodeResponse> list();
+    /** 后台分页列出卡密，支持多条件筛选 */
+    IPage<RedemptionCodeResponse> list(int page, int size, String keyword, Integer days, Integer status,
+                                       String username, String startDate, String endDate,
+                                       String sortField, String sortOrder);
+
+    /** 删除单张卡密 */
+    void delete(Long id);
+
+    /** 批量删除卡密 */
+    void deleteBatch(List<Long> ids);
 }

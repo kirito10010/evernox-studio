@@ -65,7 +65,7 @@
     </div>
 
     <!-- 添加工资弹窗 -->
-    <el-dialog v-model="addVisible" title="添加工资" width="680px">
+    <el-dialog v-model="addVisible" title="添加工资" width="680px" align-center>
       <div class="salary-toolbar">
         <el-date-picker
           v-model="addMonth"
@@ -171,7 +171,7 @@
     </el-dialog>
 
     <!-- 工资配置弹窗 -->
-    <el-dialog v-model="configVisible" title="工资配置" width="520px">
+    <el-dialog v-model="configVisible" title="工资配置" width="560px" align-center>
       <el-form v-loading="configLoading" label-width="120px">
         <el-form-item label="基本薪资">
           <el-input-number v-model="configForm.baseSalary" :min="0" :precision="5" :step="1" class="config-input" />
@@ -467,7 +467,7 @@ onMounted(() => {
 .card {
   border: 1px solid var(--ev-border-subtle, rgba(47, 124, 246, 0.08));
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--ev-bg-glass);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: 0 1px 2px rgba(18, 48, 79, 0.04), 0 8px 24px -8px rgba(47, 124, 246, 0.12);
@@ -503,7 +503,7 @@ onMounted(() => {
   padding: 10px 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
 
   &:hover {
     border-color: var(--el-color-primary-light-5);

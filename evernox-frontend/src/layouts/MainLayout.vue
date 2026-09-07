@@ -142,18 +142,39 @@
           <el-sub-menu index="super-member">
             <template #title>
               <el-icon><StarFilled /></el-icon>
-              <span>超级会员</span>
+              <span class="admin-menu-title">
+                <span>超级会员</span>
+                <span v-if="orgPending > 0" class="menu-count">{{ orgPending }}</span>
+              </span>
             </template>
             <el-menu-item index="/super-member/org">
               <el-icon><DataAnalysis /></el-icon>
-              <template #title>组织积分</template>
+              <template #title>火影组织管理</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu index="games">
+            <template #title>
+              <el-icon><VideoPlay /></el-icon>
+              <span>小游戏</span>
+            </template>
+            <el-menu-item index="/games/sandbox">
+              <el-icon><Trophy /></el-icon>
+              <template #title>沙盘争霸</template>
+            </el-menu-item>
+            <el-menu-item index="/games/support-board">
+              <el-icon><Brush /></el-icon>
+              <template #title>应援板</template>
             </el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu v-if="userStore.isAdmin" index="admin">
             <template #title>
               <el-icon><Setting /></el-icon>
-              <span>管理员</span>
+              <span class="admin-menu-title">
+                <span>管理员</span>
+                <span v-if="approvalTotal > 0" class="menu-count">{{ approvalTotal }}</span>
+              </span>
             </template>
             <el-menu-item index="/admin/users">
               <el-icon><UserFilled /></el-icon>
@@ -165,31 +186,54 @@
             </el-menu-item>
             <el-menu-item index="/admin/sites">
               <el-icon><Link /></el-icon>
-              <template #title>网站审批</template>
+              <template #title>
+                <span class="admin-menu-title">
+                  <span>网站审批</span>
+                  <span v-if="approval.sitePending > 0" class="menu-count">{{ approval.sitePending }}</span>
+                </span>
+              </template>
             </el-menu-item>
             <el-menu-item index="/admin/notes">
               <el-icon><Notebook /></el-icon>
-              <template #title>笔记审批</template>
+              <template #title>
+                <span class="admin-menu-title">
+                  <span>笔记审批</span>
+                  <span v-if="approval.notePending > 0" class="menu-count">{{ approval.notePending }}</span>
+                </span>
+              </template>
             </el-menu-item>
-            <el-menu-item index="/admin/announcement">
-              <el-icon><Bell /></el-icon>
-              <template #title>公告</template>
+            <el-menu-item index="/admin/redemption">
+              <el-icon><Ticket /></el-icon>
+              <template #title>卡密管理</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/visit">
+              <el-icon><DataLine /></el-icon>
+              <template #title>访问数据</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/support-board">
+              <el-icon><Brush /></el-icon>
+              <template #title>应援板管理</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/quiz">
+              <el-icon><QuestionFilled /></el-icon>
+              <template #title>
+                <span class="admin-menu-title">
+                  <span>忍者测验管理</span>
+                  <span v-if="approval.quizPending > 0" class="menu-count">{{ approval.quizPending }}</span>
+                </span>
+              </template>
             </el-menu-item>
             <el-menu-item index="/admin/topic">
               <el-icon><ChatDotRound /></el-icon>
               <template #title>话题集中营管理</template>
             </el-menu-item>
-            <el-menu-item index="/admin/quiz">
-              <el-icon><QuestionFilled /></el-icon>
-              <template #title>忍者测验管理</template>
-            </el-menu-item>
             <el-menu-item index="/admin/points">
               <el-icon><Money /></el-icon>
               <template #title>积分与会员管理</template>
             </el-menu-item>
-            <el-menu-item index="/admin/redemption">
-              <el-icon><Ticket /></el-icon>
-              <template #title>卡密管理</template>
+            <el-menu-item index="/admin/announcement">
+              <el-icon><Bell /></el-icon>
+              <template #title>公告</template>
             </el-menu-item>
           </el-sub-menu>
         </el-menu>
@@ -217,8 +261,19 @@
           </div>
 
           <div class="header-right">
+            <!-- 主题切换 -->
+            <div class="theme-toggle" @click="themeDrawerVisible = true" title="主题设置">
+              <el-icon :size="18"><Moon /></el-icon>
+            </div>
+
             <!-- 公告铃铛 -->
             <AnnouncementBell />
+
+            <!-- 我的积分 -->
+            <div class="points-badge" title="我的积分">
+              <el-icon :size="16"><Coin /></el-icon>
+              <span>{{ userStore.userInfo?.points ?? 0 }}</span>
+            </div>
 
             <!-- User dropdown -->
             <el-dropdown @command="handleCommand" trigger="click">
@@ -246,6 +301,8 @@
           </div>
         </el-header>
 
+        <TagsView />
+
         <!-- Content -->
         <el-main class="main-content">
           <router-view v-slot="{ Component }">
@@ -256,21 +313,38 @@
         </el-main>
       </el-container>
     </el-container>
+
+    <ThemeSettingDrawer v-model="themeDrawerVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { UserRoleMap, UserRole } from '@/types/user'
+import type { ApprovalSummary } from '@/types/user'
+import { getApprovalSummary } from '@/api/admin'
+import { getOrgApplicationCount } from '@/api/org'
 import AnnouncementBell from '@/components/AnnouncementBell.vue'
+import TagsView from '@/components/TagsView.vue'
+import ThemeSettingDrawer from '@/components/ThemeSettingDrawer.vue'
+import { useTabsStore } from '@/stores/tabs'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const tabsStore = useTabsStore()
+
+// 路由切换时登记多标签页
+watch(
+  () => route.fullPath,
+  () => tabsStore.addTab(route.path, (route.meta?.title as string) || ''),
+  { immediate: true }
+)
 
 const isCollapse = ref(false)
+const themeDrawerVisible = ref(false)
 
 const activeMenu = computed(() => route.path)
 
@@ -294,6 +368,70 @@ const handleCommand = (command: string) => {
     router.push('/login')
   }
 }
+
+// ---------- 管理员待审批红点 ----------
+const approval = reactive<ApprovalSummary>({ sitePending: 0, notePending: 0, quizPending: 0 })
+const approvalTotal = computed(() => approval.sitePending + approval.notePending + approval.quizPending)
+const orgPending = ref(0)
+let approvalTimer: number | undefined
+
+const loadApproval = async () => {
+  if (!userStore.isAdmin) return
+  try {
+    const res = await getApprovalSummary()
+    const d = res?.data
+    approval.sitePending = d?.sitePending ?? 0
+    approval.notePending = d?.notePending ?? 0
+    approval.quizPending = d?.quizPending ?? 0
+  } catch {
+    /* 忽略 */
+  }
+}
+
+const loadOrgPending = async () => {
+  if (!userStore.isAdmin && !userStore.isSuperMember) return
+  try {
+    const res = await getOrgApplicationCount()
+    orgPending.value = res?.data ?? 0
+  } catch {
+    /* 忽略 */
+  }
+}
+
+let pointsSource: EventSource | null = null
+const connectPointsStream = () => {
+  const token = localStorage.getItem('accessToken')
+  if (!token) return
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  pointsSource = new EventSource(`${base}/points/stream?token=${encodeURIComponent(token)}`)
+  pointsSource.addEventListener('points-changed', (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data)
+      if (typeof data?.points === 'number') {
+        userStore.setPoints(data.points)
+      }
+    } catch {
+      /* 忽略 */
+    }
+  })
+}
+
+onMounted(() => {
+  if (userStore.isAdmin || userStore.isSuperMember) {
+    void loadApproval()
+    void loadOrgPending()
+    approvalTimer = window.setInterval(() => {
+      void loadApproval()
+      void loadOrgPending()
+    }, 60000)
+  }
+  connectPointsStream()
+})
+
+onBeforeUnmount(() => {
+  if (approvalTimer) window.clearInterval(approvalTimer)
+  if (pointsSource) pointsSource.close()
+})
 </script>
 
 <style scoped lang="scss">
@@ -315,14 +453,14 @@ const handleCommand = (command: string) => {
 .sidebar {
   position: relative;
   background: linear-gradient(180deg,
-    rgba(255, 255, 255, 0.82) 0%,
-    rgba(255, 255, 255, 0.72) 60%,
-    rgba(247, 251, 255, 0.68) 100%
+    var(--ev-bg-glass-strong) 0%,
+    var(--ev-bg-glass) 60%,
+    var(--ev-bg-glass-light) 100%
   );
   border-right: 1px solid var(--ev-border-subtle);
   backdrop-filter: var(--ev-blur-lg);
   -webkit-backdrop-filter: var(--ev-blur-lg);
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6), var(--ev-shadow-sm);
+  box-shadow: inset -1px 0 0 var(--ev-border-gloss), var(--ev-shadow-sm);
   transition: width 0.35s var(--ev-ease-out);
   display: flex;
   flex-direction: column;
@@ -330,7 +468,7 @@ const handleCommand = (command: string) => {
   overflow: hidden;
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--ev-bg-glass-strong);
   }
 }
 
@@ -360,11 +498,11 @@ const handleCommand = (command: string) => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--ev-shadow-xs),     var(--ev-inset-gloss);
   transition: all 0.3s ease;
 
   &:hover {
-    box-shadow: var(--ev-glow-violet), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    box-shadow: var(--ev-glow-violet),     var(--ev-inset-gloss);
     border-color: var(--ev-border-hover);
   }
 
@@ -427,7 +565,7 @@ const handleCommand = (command: string) => {
     margin: 3px 0 !important;
     height: 44px !important;
     line-height: 44px !important;
-    transition: all 0.25s var(--ev-ease-out) !important;
+    transition: all 0.15s var(--ev-ease-out) !important;
     position: relative;
 
     &:hover {
@@ -443,7 +581,7 @@ const handleCommand = (command: string) => {
     ) !important;
     color: var(--ev-primary) !important;
     font-weight: 600 !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    box-shadow: var(--ev-inset-gloss) !important;
 
     /* Active indicator bar */
     &::before {
@@ -488,9 +626,9 @@ const handleCommand = (command: string) => {
 
 .header {
   height: 60px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border-bottom: 1px solid var(--ev-border-subtle);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), var(--ev-shadow-xs);
+  box-shadow: var(--ev-inset-gloss), var(--ev-shadow-xs);
   backdrop-filter: var(--ev-blur-md);
   -webkit-backdrop-filter: var(--ev-blur-md);
   display: flex;
@@ -500,7 +638,7 @@ const handleCommand = (command: string) => {
   flex-shrink: 0;
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--ev-bg-glass-strong);
   }
 }
 
@@ -514,9 +652,9 @@ const handleCommand = (command: string) => {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
+    background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-default);
-  box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--ev-shadow-xs),     var(--ev-inset-gloss);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -527,7 +665,7 @@ const handleCommand = (command: string) => {
   &:hover {
     color: var(--ev-primary);
     border-color: var(--ev-border-hover);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--ev-bg-elevated);
     box-shadow: var(--ev-glow-violet);
   }
 }
@@ -559,14 +697,33 @@ const handleCommand = (command: string) => {
   gap: 12px;
 }
 
-.header-icon-btn {
-  position: relative;
+.points-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--ev-bg-glass);
+  border: 1px solid var(--ev-border-default);
+  box-shadow: var(--ev-shadow-xs), var(--ev-inset-gloss);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ev-warning);
+  cursor: default;
+
+  .el-icon {
+    color: var(--ev-warning);
+  }
+}
+
+.theme-toggle {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-default);
-  box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--ev-shadow-xs), var(--ev-inset-gloss);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -577,7 +734,29 @@ const handleCommand = (command: string) => {
   &:hover {
     color: var(--ev-primary);
     border-color: var(--ev-border-hover);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--ev-bg-glass-strong);
+  }
+}
+
+.header-icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+    background: var(--ev-bg-glass);
+  border: 1px solid var(--ev-border-default);
+  box-shadow: var(--ev-shadow-xs),     var(--ev-inset-gloss);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ev-text-secondary);
+  transition: all 0.25s var(--ev-ease-out);
+
+  &:hover {
+    color: var(--ev-primary);
+    border-color: var(--ev-border-hover);
+    background: var(--ev-bg-elevated);
   }
 
   .notification-dot {
@@ -598,16 +777,16 @@ const handleCommand = (command: string) => {
   align-items: center;
   gap: 10px;
   padding: 4px 12px 4px 4px;
-  background: rgba(255, 255, 255, 0.6);
+    background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-default);
-  box-shadow: var(--ev-shadow-xs), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: var(--ev-shadow-xs),     var(--ev-inset-gloss);
   border-radius: 30px;
   cursor: pointer;
   transition: all 0.25s var(--ev-ease-out);
 
   &:hover {
     border-color: var(--ev-border-hover);
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--ev-bg-elevated);
     box-shadow: var(--ev-shadow-sm);
   }
 }
@@ -620,7 +799,7 @@ const handleCommand = (command: string) => {
   :deep(.el-avatar) {
     background: var(--ev-grad-aurora) !important;
     color: var(--ev-text-on-accent) !important;
-    border: 2px solid #ffffff !important;
+    border: 2px solid var(--ev-bg-elevated) !important;
   }
 }
 
@@ -645,6 +824,30 @@ const handleCommand = (command: string) => {
 .dropdown-arrow {
   color: var(--ev-text-muted);
   transition: transform 0.2s ease;
+}
+
+/* 管理员菜单待审批红点 */
+.admin-menu-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--ev-danger);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
 }
 
 /* ============================================================

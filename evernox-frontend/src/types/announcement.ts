@@ -38,4 +38,10 @@ export interface AnnouncementAdminListParams {
   page: number
   size: number
   keyword?: string
+  tagId?: number | null
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'title'
+  sortOrder?: 'asc' | 'desc'
 }

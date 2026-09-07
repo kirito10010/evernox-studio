@@ -2,7 +2,7 @@
   <div class="admin-org">
     <el-tabs v-model="activeTab" class="org-tabs">
       <!-- ==================== 成员管理 ==================== -->
-      <el-tab-pane label="成员管理" name="members">
+      <el-tab-pane label="成员管理" name="members" lazy>
         <div class="toolbar">
           <el-button type="primary" @click="openOrgDialog()">添加组织</el-button>
           <el-button @click="orgManageVisible = true">管理组织</el-button>
@@ -28,6 +28,7 @@
             导入成员
           </el-button>
           <el-input v-model="memberKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
+          <el-button link type="primary" @click="importHelpVisible = true">导入说明</el-button>
         </div>
         <el-table :data="filteredMembers" border stripe>
           <el-table-column prop="name" label="玩家名" min-width="130" />
@@ -56,7 +57,7 @@
       </el-tab-pane>
 
       <!-- ==================== 积分换算比 ==================== -->
-      <el-tab-pane label="积分换算比" name="config">
+      <el-tab-pane label="积分换算比" name="config" lazy>
         <div class="toolbar">
           <span class="toolbar-label">选择组织：</span>
           <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 200px">
@@ -84,7 +85,7 @@
       </el-tab-pane>
 
       <!-- ==================== 奖励礼包 ==================== -->
-      <el-tab-pane label="奖励礼包" name="packages">
+      <el-tab-pane label="奖励礼包" name="packages" lazy>
         <div class="toolbar">
           <span class="toolbar-label">选择组织：</span>
           <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 200px">
@@ -107,7 +108,7 @@
       </el-tab-pane>
 
       <!-- ==================== 周记录 ==================== -->
-      <el-tab-pane label="周记录" name="records">
+      <el-tab-pane label="周记录" name="records" lazy>
         <div class="toolbar records-toolbar">
           <span class="toolbar-label">组织：</span>
           <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 180px">
@@ -145,27 +146,28 @@
           <el-button type="warning" :disabled="!selectedOrgId || !selectedWeek" @click="calculate">计算积分</el-button>
           <el-button type="danger" :disabled="!selectedOrgId || !selectedWeek" @click="deleteWeek">删除本周</el-button>
           <el-input v-model="recordKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
+          <el-button link type="primary" @click="importHelpVisible = true">导入说明</el-button>
         </div>
 
-        <el-table :data="filteredRecords" border stripe :default-sort="{ prop: 'totalPoints', order: 'descending' }">
+        <el-table :data="pagedRecords" border stripe :default-sort="{ prop: 'totalPoints', order: 'descending' }" @sort-change="handleSortChange">
           <el-table-column prop="memberName" label="玩家名" min-width="90" fixed="left" />
           <el-table-column prop="position" label="职务" min-width="90" />
-          <el-table-column prop="ninjaBattleCount" v-if="config.ninjaBattleVisible === 1" label="忍战次数" min-width="90" sortable />
-          <el-table-column prop="totalPower" v-if="config.totalPowerVisible === 1" label="总战力" min-width="100" sortable />
-          <el-table-column prop="powerIncrease" v-if="config.powerIncreaseVisible === 1" label="战力增幅" min-width="90" sortable />
-          <el-table-column prop="copperContribution" v-if="config.copperVisible === 1" label="铜币" min-width="80" sortable />
-          <el-table-column prop="beastSacrifice" v-if="config.beastVisible === 1" label="通灵兽" min-width="80" sortable />
-          <el-table-column prop="renegadeCount" v-if="config.renegadeVisible === 1" label="叛忍" min-width="70" sortable />
+          <el-table-column prop="ninjaBattleCount" v-if="config.ninjaBattleVisible === 1" label="忍战次数" min-width="90" sortable="custom" />
+          <el-table-column prop="totalPower" v-if="config.totalPowerVisible === 1" label="总战力" min-width="100" sortable="custom" />
+          <el-table-column prop="powerIncrease" v-if="config.powerIncreaseVisible === 1" label="战力增幅" min-width="90" sortable="custom" />
+          <el-table-column prop="copperContribution" v-if="config.copperVisible === 1" label="铜币" min-width="80" sortable="custom" />
+          <el-table-column prop="beastSacrifice" v-if="config.beastVisible === 1" label="通灵兽" min-width="80" sortable="custom" />
+          <el-table-column prop="renegadeCount" v-if="config.renegadeVisible === 1" label="叛忍" min-width="70" sortable="custom" />
           <el-table-column v-if="config.renegadeLeaderVisible === 1" label="车头" min-width="70">
             <template #default="{ row }">{{ row.isRenegadeLeader === 1 ? '是' : '' }}</template>
           </el-table-column>
-          <el-table-column label="上周剩余" min-width="100" sortable prop="lastWeekPoints">
+          <el-table-column label="上周剩余" min-width="100" sortable="custom" prop="lastWeekPoints">
             <template #default="{ row }">{{ fmt(row.lastWeekPoints) }}</template>
           </el-table-column>
-          <el-table-column label="本周积分" min-width="100" sortable prop="thisWeekPoints">
+          <el-table-column label="本周积分" min-width="100" sortable="custom" prop="thisWeekPoints">
             <template #default="{ row }">{{ fmt(row.thisWeekPoints) }}</template>
           </el-table-column>
-          <el-table-column label="总积分" min-width="100" sortable prop="totalPoints">
+          <el-table-column label="总积分" min-width="100" sortable="custom" prop="totalPoints">
             <template #default="{ row }">{{ fmt(row.totalPoints) }}</template>
           </el-table-column>
           <el-table-column label="奖励礼包" width="170" fixed="right">
@@ -181,7 +183,7 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="扣除后积分" width="110" fixed="right" sortable prop="pointsAfterDeduction">
+          <el-table-column label="扣除后积分" width="110" fixed="right" sortable="custom" prop="pointsAfterDeduction">
             <template #default="{ row }">{{ fmt(row.pointsAfterDeduction) }}</template>
           </el-table-column>
           <el-table-column label="操作" width="70" fixed="right">
@@ -190,10 +192,21 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <div class="records-pagination">
+          <el-pagination
+            v-model:current-page="recordPage"
+            v-model:page-size="recordPageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="filteredRecords.length"
+            layout="total, sizes, prev, pager, next, jumper"
+            small
+          />
+        </div>
       </el-tab-pane>
 
       <!-- ==================== 加入审批 ==================== -->
-      <el-tab-pane label="加入审批" name="applications">
+      <el-tab-pane label="加入审批" name="applications" lazy>
         <el-table :data="applications" border stripe v-loading="loadingApplications">
           <el-table-column prop="organizationName" label="组织" min-width="140" />
           <el-table-column prop="username" label="申请人" min-width="120" />
@@ -297,20 +310,135 @@
       </template>
     </el-dialog>
 
-    <!-- 成员导入结果弹窗 -->
-    <el-dialog v-model="memberImportResultVisible" title="成员导入结果" width="520px">
-      <div class="import-report">
-        <div class="import-block">
-          <div class="import-title import-success">成功导入（{{ memberImportResult.importedNames.length }}）</div>
-          <div class="import-names">{{ memberImportResult.importedNames.join('、') || '无' }}</div>
+    <!-- 成员导入差异预览弹窗 -->
+    <el-dialog v-model="memberPreviewVisible" title="成员导入预览" width="640px">
+      <div class="member-preview">
+        <div class="preview-block">
+          <div class="preview-title">
+            新增成员（勾选加入，{{ selectedAdd.length }}/{{ memberPreview.toAdd.length }}）
+          </div>
+          <el-table
+            :data="memberPreview.toAdd"
+            size="small"
+            max-height="200"
+            border
+            @selection-change="onAddSelection"
+          >
+            <el-table-column type="selection" width="45" />
+            <el-table-column prop="name" label="玩家名" min-width="140" />
+            <el-table-column prop="position" label="职务" min-width="120" />
+          </el-table>
+          <el-empty v-if="memberPreview.toAdd.length === 0" description="无新增成员" :image-size="60" />
         </div>
-        <div class="import-block">
-          <div class="import-title import-warning">未导入（{{ memberImportResult.skippedNames.length }}）</div>
-          <div class="import-names">{{ memberImportResult.skippedNames.join('、') || '无' }}</div>
+
+        <div class="preview-block">
+          <div class="preview-title">无变动成员（{{ memberPreview.unchangedNames.length }}）</div>
+          <div class="preview-names">{{ memberPreview.unchangedNames.join('、') || '无' }}</div>
+        </div>
+
+        <div class="preview-block">
+          <div class="preview-title">
+            恢复候选（勾选恢复为在组织，{{ selectedRestore.length }}/{{ memberPreview.toRestore.length }}）
+          </div>
+          <el-table
+            :data="memberPreview.toRestore"
+            size="small"
+            max-height="200"
+            border
+            @selection-change="onRestoreSelection"
+          >
+            <el-table-column type="selection" width="45" />
+            <el-table-column prop="name" label="玩家名" min-width="140" />
+            <el-table-column prop="position" label="职务" min-width="120" />
+          </el-table>
+          <el-empty v-if="memberPreview.toRestore.length === 0" description="无恢复候选" :image-size="60" />
+        </div>
+
+        <div class="preview-block">
+          <div class="preview-title">
+            职务替换（勾选替换，{{ selectedUpdate.length }}/{{ memberPreview.toUpdate.length }}）
+
+          </div>
+          <el-table
+            :data="memberPreview.toUpdate"
+            size="small"
+            max-height="200"
+            border
+            @selection-change="onUpdateSelection"
+          >
+            <el-table-column type="selection" width="45" />
+            <el-table-column prop="name" label="玩家名" min-width="120" />
+            <el-table-column label="原职务" min-width="110">
+              <template #default="{ row }">{{ row.oldPosition || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="新职务" min-width="110">
+              <template #default="{ row }">{{ row.newPosition || '-' }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="memberPreview.toUpdate.length === 0" description="无职务替换" :image-size="60" />
+        </div>
+
+        <div class="preview-block">
+          <div class="preview-title">
+            离开候选（勾选设为离开组织，{{ selectedLeave.length }}/{{ memberPreview.toLeave.length }}）
+          </div>
+          <el-table
+            :data="memberPreview.toLeave"
+            size="small"
+            max-height="200"
+            border
+            @selection-change="onLeaveSelection"
+          >
+            <el-table-column type="selection" width="45" />
+            <el-table-column prop="name" label="玩家名" min-width="140" />
+            <el-table-column prop="position" label="职务" min-width="120" />
+          </el-table>
+          <el-empty v-if="memberPreview.toLeave.length === 0" description="无离开候选" :image-size="60" />
         </div>
       </div>
       <template #footer>
-        <el-button type="primary" @click="memberImportResultVisible = false">关闭</el-button>
+        <el-button @click="memberPreviewVisible = false">取消导入</el-button>
+        <el-button
+          type="primary"
+          :loading="applyingMembers"
+          :disabled="selectedAdd.length === 0 && selectedUpdate.length === 0 && selectedRestore.length === 0 && selectedLeave.length === 0"
+          @click="confirmMemberImport"
+        >
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导入说明弹窗 -->
+    <el-dialog v-model="importHelpVisible" title="Excel 导入说明" width="620px" append-to-body>
+      <div class="import-help">
+        <div class="help-section">
+          <h4>成员管理 · 导入成员</h4>
+          <p>第一行必须是表头，列名如下：</p>
+          <ul>
+            <li><b>成员</b>：玩家名（必填，也接受「角色名字 / 名称 / 玩家名」）</li>
+            <li><b>职务</b>：职务（可选，也接受「职位」）</li>
+          </ul>
+          <p>导入时会先预览差异，再勾选新增 / 恢复 / 替换职务 / 离开，最后确认，可随时取消。</p>
+        </div>
+        <div class="help-section">
+          <h4>周记录 · 导入数据</h4>
+          <p>第一行必须是表头，列名如下：</p>
+          <ul>
+            <li><b>成员</b>：玩家名（必填，也接受「角色名字 / 名称 / 玩家名」）</li>
+            <li><b>参战次数</b> → 忍战次数</li>
+            <li><b>战斗力</b> → 总战力</li>
+            <li><b>捐献贡献</b> → 铜币</li>
+            <li><b>献祭通灵查克拉</b> → 通灵兽</li>
+            <li><b>缉拿叛忍数</b> → 叛忍</li>
+            <li><b>车头</b> → 叛忍车头</li>
+          </ul>
+          <p>「战力增幅」不需要在 Excel 里填：点「计算积分」时自动按「本周战斗力 − 上周战斗力」计算。</p>
+          <p>使用前提：先在该周「一键生成」记录，再「导入数据」。</p>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="importHelpVisible = false">知道了</el-button>
       </template>
     </el-dialog>
 
@@ -375,7 +503,8 @@ import {
   generateOrgRecords,
   calculateOrgRecords,
   importOrgExcel,
-  importOrgMembers,
+  previewOrgMembers,
+  applyOrgMembers,
   setOrgRecordPackage,
   clearOrgRecordPackage,
   updateOrgRecord,
@@ -387,7 +516,11 @@ import {
 import type {
   OrgImportResult,
   OrgMember,
-  OrgMemberImportResult,
+  OrgMemberImportApplyRequest,
+  OrgMemberImportApplyResult,
+  OrgMemberImportCandidate,
+  OrgMemberImportPreviewResult,
+  OrgMemberImportUpdateCandidate,
   OrgMemberRequest,
   OrgMembershipApplication,
   OrgOrganization,
@@ -513,11 +646,35 @@ const toggleStatus = async (row: OrgMember) => {
 const memberImportOrgId = ref<number | null>(null)
 const memberImportFile = ref<File | null>(null)
 const importingMembers = ref(false)
-const memberImportResultVisible = ref(false)
-const memberImportResult = reactive<OrgMemberImportResult>({ importedNames: [], skippedNames: [] })
+const applyingMembers = ref(false)
+const importHelpVisible = ref(false)
+const memberPreviewVisible = ref(false)
+const memberPreview = reactive<OrgMemberImportPreviewResult>({
+  toAdd: [],
+  unchangedNames: [],
+  toRestore: [],
+  toUpdate: [],
+  toLeave: [],
+})
+const selectedAdd = ref<OrgMemberImportCandidate[]>([])
+const selectedUpdate = ref<OrgMemberImportUpdateCandidate[]>([])
+const selectedRestore = ref<OrgMember[]>([])
+const selectedLeave = ref<OrgMember[]>([])
 
 const onMemberFileChange = (file: UploadFile) => {
   memberImportFile.value = file.raw ?? null
+}
+const onAddSelection = (rows: OrgMemberImportCandidate[]) => {
+  selectedAdd.value = rows
+}
+const onUpdateSelection = (rows: OrgMemberImportUpdateCandidate[]) => {
+  selectedUpdate.value = rows
+}
+const onRestoreSelection = (rows: OrgMember[]) => {
+  selectedRestore.value = rows
+}
+const onLeaveSelection = (rows: OrgMember[]) => {
+  selectedLeave.value = rows
 }
 const doMemberImport = async () => {
   if (!memberImportOrgId.value) return
@@ -527,14 +684,42 @@ const doMemberImport = async () => {
   }
   importingMembers.value = true
   try {
-    const res = await importOrgMembers(memberImportFile.value, memberImportOrgId.value)
-    memberImportResult.importedNames = res.data.importedNames ?? []
-    memberImportResult.skippedNames = res.data.skippedNames ?? []
-    memberImportResultVisible.value = true
+    const res = await previewOrgMembers(memberImportFile.value, memberImportOrgId.value)
+    memberPreview.toAdd = res.data.toAdd ?? []
+    memberPreview.unchangedNames = res.data.unchangedNames ?? []
+    memberPreview.toRestore = res.data.toRestore ?? []
+    memberPreview.toUpdate = res.data.toUpdate ?? []
+    memberPreview.toLeave = res.data.toLeave ?? []
+    selectedAdd.value = []
+    selectedUpdate.value = []
+    selectedRestore.value = []
+    selectedLeave.value = []
+    memberPreviewVisible.value = true
+  } finally {
+    importingMembers.value = false
+  }
+}
+const confirmMemberImport = async () => {
+  if (!memberImportOrgId.value) return
+  applyingMembers.value = true
+  try {
+    const payload: OrgMemberImportApplyRequest = {
+      organizationId: memberImportOrgId.value,
+      add: selectedAdd.value.map((c) => ({ name: c.name, position: c.position })),
+      updates: selectedUpdate.value,
+      restoreIds: selectedRestore.value.map((m) => m.id),
+      leaveIds: selectedLeave.value.map((m) => m.id),
+    }
+    const res = await applyOrgMembers(payload)
+    const r: OrgMemberImportApplyResult = res.data
+    ElMessage.success(
+      `导入完成：新增 ${r.addedNames?.length ?? 0} 人、恢复 ${r.restoredNames?.length ?? 0} 人、替换职务 ${r.updatedNames?.length ?? 0} 人、离开 ${r.leftNames?.length ?? 0} 人、跳过 ${r.skippedNames?.length ?? 0} 人`
+    )
+    memberPreviewVisible.value = false
     memberImportFile.value = null
     await loadMembers()
   } finally {
-    importingMembers.value = false
+    applyingMembers.value = false
   }
 }
 
@@ -674,11 +859,42 @@ const weeks = ref<string[]>([])
 const selectedWeek = ref('')
 const records = ref<OrgWeekRecord[]>([])
 const recordKeyword = ref('')
+const recordPage = ref(1)
+const recordPageSize = ref(20)
 const filteredRecords = computed(() => {
   const kw = recordKeyword.value.trim().toLowerCase()
   if (!kw) return records.value
   return records.value.filter((r) => r.memberName.toLowerCase().includes(kw))
 })
+const sortState = reactive<{ prop: string; order: 'ascending' | 'descending' }>({
+  prop: 'totalPoints',
+  order: 'descending',
+})
+const sortedRecords = computed(() => {
+  const { prop, order } = sortState
+  const arr = [...filteredRecords.value]
+  if (!prop) return arr
+  const dir = order === 'ascending' ? 1 : -1
+  arr.sort((a, b) => {
+    const av = (a as unknown as Record<string, unknown>)[prop]
+    const bv = (b as unknown as Record<string, unknown>)[prop]
+    const an = av == null ? null : Number(av)
+    const bn = bv == null ? null : Number(bv)
+    if (an == null && bn == null) return 0
+    if (an == null) return 1
+    if (bn == null) return -1
+    return (an - bn) * dir
+  })
+  return arr
+})
+const pagedRecords = computed(() => {
+  const start = (recordPage.value - 1) * recordPageSize.value
+  return sortedRecords.value.slice(start, start + recordPageSize.value)
+})
+const handleSortChange = ({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) => {
+  sortState.prop = prop || 'totalPoints'
+  sortState.order = order || 'descending'
+}
 const uploadFile = ref<File | null>(null)
 const importing = ref(false)
 const generateDate = ref('')
@@ -705,6 +921,7 @@ const loadRecords = async () => {
   }
   const res = await getOrgRecords(selectedOrgId.value, selectedWeek.value)
   records.value = res.data
+  recordPage.value = 1
 }
 const computeSunday = (dateStr: string): string => {
   const d = dayjs(dateStr)
@@ -857,6 +1074,10 @@ watch(activeTab, (val) => {
   if (val === 'applications') loadApplications()
 })
 
+watch(recordKeyword, () => {
+  recordPage.value = 1
+})
+
 watch(selectedOrgId, () => {
   selectedWeek.value = ''
   loadConfig()
@@ -889,6 +1110,12 @@ onMounted(async () => {
       font-size: 13px;
       color: var(--ev-text-secondary);
     }
+  }
+
+  .records-pagination {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
   }
 
   .config-panel {
@@ -947,8 +1174,64 @@ onMounted(async () => {
     }
   }
 
+  .member-preview {
+    .preview-block {
+      margin-bottom: 16px;
+
+      .preview-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--ev-text-primary);
+      }
+
+      .preview-names {
+        font-size: 13px;
+        color: var(--ev-text-secondary);
+        word-break: break-all;
+        max-height: 80px;
+        overflow-y: auto;
+      }
+    }
+  }
+
   :deep(.el-table th .cell) {
     white-space: nowrap;
+  }
+}
+
+.import-help {
+  max-height: 60vh;
+  overflow-y: auto;
+
+  .help-section {
+    margin-bottom: 16px;
+
+    h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ev-text-primary);
+    }
+
+    p {
+      margin: 0 0 4px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--ev-text-secondary);
+    }
+
+    ul {
+      margin: 4px 0 0;
+      padding-left: 20px;
+      list-style: disc;
+
+      li {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--ev-text-secondary);
+      }
+    }
   }
 }
 </style>

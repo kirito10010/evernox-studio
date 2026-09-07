@@ -19,6 +19,20 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <span class="result-count">共 <strong>{{ total }}</strong> 张图片</span>
+        <el-select v-model="orientation" placeholder="方向" clearable style="width: 110px">
+          <el-option label="横图" value="landscape" />
+          <el-option label="竖图" value="portrait" />
+          <el-option label="方图" value="square" />
+        </el-select>
+        <el-select v-model="resolution" placeholder="分辨率" clearable style="width: 110px">
+          <el-option label="标清" value="sd" />
+          <el-option label="高清" value="hd" />
+          <el-option label="超清" value="uhd" />
+        </el-select>
+        <el-select v-model="albumFilter" placeholder="相册" clearable style="width: 150px">
+          <el-option label="未分类" value="uncategorized" />
+          <el-option v-for="a in myAlbums" :key="a.id" :label="a.name" :value="a.id" />
+        </el-select>
       </div>
       <div class="toolbar-right">
         <el-button
@@ -30,7 +44,7 @@
     </div>
 
     <!-- Grid View (Masonry) -->
-    <div v-if="isGrid && images.length > 0" class="masonry" ref="gridRef">
+    <div v-if="isGrid && images.length > 0" class="masonry" :ref="(el) => (gridRef = el as HTMLElement | null)">
       <div class="masonry-col" v-for="(col, colIndex) in columns" :key="colIndex">
         <div
           v-for="img in col"
@@ -139,7 +153,7 @@
 
     <!-- Infinite scroll footer -->
     <div class="list-footer" v-if="images.length > 0">
-      <div v-if="hasMore" ref="sentinelRef" class="load-sentinel"></div>
+      <div v-if="hasMore" :ref="(el) => (sentinelRef = el as HTMLElement | null)" class="load-sentinel"></div>
       <div v-if="loadingMore" class="footer-tip">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>加载中...</span>
@@ -192,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   getMyImages, deleteImage, updateImageVisibility,
   getMyAlbums, addImageToAlbum, removeImageFromAlbum, getImageAlbums,
@@ -225,6 +239,31 @@ const supportsObserver = typeof IntersectionObserver !== 'undefined'
 const isGrid = ref(true)
 const showUpload = ref(false)
 
+// ========== 筛选 ==========
+const orientation = ref('')
+const resolution = ref('')
+const albumFilter = ref<string | number>('')
+const myAlbums = ref<AlbumResponse[]>([])
+
+const filters = computed(() => {
+  const f: {
+    orientation?: string
+    resolution?: string
+    albumId?: number
+    inAlbum?: boolean
+  } = {}
+  if (orientation.value) f.orientation = orientation.value
+  if (resolution.value) f.resolution = resolution.value
+  if (albumFilter.value === 'uncategorized') f.inAlbum = false
+  else if (albumFilter.value !== '' && typeof albumFilter.value === 'number') f.albumId = albumFilter.value
+  return f
+})
+
+const loadAlbumOptions = async () => {
+  const res = await getMyAlbums(1, 100)
+  if (res.data) myAlbums.value = res.data.records || []
+}
+
 const lightboxVisible = ref(false)
 const lightboxImage = ref<ImageResponse | null>(null)
 const lightboxSrc = ref<string | null>(null)
@@ -247,11 +286,16 @@ const openLightbox = async (img: ImageResponse) => {
 const ratioOf = (img: ImageResponse) => (img.width && img.height ? img.width / img.height : 1)
 const { gridRef, columns } = useMasonry(images, ratioOf, { minColumnWidth: 260 })
 
-onMounted(() => resetAndLoad())
+onMounted(() => {
+  loadAlbumOptions()
+  resetAndLoad()
+})
 onUnmounted(() => {
   clearCache()
   clearThumbCache()
 })
+
+watch([orientation, resolution, albumFilter], () => resetAndLoad())
 
 const { sentinelRef, recheck } = useInfiniteScroll(() => void loadMore())
 
@@ -264,7 +308,7 @@ const loadMore = async () => {
   if (isFirstBatch) loading.value = true
   else loadingMore.value = true
   try {
-    const res = await getMyImages(batchIndex.value + 1, BATCH_SIZE)
+    const res = await getMyImages(batchIndex.value + 1, BATCH_SIZE, filters.value)
     if (res.data) {
       images.value.push(...(res.data.records || []))
       total.value = res.data.total || 0
@@ -409,7 +453,7 @@ const formatDate = (dateStr: string): string => {
   border-radius: var(--ev-radius-xl);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   -webkit-backdrop-filter: var(--ev-blur-md);
   backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
@@ -463,13 +507,20 @@ const formatDate = (dateStr: string): string => {
   border-radius: 16px;
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   -webkit-backdrop-filter: var(--ev-blur-md);
   backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     background: rgba(255, 255, 255, 0.92);
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .result-count {
@@ -495,7 +546,7 @@ const formatDate = (dateStr: string): string => {
 }
 
 .image-card {
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: var(--ev-radius-md);
@@ -568,7 +619,7 @@ const formatDate = (dateStr: string): string => {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ev-bg-glass-strong);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--ev-border-subtle);
@@ -595,7 +646,7 @@ const formatDate = (dateStr: string): string => {
 .card-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--ev-bg-glass-light);
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   display: flex;
@@ -676,7 +727,7 @@ const formatDate = (dateStr: string): string => {
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: var(--ev-radius-md);

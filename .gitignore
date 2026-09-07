@@ -14,6 +14,9 @@ evernox-frontend/dist/
 # nginx binary distribution (deployment, not source)
 /nginx-1.30.4/
 
+# redis binary distribution (deployment, not source)
+/Redis-8.10.1-Windows-x64/
+
 # comate local spec docs
 /.comate/
 

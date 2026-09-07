@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="header-text">
         <h2>网站审批</h2>
-        <p>审批通过前必须为站点打标签，公开页的筛选依赖标签</p>
+        <p>审批时可为站点打标签（可选），公开页按标签筛选</p>
       </div>
       <div class="stat-row">
         <div class="stat"><span class="num">{{ stats.pending ?? '—' }}</span><span class="label">待审批</span></div>
@@ -28,6 +28,14 @@
           @input="onKeywordInput"
           @clear="applyFilters"
         />
+        <el-input
+          v-model="username"
+          class="filter-item"
+          placeholder="分享者"
+          clearable
+          @input="onUsernameInput"
+          @clear="applyFilters"
+        />
         <el-select
           v-if="activeTab === 'all'"
           v-model="statusFilter"
@@ -40,6 +48,27 @@
           <el-option label="待审批" :value="1" />
           <el-option label="已公开" :value="2" />
           <el-option label="已驳回" :value="3" />
+        </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          range-separator="~"
+          start-placeholder="提交起"
+          end-placeholder="止"
+          class="filter-date"
+          @change="applyFilters"
+        />
+        <el-select v-model="sortField" class="filter-item" @change="applyFilters">
+          <el-option label="提交时间" value="submittedAt" />
+          <el-option label="创建时间" value="createdAt" />
+          <el-option label="审批时间" value="reviewedAt" />
+          <el-option label="权重" value="weight" />
+          <el-option label="标题" value="title" />
+        </el-select>
+        <el-select v-model="sortOrder" class="filter-order" @change="applyFilters">
+          <el-option label="降序" value="desc" />
+          <el-option label="升序" value="asc" />
         </el-select>
       </div>
 
@@ -83,7 +112,12 @@
             <el-tag :type="SiteStatusColor[row.status]" size="small">{{ SiteStatusMap[row.status] }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="submittedAt" label="提交时间" width="170" />
+        <el-table-column label="权重" width="80">
+          <template #default="{ row }">{{ row.weight ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="提交时间" width="170">
+          <template #default="{ row }">{{ formatDateTime(row.submittedAt) }}</template>
+        </el-table-column>
         <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status === 1" size="small" type="primary" @click="openApprove(row as SiteLink)">通过</el-button>
@@ -109,12 +143,9 @@
 
     <template v-else>
       <div class="filter-bar">
-        <el-input v-model="tagForm.name" class="search" placeholder="标签名" maxlength="30" />
-        <el-input-number v-model="tagForm.sort" :min="0" :max="9999" controls-position="right" />
-        <el-button type="primary" :loading="tagSaving" @click="saveTag">
-          {{ editingTagId ? '保存修改' : '新增标签' }}
+        <el-button type="primary" @click="openTagDialog()">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon>新增标签
         </el-button>
-        <el-button v-if="editingTagId" @click="resetTagForm">取消编辑</el-button>
       </div>
 
       <el-table :data="tags" v-loading="tagLoading" row-key="id">
@@ -155,13 +186,55 @@
           <p class="approve-desc">{{ approveTarget.description || '提交者未填写介绍' }}</p>
         </div>
       </div>
-      <p class="dialog-hint">公开前必须至少选择一个标签，用户在公开页按标签筛选。</p>
-      <el-select v-model="approveTagIds" multiple filterable class="tag-select" placeholder="选择标签">
-        <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
-      </el-select>
+      <p class="dialog-hint">标签可选，公开页按标签筛选。可搜索、多选，或输入新标签名直接新建（默认排序 10）。</p>
+      <div class="tag-picker">
+        <div class="tag-picker-tools">
+          <el-input v-model="tagSearch" placeholder="搜索标签" clearable class="tag-search" />
+          <div class="tag-create">
+            <el-input
+              v-model="newTagName"
+              placeholder="输入新标签名"
+              maxlength="30"
+              class="tag-create-input"
+              @keyup.enter="addCustomTag"
+            />
+            <el-button size="small" :loading="customTagAdding" @click="addCustomTag">添加</el-button>
+          </div>
+        </div>
+        <div class="tag-grid">
+          <span
+            v-for="tag in filteredTags"
+            :key="tag.id"
+            class="tag-option"
+            :class="{ 'is-selected': approveTagIds.includes(tag.id) }"
+            @click="toggleTag(tag.id)"
+          >{{ tag.name }}</span>
+          <span v-if="!filteredTags.length" class="muted">暂无标签</span>
+        </div>
+      </div>
+      <div class="weight-row">
+        <span class="weight-label">权重</span>
+        <el-input-number v-model="approveWeight" :min="0" :step="1" :controls="false" class="weight-input" />
+        <span class="weight-hint">数值越大越靠前</span>
+      </div>
       <template #footer>
         <el-button @click="approveVisible = false">取消</el-button>
         <el-button type="primary" :loading="approving" @click="confirmApprove">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="tagDialogVisible" :title="editingTagId ? '编辑标签' : '新增标签'" width="420px">
+      <el-form label-width="60px">
+        <el-form-item label="名称">
+          <el-input v-model="tagForm.name" maxlength="30" show-word-limit />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="tagForm.sort" :min="0" :max="9999" controls-position="right" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="tagDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="tagSaving" @click="saveTag">确定</el-button>
       </template>
     </el-dialog>
 
@@ -169,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import LazyImage from '@/components/LazyImage.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
@@ -185,6 +258,7 @@ import {
   rejectSite,
   updateSiteTag,
   updateSiteTags,
+  updateSiteWeight,
 } from '@/api/adminSite'
 import { SiteStatus, SiteStatusColor, SiteStatusMap } from '@/types/site'
 import type { SiteLink, SiteStats, SiteTag } from '@/types/site'
@@ -200,15 +274,20 @@ const { decryptImage, clearCache } = useImageDecrypt(getAdminImageBlob)
 const sites = ref<SiteLink[]>([])
 const loading = ref(false)
 const keyword = ref('')
+const username = ref('')
 const statusFilter = ref<number | null>(null)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const dateRange = ref<[string, string] | null>(null)
+const sortField = ref<'createdAt' | 'submittedAt' | 'reviewedAt' | 'title' | 'weight'>('submittedAt')
+const sortOrder = ref<'asc' | 'desc'>('desc')
 const stats = ref<SiteStats>({ mine: null, pending: null, published: null, rejected: null })
 
 const tags = ref<SiteTag[]>([])
 const tagLoading = ref(false)
 const tagSaving = ref(false)
+const tagDialogVisible = ref(false)
 const editingTagId = ref<number | null>(null)
 const tagForm = reactive({ name: '', sort: 0 })
 
@@ -216,6 +295,23 @@ const approveVisible = ref(false)
 const approving = ref(false)
 const approveTagIds = ref<number[]>([])
 const approveTarget = ref<SiteLink | null>(null)
+const approveWeight = ref(0)
+const tagSearch = ref('')
+const newTagName = ref('')
+const customTagAdding = ref(false)
+
+const filteredTags = computed(() => {
+  const kw = tagSearch.value.trim()
+  if (!kw) return tags.value
+  return tags.value.filter((t) => t.name.includes(kw))
+})
+
+const formatDateTime = (value: string): string => {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const loadSites = async () => {
   loading.value = true
@@ -226,8 +322,11 @@ const loadSites = async () => {
       // 待审批 Tab 固定过滤 status=1，全部 Tab 用下拉筛选
       status: activeTab.value === 'pending' ? SiteStatus.PENDING : statusFilter.value,
       keyword: keyword.value.trim() || undefined,
-      sortField: activeTab.value === 'pending' ? 'submittedAt' : 'createdAt',
-      sortOrder: 'desc',
+      username: username.value.trim() || undefined,
+      startDate: dateRange.value?.[0],
+      endDate: dateRange.value?.[1],
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
     })
     sites.value = res.data?.records || []
     total.value = res.data?.total || 0
@@ -274,6 +373,12 @@ const onKeywordInput = () => {
   keywordTimer = setTimeout(applyFilters, 300)
 }
 
+let usernameTimer: ReturnType<typeof setTimeout> | null = null
+const onUsernameInput = () => {
+  if (usernameTimer) clearTimeout(usernameTimer)
+  usernameTimer = setTimeout(applyFilters, 300)
+}
+
 const onTabChange = () => {
   currentPage.value = 1
   statusFilter.value = null
@@ -284,6 +389,9 @@ const onTabChange = () => {
 const openApprove = (site: SiteLink) => {
   approveTarget.value = site
   approveTagIds.value = site.tags?.map((t) => t.id) || []
+  approveWeight.value = site.weight || 0
+  tagSearch.value = ''
+  newTagName.value = ''
   approveVisible.value = true
 }
 
@@ -291,22 +399,56 @@ const openApprove = (site: SiteLink) => {
 const onApproveClosed = () => {
   approveTarget.value = null
   approveTagIds.value = []
+  approveWeight.value = 0
+  tagSearch.value = ''
+  newTagName.value = ''
+}
+
+const toggleTag = (id: number) => {
+  const idx = approveTagIds.value.indexOf(id)
+  if (idx === -1) approveTagIds.value.push(id)
+  else approveTagIds.value.splice(idx, 1)
+}
+
+const addCustomTag = async () => {
+  const name = newTagName.value.trim()
+  if (!name) {
+    ElMessage.warning('请输入新标签名')
+    return
+  }
+  if (tags.value.some((t) => t.name === name)) {
+    ElMessage.warning('该标签已存在')
+    return
+  }
+  customTagAdding.value = true
+  try {
+    await createSiteTag({ name, sort: 10 })
+    newTagName.value = ''
+    await loadTags()
+    // 自动选中刚新建的标签
+    const created = tags.value.find((t) => t.name === name)
+    if (created) toggleTag(created.id)
+  } catch {
+    /* 请求层已提示 */
+  } finally {
+    customTagAdding.value = false
+  }
 }
 
 const confirmApprove = async () => {
   if (!approveTarget.value) return
-  if (!approveTagIds.value.length) {
-    ElMessage.warning('请至少选择一个标签')
-    return
-  }
   approving.value = true
   try {
-    // 已公开站点走改标签接口，待审批走通过接口
+    const weight = approveWeight.value || 0
+    // 已公开站点走改标签+改权重接口，待审批走通过接口
     if (approveTarget.value.status === SiteStatus.PUBLIC) {
-      await updateSiteTags(approveTarget.value.id, approveTagIds.value)
-      ElMessage.success('标签已更新')
+      await Promise.all([
+        updateSiteTags(approveTarget.value.id, approveTagIds.value),
+        updateSiteWeight(approveTarget.value.id, weight),
+      ])
+      ElMessage.success('标签与权重已更新')
     } else {
-      await approveSite(approveTarget.value.id, approveTagIds.value)
+      await approveSite(approveTarget.value.id, approveTagIds.value, weight)
       ElMessage.success('已通过审批')
     }
     approveVisible.value = false
@@ -360,17 +502,14 @@ const handleOffline = async (site: SiteLink) => {
   }
 }
 
-const startEditTag = (tag: SiteTag) => {
-  editingTagId.value = tag.id
-  tagForm.name = tag.name
-  tagForm.sort = tag.sort
+const openTagDialog = (tag?: SiteTag) => {
+  editingTagId.value = tag ? tag.id : null
+  tagForm.name = tag ? tag.name : ''
+  tagForm.sort = tag ? tag.sort : 0
+  tagDialogVisible.value = true
 }
 
-const resetTagForm = () => {
-  editingTagId.value = null
-  tagForm.name = ''
-  tagForm.sort = 0
-}
+const startEditTag = (tag: SiteTag) => openTagDialog(tag)
 
 const saveTag = async () => {
   const name = tagForm.name.trim()
@@ -382,7 +521,7 @@ const saveTag = async () => {
   try {
     if (editingTagId.value) await updateSiteTag(editingTagId.value, { name, sort: tagForm.sort })
     else await createSiteTag({ name, sort: tagForm.sort })
-    resetTagForm()
+    tagDialogVisible.value = false
     await loadTags()
   } catch {
     /* 请求层已提示 */
@@ -420,7 +559,11 @@ onMounted(() => {
   void loadStats()
 })
 
-onUnmounted(clearCache)
+onUnmounted(() => {
+  clearCache()
+  if (keywordTimer) clearTimeout(keywordTimer)
+  if (usernameTimer) clearTimeout(usernameTimer)
+})
 </script>
 
 <style scoped lang="scss">
@@ -475,6 +618,12 @@ onUnmounted(clearCache)
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+
+  :deep(.filter-date) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .search {
@@ -483,6 +632,10 @@ onUnmounted(clearCache)
 
 .filter-item {
   width: 150px;
+}
+
+.filter-order {
+  width: 110px;
 }
 
 .site-cell {
@@ -589,8 +742,82 @@ onUnmounted(clearCache)
   color: var(--ev-text-muted, #90a4bb);
 }
 
-.tag-select {
+.tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tag-picker-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-search {
   width: 100%;
+}
+
+.tag-create {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-create-input {
+  flex: 1;
+}
+
+.tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.tag-option {
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ev-border-default);
+  font-size: 13px;
+  color: var(--ev-text-secondary);
+  user-select: none;
+  transition: all 0.15s var(--ev-ease-out);
+
+  &:hover {
+    border-color: var(--ev-primary);
+    color: var(--ev-primary);
+  }
+
+  &.is-selected {
+    background: var(--ev-primary);
+    border-color: var(--ev-primary);
+    color: #ffffff;
+  }
+}
+
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.weight-label {
+  font-size: 13px;
+  color: var(--ev-text-secondary);
+  flex-shrink: 0;
+}
+
+.weight-input {
+  width: 160px;
+}
+
+.weight-hint {
+  font-size: 12px;
+  color: var(--ev-text-muted, #90a4bb);
 }
 </style>
 

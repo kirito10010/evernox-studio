@@ -68,6 +68,40 @@ export interface TopicCircleListParams {
   mine?: boolean
 }
 
+export interface AdminTopicPostListParams {
+  page: number
+  size: number
+  keyword?: string
+  username?: string
+  circleId?: number | null
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'likeCount' | 'commentCount' | 'favoriteCount'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface AdminTopicCommentListParams {
+  page: number
+  size: number
+  keyword?: string
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface AdminTopicCircleListParams {
+  page: number
+  size: number
+  keyword?: string
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt' | 'postCount' | 'memberCount'
+  sortOrder?: 'asc' | 'desc'
+}
+
 export interface TopicPostListParams {
   page: number
   size: number

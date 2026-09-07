@@ -9,6 +9,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AlbumCoverCropper: typeof import('./components/AlbumCoverCropper.vue')['default']
     AnnouncementBell: typeof import('./components/AnnouncementBell.vue')['default']
+    ChinaMap: typeof import('./components/game/ChinaMap.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
@@ -56,6 +57,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElUpload: typeof import('element-plus/es')['ElUpload']
     ExpenseChart: typeof import('./components/ExpenseChart.vue')['default']
+    ExpensePieChart: typeof import('./components/ExpensePieChart.vue')['default']
     ImageLightbox: typeof import('./components/ImageLightbox.vue')['default']
     LazyImage: typeof import('./components/LazyImage.vue')['default']
     PerformanceChart: typeof import('./components/PerformanceChart.vue')['default']
@@ -68,6 +70,8 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SalaryChart: typeof import('./components/SalaryChart.vue')['default']
     SiteCard: typeof import('./components/SiteCard.vue')['default']
+    TagsView: typeof import('./components/TagsView.vue')['default']
+    ThemeSettingDrawer: typeof import('./components/ThemeSettingDrawer.vue')['default']
     UploadModal: typeof import('./components/UploadModal.vue')['default']
   }
   export interface ComponentCustomProperties {

@@ -21,9 +21,9 @@ export const getAdminSites = (
   return get(`/admin/site/list${buildQuery({ ...params })}`)
 }
 
-/** 审批通过，必须带标签 */
-export const approveSite = (id: number, tagIds: number[]): Promise<Result<void>> => {
-  return post(`/admin/site/${id}/approve`, { tagIds })
+/** 审批通过，必须带标签，可设权重 */
+export const approveSite = (id: number, tagIds: number[], weight: number): Promise<Result<void>> => {
+  return post(`/admin/site/${id}/approve`, { tagIds, weight })
 }
 
 /** 审批驳回，必须带原因 */
@@ -39,6 +39,11 @@ export const offlineSite = (id: number): Promise<Result<void>> => {
 /** 调整已公开站点的标签 */
 export const updateSiteTags = (id: number, tagIds: number[]): Promise<Result<void>> => {
   return put(`/admin/site/${id}/tags`, { tagIds })
+}
+
+/** 调整已公开站点的权重 */
+export const updateSiteWeight = (id: number, weight: number): Promise<Result<void>> => {
+  return put(`/admin/site/${id}/weight?weight=${weight}`)
 }
 
 /** 标签库列表（含关联站点数） */

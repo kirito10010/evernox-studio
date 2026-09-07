@@ -328,7 +328,7 @@ const formatSize = (bytes: number): string => {
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     :deep(.el-dialog) {
-      background: rgba(255, 255, 255, 0.96);
+      background: var(--ev-bg-glass-strong);
     }
   }
 
@@ -416,7 +416,7 @@ const formatSize = (bytes: number): string => {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
 
   .preview-thumb {
@@ -424,7 +424,7 @@ const formatSize = (bytes: number): string => {
     aspect-ratio: 1;
     object-fit: cover;
     display: block;
-    background: linear-gradient(135deg, var(--ev-mist), #fff);
+    background: linear-gradient(135deg, var(--ev-mist), var(--ev-bg-elevated));
     box-shadow: inset 0 0 0 1px var(--ev-border-default);
   }
 
@@ -534,7 +534,7 @@ const formatSize = (bytes: number): string => {
   padding: 12px;
   border: 1px solid var(--ev-border-subtle);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--ev-bg-glass-light);
   max-height: 160px;
   overflow-y: auto;
 

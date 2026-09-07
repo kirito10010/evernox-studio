@@ -22,7 +22,9 @@ public interface AnnouncementService {
 
     void batchDelete(List<Long> ids);
 
-    IPage<AnnouncementResponse> listAdmin(int page, int size, String keyword);
+    IPage<AnnouncementResponse> listAdmin(int page, int size, String keyword, Long tagId,
+                                          String username, String startDate, String endDate,
+                                          String sortField, String sortOrder);
 
     // ==================== 用户 ====================
 

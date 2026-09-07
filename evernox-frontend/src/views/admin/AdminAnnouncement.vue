@@ -16,10 +16,40 @@
         v-model="keyword"
         placeholder="搜索标题"
         clearable
-        style="width: 240px"
+        style="width: 200px"
         @input="onKeywordInput"
         @clear="onKeywordClear"
       />
+      <el-select v-model="tagFilter" placeholder="全部标签" clearable style="width: 130px" @change="applyFilters">
+        <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
+      </el-select>
+      <el-input
+        v-model="username"
+        placeholder="发布人"
+        clearable
+        style="width: 140px"
+        @input="onUsernameInput"
+        @clear="applyFilters"
+      />
+      <el-date-picker
+        v-model="dateRange"
+        type="daterange"
+        value-format="YYYY-MM-DD"
+        range-separator="~"
+        start-placeholder="发布起"
+        end-placeholder="止"
+        class="filter-date"
+        @change="applyFilters"
+      />
+      <el-select v-model="sortField" placeholder="默认排序" style="width: 130px" @change="applyFilters">
+        <el-option label="默认排序" value="" />
+        <el-option label="发布时间" value="createdAt" />
+        <el-option label="标题" value="title" />
+      </el-select>
+      <el-select v-model="sortOrder" style="width: 100px" @change="applyFilters">
+        <el-option label="降序" value="desc" />
+        <el-option label="升序" value="asc" />
+      </el-select>
     </div>
 
     <el-table v-loading="loading" :data="list" @selection-change="onSelectionChange">
@@ -35,7 +65,9 @@
         </template>
       </el-table-column>
       <el-table-column prop="createdByName" label="发布人" width="120" />
-      <el-table-column prop="createdAt" label="发布时间" width="180" />
+      <el-table-column label="发布时间" width="180">
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEditDialog(row as AnnouncementResponse)">编辑</el-button>
@@ -147,6 +179,18 @@ const total = ref(0)
 const page = ref(1)
 const size = ref(10)
 const keyword = ref('')
+const username = ref('')
+const tagFilter = ref<number | null>(null)
+const dateRange = ref<[string, string] | null>(null)
+const sortField = ref<'createdAt' | 'title' | ''>('')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+
+const formatDateTime = (value: string): string => {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 const loading = ref(false)
 const submitting = ref(false)
 const selectedIds = ref<number[]>([])
@@ -177,6 +221,12 @@ const loadList = async () => {
       page: page.value,
       size: size.value,
       keyword: keyword.value || undefined,
+      tagId: tagFilter.value,
+      username: username.value.trim() || undefined,
+      startDate: dateRange.value?.[0],
+      endDate: dateRange.value?.[1],
+      sortField: sortField.value || undefined,
+      sortOrder: sortField.value ? sortOrder.value : undefined,
     })
     list.value = res.data?.records || []
     total.value = res.data?.total || 0
@@ -201,6 +251,17 @@ const onKeywordInput = () => {
 const onKeywordClear = () => {
   page.value = 1
   loadList()
+}
+
+const applyFilters = () => {
+  page.value = 1
+  loadList()
+}
+
+let usernameTimer: ReturnType<typeof setTimeout> | null = null
+const onUsernameInput = () => {
+  if (usernameTimer) clearTimeout(usernameTimer)
+  usernameTimer = setTimeout(applyFilters, 300)
 }
 
 const onSelectionChange = (rows: AnnouncementResponse[]) => {
@@ -340,6 +401,7 @@ onMounted(() => {
 onUnmounted(() => {
   clearAnnouncementCache()
   if (keywordTimer) clearTimeout(keywordTimer)
+  if (usernameTimer) clearTimeout(usernameTimer)
 })
 </script>
 
@@ -371,7 +433,17 @@ onUnmounted(() => {
   }
 
   .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
     margin-bottom: 16px;
+
+    :deep(.filter-date) {
+      flex: none !important;
+      width: 250px !important;
+      max-width: 250px !important;
+    }
   }
 
   .table-footer {

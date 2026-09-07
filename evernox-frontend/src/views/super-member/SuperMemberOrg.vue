@@ -4,7 +4,7 @@
   </div>
   <div v-else class="super-member-intro">
     <div class="intro-card">
-      <h2 class="intro-title">组织积分</h2>
+      <h2 class="intro-title">火影组织管理</h2>
       <p class="intro-sub">超级会员专属功能</p>
       <div class="intro-desc">
         <p>面向火影忍者OL 游戏组织的周积分统计与功勋礼包管理：</p>

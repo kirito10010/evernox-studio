@@ -18,6 +18,8 @@ export interface ImageResponse {
   purpose: number
   createdAt: string
   uploaderName: string
+  /** 所属相册名列表 */
+  albumNames: string[]
 }
 
 export interface AlbumResponse {
@@ -103,17 +105,54 @@ export const uploadImage = (
 /** 获取当前用户图片列表 */
 export const getMyImages = (
   page = 1,
-  size = 20
+  size = 20,
+  filters?: {
+    orientation?: string
+    resolution?: string
+    albumId?: number
+    inAlbum?: boolean
+  }
 ): Promise<Result<PageResult<ImageResponse>>> => {
-  return get(`/image/list?page=${page}&size=${size}`)
+  const qs = new URLSearchParams()
+  qs.set('page', String(page))
+  qs.set('size', String(size))
+  if (filters?.orientation) qs.set('orientation', filters.orientation)
+  if (filters?.resolution) qs.set('resolution', filters.resolution)
+  if (filters?.albumId != null) qs.set('albumId', String(filters.albumId))
+  if (filters?.inAlbum === false) qs.set('inAlbum', 'false')
+  return get(`/image/list?${qs.toString()}`)
 }
 
 /** 获取公开图片列表 */
 export const getPublicImages = (
   page = 1,
-  size = 20
+  size = 20,
+  filters?: {
+    orientation?: string
+    resolution?: string
+    albumId?: number
+    inAlbum?: boolean
+    authorId?: number
+    seed?: number
+  }
 ): Promise<Result<PageResult<ImageResponse>>> => {
-  return get(`/image/public?page=${page}&size=${size}`)
+  const qs = new URLSearchParams()
+  qs.set('page', String(page))
+  qs.set('size', String(size))
+  if (filters?.orientation) qs.set('orientation', filters.orientation)
+  if (filters?.resolution) qs.set('resolution', filters.resolution)
+  if (filters?.albumId != null) qs.set('albumId', String(filters.albumId))
+  if (filters?.inAlbum === false) qs.set('inAlbum', 'false')
+  if (filters?.authorId != null) qs.set('authorId', String(filters.authorId))
+  if (filters?.seed != null) qs.set('seed', String(filters.seed))
+  return get(`/image/public?${qs.toString()}`)
+}
+
+/** 获取有公开图片的作者列表 */
+export const getPublicImageAuthors = (): Promise<
+  Result<{ id: number; username: string }[]>
+> => {
+  return get('/image/public/authors')
 }
 
 /** 获取图片详情 */
@@ -231,9 +270,16 @@ export const getMyAlbums = (
 /** 获取公开相册列表 */
 export const getPublicAlbums = (
   page = 1,
-  size = 20
+  size = 20,
+  userId?: number,
+  seed?: number
 ): Promise<Result<PageResult<AlbumResponse>>> => {
-  return get(`/album/public?page=${page}&size=${size}`)
+  const qs = new URLSearchParams()
+  qs.set('page', String(page))
+  qs.set('size', String(size))
+  if (userId != null) qs.set('userId', String(userId))
+  if (seed != null) qs.set('seed', String(seed))
+  return get(`/album/public?${qs.toString()}`)
 }
 
 /** 获取相册详情 */

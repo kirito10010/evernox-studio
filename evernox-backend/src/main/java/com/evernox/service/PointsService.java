@@ -16,4 +16,7 @@ public interface PointsService {
 
     /** 用户自助用积分开通/续费超级会员 */
     void upgradeSuperMember(Long userId, Integer days);
+
+    /** 系统发奖（沙盘争霸等游戏奖励），日志 type=game_reward */
+    void award(Long userId, Integer points, String description);
 }

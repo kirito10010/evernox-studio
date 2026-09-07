@@ -105,8 +105,39 @@ export interface OrgImportResult {
   emptyNames: string[]
 }
 
-export interface OrgMemberImportResult {
-  importedNames: string[]
+export interface OrgMemberImportCandidate {
+  name: string
+  position: string | null
+}
+
+export interface OrgMemberImportUpdateCandidate {
+  memberId: number
+  name: string
+  oldPosition: string | null
+  newPosition: string | null
+}
+
+export interface OrgMemberImportPreviewResult {
+  toAdd: OrgMemberImportCandidate[]
+  unchangedNames: string[]
+  toRestore: OrgMember[]
+  toUpdate: OrgMemberImportUpdateCandidate[]
+  toLeave: OrgMember[]
+}
+
+export interface OrgMemberImportApplyRequest {
+  organizationId: number
+  add: OrgMemberImportCandidate[]
+  updates: OrgMemberImportUpdateCandidate[]
+  restoreIds: number[]
+  leaveIds: number[]
+}
+
+export interface OrgMemberImportApplyResult {
+  addedNames: string[]
+  updatedNames: string[]
+  restoredNames: string[]
+  leftNames: string[]
   skippedNames: string[]
 }
 

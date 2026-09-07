@@ -3,15 +3,19 @@ package com.evernox.service.impl;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.evernox.common.ResultCode;
 import com.evernox.dto.QuizImportResponse;
 import com.evernox.dto.QuizQuestionRequest;
 import com.evernox.dto.QuizQuestionResponse;
 import com.evernox.entity.QuizQuestion;
 import com.evernox.exception.BusinessException;
 import com.evernox.repository.QuizQuestionRepository;
+import com.evernox.service.AdminApprovalService;
 import com.evernox.service.QuizQuestionService;
+import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +49,13 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
     private static final double MIN_SCORE = 0.3;
     private static final int MAX_SEARCH_RESULTS = 20;
 
+    /** 排序字段白名单 */
+    private static final Map<String, String> SORT_COLUMNS = Map.of(
+            "createdAt", "created_at"
+    );
+
     private final QuizQuestionRepository questionRepository;
+    private final AdminApprovalService adminApprovalService;
 
     // ==================== 用户侧 ====================
 
@@ -84,21 +96,47 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         q.setCreatedBy(userId);
         questionRepository.insert(q);
         log.info("测验题目提交: id={}, user={}", q.getId(), userId);
+        adminApprovalService.notifyPending("忍者测验题目");
         return QuizQuestionResponse.from(q);
     }
 
     // ==================== 管理员侧 ====================
 
     @Override
-    public IPage<QuizQuestionResponse> list(int page, int size, Integer status, String keyword) {
-        LambdaQueryWrapper<QuizQuestion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(status != null, QuizQuestion::getStatus, status);
-        if (StringUtils.hasText(keyword)) {
-            wrapper.like(QuizQuestion::getQuestion, keyword.trim());
+    public IPage<QuizQuestionResponse> list(int page, int size, Integer status, String keyword,
+                                            String startDate, String endDate, String sortField, String sortOrder) {
+        QueryWrapper<QuizQuestion> wrapper = new QueryWrapper<>();
+        if (status != null) {
+            wrapper.eq("status", status);
         }
-        wrapper.orderByDesc(QuizQuestion::getId);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.like("question", keyword.trim());
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("created_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("created_at", end.plusDays(1).atStartOfDay());
+        }
+
+        String column = SortColumnResolver.resolve(SORT_COLUMNS, sortField, "created_at");
+        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
+        wrapper.orderByDesc("id");
         IPage<QuizQuestion> raw = questionRepository.selectPage(newPage(page, size), wrapper);
         return raw.convert(QuizQuestionResponse::from);
+    }
+
+    private LocalDate parseDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
     }
 
     @Override
@@ -219,6 +257,7 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         apply(q, request, normalized);
         q.setStatus(STATUS_PENDING);
         questionRepository.updateById(q);
+        adminApprovalService.notifyPending("忍者测验题目");
         return QuizQuestionResponse.from(q);
     }
 
@@ -241,6 +280,7 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         }
         q.setStatus(STATUS_PENDING);
         questionRepository.updateById(q);
+        adminApprovalService.notifyPending("忍者测验题目");
     }
 
     // ==================== 内部方法 ====================

@@ -103,9 +103,10 @@ onBeforeUnmount(() => {
   }
 
   :deep(img) {
+    display: block;
     max-width: 100%;
     border-radius: 8px;
-    margin: 6px 0;
+    margin: 8px 0;
   }
 
   :deep(img.img-failed) {

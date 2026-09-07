@@ -76,10 +76,11 @@
   --ev-glow-rose:    0 8px 28px -8px rgba(242, 99, 127, 0.28);
   --ev-glow-emerald: 0 8px 28px -8px rgba(127, 216, 232, 0.28);
 
-  /* Blur presets */
-  --ev-blur-sm: blur(12px) saturate(150%);
-  --ev-blur-md: blur(20px) saturate(160%);
-  --ev-blur-lg: blur(32px) saturate(170%);
+  /* Blur presets — 模糊值刻意压小：backdrop-filter 是最耗性能的 CSS 滤镜，
+     大面积使用大半径 blur 会导致滚动/动画掉帧。 */
+  --ev-blur-sm: blur(6px);
+  --ev-blur-md: blur(8px);
+  --ev-blur-lg: blur(14px);
 
   /* Radii */
   --ev-radius-sm:   8px;
@@ -92,6 +93,49 @@
   /* Transitions */
   --ev-ease-out:    cubic-bezier(0.4, 0, 0.2, 1);
   --ev-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   深色主题（data-theme='dark'）
+   覆盖背景 / 文字 / 边框 / 阴影等令牌；主色与渐变保持蓝色系
+   ============================================================ */
+[data-theme='dark'] {
+  /* Background layers — 深蓝黑 */
+  --ev-bg-deep:         #0f1621;
+  --ev-bg-surface:      #131c2a;
+  --ev-bg-elevated:     #1a2434;
+  --ev-bg-glass:        rgba(26, 36, 52, 0.66);
+  --ev-bg-glass-strong: rgba(30, 42, 60, 0.85);
+  --ev-bg-glass-light:  rgba(26, 36, 52, 0.45);
+  --ev-bg-tint:         rgba(47, 124, 246, 0.10);
+  --ev-bg-tint-strong:  rgba(47, 124, 246, 0.16);
+
+  /* Text — 高对比浅色，保证阅读清晰 */
+  --ev-text-primary:    #e6edf5;
+  --ev-text-secondary:  #a3b3c6;
+  --ev-text-muted:      #6f8096;
+  --ev-text-on-accent:  #ffffff;
+
+  /* Borders — 半透明白 */
+  --ev-border-subtle:  rgba(255, 255, 255, 0.06);
+  --ev-border-default: rgba(255, 255, 255, 0.12);
+  --ev-border-hover:   rgba(47, 124, 246, 0.42);
+  --ev-border-active:  rgba(47, 124, 246, 0.62);
+  --ev-border-gloss:   rgba(255, 255, 255, 0.08);
+
+  /* 主色微调：深色下 hover 提亮而非变暗 */
+  --ev-primary-hover: #4a8df8;
+  --ev-mist:          #2a3648;
+
+  /* Shadows — 更重、更低透明度 */
+  --ev-shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.4);
+  --ev-shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.4);
+  --ev-shadow-card:  0 1px 2px rgba(0, 0, 0, 0.4),
+                     0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --ev-shadow-lg:    0 2px 4px rgba(0, 0, 0, 0.4),
+                     0 12px 32px -10px rgba(0, 0, 0, 0.5);
+  --ev-shadow-float: 0 20px 50px -16px rgba(0, 0, 0, 0.6);
+  --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 /* ---------- Reset ---------- */
@@ -248,11 +292,11 @@ textarea:focus-visible,
 
 /* ---------- Page Transition Classes ---------- */
 .page-fade-enter-active {
-  animation: page-enter 0.35s var(--ev-ease-out) both;
+  animation: page-enter 0.12s var(--ev-ease-out) both;
 }
 
 .page-fade-leave-active {
-  animation: page-leave 0.25s var(--ev-ease-out) both;
+  animation: page-leave 0.1s var(--ev-ease-out) both;
 }
 
 /* ---------- Reduced motion ---------- */
@@ -273,29 +317,29 @@ textarea:focus-visible,
 /* --- Input / Textarea --- */
 .el-input__wrapper,
 .el-textarea__inner {
-  background-color: rgba(255, 255, 255, 0.78) !important;
+  background-color: var(--ev-bg-glass-strong) !important;
   box-shadow:
     0 0 0 1px var(--ev-border-default) inset,
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    var(--ev-inset-gloss),
     0 1px 2px rgba(18, 48, 79, 0.03) !important;
   border-radius: var(--ev-radius-md) !important;
   transition: all 0.3s var(--ev-ease-out) !important;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.9) !important;
+    background-color: var(--ev-bg-elevated) !important;
     box-shadow:
       0 0 0 1px var(--ev-border-hover) inset,
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      var(--ev-inset-gloss),
       0 1px 2px rgba(18, 48, 79, 0.04) !important;
   }
 }
 
 .el-input__wrapper {
   &.is-focus {
-    background-color: #ffffff !important;
+    background-color: var(--ev-bg-elevated) !important;
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      var(--ev-inset-gloss),
       0 1px 3px rgba(18, 48, 79, 0.05) !important;
   }
 
@@ -340,7 +384,7 @@ textarea:focus-visible,
 .el-form-item.is-error {
   .el-input__wrapper,
   .el-textarea__inner {
-    background-color: rgba(255, 255, 255, 0.86) !important;
+    background-color: var(--ev-bg-glass-strong) !important;
     box-shadow: 0 0 0 1.5px var(--ev-danger) inset !important;
   }
 }
@@ -351,7 +395,7 @@ textarea:focus-visible,
 .el-input__inner:-webkit-autofill:focus,
 .el-input__inner:-webkit-autofill:active {
   -webkit-text-fill-color: var(--ev-text-primary) !important;
-  -webkit-box-shadow: inset 0 0 0 1000px rgba(255, 255, 255, 0.94) !important;
+  -webkit-box-shadow: inset 0 0 0 1000px var(--ev-bg-elevated) !important;
   caret-color: var(--ev-text-primary);
   transition: background-color 9999s ease-out 0s !important;
 }
@@ -365,10 +409,10 @@ textarea:focus-visible,
   }
 
   &:focus {
-    background-color: #ffffff !important;
+    background-color: var(--ev-bg-elevated) !important;
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      var(--ev-inset-gloss),
       0 1px 3px rgba(18, 48, 79, 0.05) !important;
   }
 }
@@ -381,10 +425,10 @@ textarea:focus-visible,
   color: var(--ev-text-primary) !important;
 
   &.is-focused {
-    background-color: rgba(255, 255, 255, 0.92) !important;
+    background-color: var(--ev-bg-elevated) !important;
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      var(--ev-inset-gloss),
       0 1px 3px rgba(18, 48, 79, 0.05) !important;
   }
 }
@@ -408,73 +452,77 @@ textarea:focus-visible,
 /* --- Buttons --- */
 .el-button {
   border-radius: var(--ev-radius-md) !important;
-  transition: all 0.3s var(--ev-ease-out) !important;
+  transition: all 0.25s var(--ev-ease-out) !important;
 }
 
 .el-button--primary {
-  background: var(--ev-grad-aurora) !important;
-  border: none !important;
-  color: var(--ev-text-on-accent) !important;
+  background: var(--ev-primary) !important;
+  border: 1px solid var(--ev-primary) !important;
+  color: #ffffff !important;
   font-weight: 600 !important;
-  letter-spacing: 0.3px !important;
-  box-shadow: var(--ev-glow-violet), var(--ev-inset-gloss) !important;
-  position: relative;
-  overflow: hidden;
-  @include ev-shimmer;
+  letter-spacing: 0.2px !important;
+  box-shadow: 0 2px 6px rgba(47, 124, 246, 0.22) !important;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px -10px rgba(47, 124, 246, 0.42),
-                var(--ev-inset-gloss) !important;
+    background: var(--ev-primary-hover) !important;
+    border-color: var(--ev-primary-hover) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(47, 124, 246, 0.3) !important;
   }
 
   &:active {
-    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(47, 124, 246, 0.22) !important;
   }
 
   &.is-disabled,
   &.is-disabled:hover {
     background: var(--ev-mist) !important;
+    border-color: var(--ev-mist) !important;
     color: #ffffff !important;
     box-shadow: none !important;
-    transform: none;
   }
 }
 
 .el-button--default {
-  background: var(--ev-bg-glass) !important;
+  background: var(--ev-bg-glass-strong) !important;
   border: 1px solid var(--ev-border-default) !important;
   color: var(--ev-text-secondary) !important;
-  backdrop-filter: var(--ev-blur-sm);
-  -webkit-backdrop-filter: var(--ev-blur-sm);
   box-shadow: var(--ev-shadow-xs) !important;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.85) !important;
+    background: var(--ev-bg-elevated) !important;
     border-color: var(--ev-border-hover) !important;
     color: var(--ev-primary) !important;
-    transform: translateY(-1px);
     box-shadow: var(--ev-shadow-sm) !important;
   }
 }
 
 .el-button--danger {
-  background: linear-gradient(135deg, #f2637f 0%, #f58aa0 100%) !important;
-  border: none !important;
+  background: var(--ev-danger) !important;
+  border: 1px solid var(--ev-danger) !important;
   color: #ffffff !important;
-  box-shadow: var(--ev-glow-rose), var(--ev-inset-gloss) !important;
+  box-shadow: 0 2px 6px rgba(242, 99, 127, 0.2) !important;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px -10px rgba(242, 99, 127, 0.4) !important;
+    background: #e25470 !important;
+    border-color: #e25470 !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(242, 99, 127, 0.28) !important;
   }
 }
 
 .el-button--success {
-  background: linear-gradient(135deg, #34c9a3 0%, #6fdcc0 100%) !important;
-  border: none !important;
+  background: var(--ev-success) !important;
+  border: 1px solid var(--ev-success) !important;
   color: #ffffff !important;
-  box-shadow: var(--ev-glow-emerald), var(--ev-inset-gloss) !important;
+  box-shadow: 0 2px 6px rgba(52, 201, 163, 0.2) !important;
+
+  &:hover {
+    background: #2bb893 !important;
+    border-color: #2bb893 !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(52, 201, 163, 0.28) !important;
+  }
 }
 
 .el-button.is-text,
@@ -542,6 +590,14 @@ textarea:focus-visible,
   background-color: rgba(18, 48, 79, 0.22) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+}
+
+/* 工作台弹窗统一尺寸：固定内容区高度，数据多时在弹窗内部滚动
+   （记录绩效 / 记账 / 记录工资 共用） */
+.ev-dialog-body {
+  height: 720px;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* --- Drawer --- */
@@ -635,7 +691,7 @@ textarea:focus-visible,
 
 /* --- Avatar --- */
 .el-avatar {
-  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  border: 2px solid var(--ev-bg-elevated) !important;
   box-shadow: var(--ev-shadow-sm) !important;
   background: var(--ev-grad-aurora) !important;
   color: var(--ev-text-on-accent) !important;
@@ -696,24 +752,25 @@ textarea:focus-visible,
   .btn-prev,
   .btn-next,
   .el-pager li {
-    background: var(--ev-bg-glass-light) !important;
-    border: 1px solid var(--ev-border-subtle) !important;
+    background: var(--ev-bg-glass-strong) !important;
+    border: 1px solid var(--ev-border-default) !important;
     border-radius: var(--ev-radius-sm) !important;
     color: var(--ev-text-secondary) !important;
-    transition: all 0.25s var(--ev-ease-out) !important;
+    transition: all 0.2s var(--ev-ease-out) !important;
 
     &:hover {
       color: var(--ev-primary) !important;
       border-color: var(--ev-border-hover) !important;
-      background: rgba(255, 255, 255, 0.8) !important;
+      background: var(--ev-bg-elevated) !important;
     }
   }
 
   .el-pager li.is-active {
-    background: var(--ev-grad-aurora) !important;
-    border-color: transparent !important;
-    color: var(--ev-text-on-accent) !important;
-    box-shadow: var(--ev-glow-violet) !important;
+    background: var(--ev-primary) !important;
+    border-color: var(--ev-primary) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 6px rgba(47, 124, 246, 0.22) !important;
   }
 }
 
@@ -771,7 +828,7 @@ textarea:focus-visible,
 
   .el-checkbox__inner,
   .el-radio__inner {
-    background: rgba(255, 255, 255, 0.85) !important;
+    background: var(--ev-bg-elevated) !important;
     border-color: var(--ev-border-hover) !important;
   }
 
@@ -807,7 +864,7 @@ textarea:focus-visible,
 
 /* --- Loading --- */
 .el-loading-mask {
-  background-color: rgba(255, 255, 255, 0.62) !important;
+  background-color: var(--ev-bg-glass) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -822,7 +879,7 @@ textarea:focus-visible,
 
 /* --- Skeleton --- */
 .el-skeleton__item {
-  background: linear-gradient(90deg, var(--ev-mist) 25%, #ffffff 37%, var(--ev-mist) 63%) !important;
+  background: linear-gradient(90deg, var(--ev-mist) 25%, var(--ev-bg-elevated) 37%, var(--ev-mist) 63%) !important;
   background-size: 400% 100% !important;
 }
 

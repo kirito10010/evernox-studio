@@ -46,6 +46,9 @@ public class SiteLink {
     /** 0私有/1待审批/2已公开/3已驳回 */
     private Integer status;
 
+    /** 排序权重，越大越靠前（默认 0） */
+    private Integer weight;
+
     /** 最近一次驳回原因，用户可见 */
     private String rejectReason;
 

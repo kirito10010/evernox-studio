@@ -3,9 +3,11 @@ import type {
   AdminUserCreateRequest,
   AdminUserListParams,
   AdminUserUpdateRequest,
+  ApprovalSummary,
   RechargePointsRequest,
   RedemptionCode,
   RedemptionCodeGenerateRequest,
+  RedemptionCodeListParams,
   Result,
   SetSuperMemberRequest,
   UserInfoResponse,
@@ -91,7 +93,24 @@ export const generateRedemptionCodes = (
   return post('/admin/redemption/generate', data)
 }
 
-/** 卡密列表 */
-export const getRedemptionCodes = (): Promise<Result<RedemptionCode[]>> => {
-  return get('/admin/redemption/list')
+/** 卡密列表（分页 + 多条件筛选） */
+export const getRedemptionCodes = (
+  params: RedemptionCodeListParams
+): Promise<Result<PageResult<RedemptionCode>>> => {
+  return get(`/admin/redemption/list${buildQuery({ ...params })}`)
+}
+
+/** 删除单张卡密 */
+export const deleteRedemptionCode = (id: number): Promise<Result<void>> => {
+  return del(`/admin/redemption/${id}`)
+}
+
+/** 批量删除卡密 */
+export const deleteRedemptionCodes = (ids: number[]): Promise<Result<void>> => {
+  return del(`/admin/redemption/batch?ids=${ids.join(',')}`)
+}
+
+/** 待审批条数汇总（网站/笔记/忍者测验） */
+export const getApprovalSummary = (): Promise<Result<ApprovalSummary>> => {
+  return get('/admin/approval/summary')
 }

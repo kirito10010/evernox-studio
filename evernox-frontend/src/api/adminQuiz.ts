@@ -1,7 +1,7 @@
 import { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
-import type { QuizImportResult, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+import type { AdminQuizListParams, QuizImportResult, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
 
 const buildQuery = (params: Record<string, unknown>): string => {
   const search = new URLSearchParams()
@@ -13,13 +13,10 @@ const buildQuery = (params: Record<string, unknown>): string => {
   return qs ? `?${qs}` : ''
 }
 
-export const getAdminQuizList = (params: {
-  page: number
-  size: number
-  status?: number | null
-  keyword?: string
-}): Promise<Result<PageResult<QuizQuestion>>> => {
-  return get(`/admin/quiz/list${buildQuery(params)}`)
+export const getAdminQuizList = (
+  params: AdminQuizListParams
+): Promise<Result<PageResult<QuizQuestion>>> => {
+  return get(`/admin/quiz/list${buildQuery({ ...params })}`)
 }
 
 export const createQuiz = (data: QuizQuestionRequest): Promise<Result<QuizQuestion>> => {

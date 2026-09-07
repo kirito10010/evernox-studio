@@ -78,38 +78,49 @@
     <!-- Album Detail Dialog -->
     <el-dialog
       v-model="albumDialogVisible"
-      :title="selectedAlbum?.name"
       width="85vw"
-      top="5vh"
+      align-center
       class="album-dialog"
     >
-      <div class="album-detail" v-if="selectedAlbum">
-        <div class="album-detail-header">
-          <div>
-            <h2>{{ selectedAlbum.name }}</h2>
-            <p v-if="selectedAlbum.description">{{ selectedAlbum.description }}</p>
-            <span class="detail-meta">by {{ selectedAlbum.creatorName }} · {{ selectedAlbum.imageCount }} 张照片</span>
-          </div>
+      <template #header>
+        <div class="dialog-title">
+          <span class="dialog-title-name">{{ selectedAlbum?.name }}</span>
+          <span v-if="selectedAlbum?.description" class="dialog-title-desc">{{ selectedAlbum.description }}</span>
+          <span class="dialog-title-meta">by {{ selectedAlbum?.creatorName }} · {{ selectedAlbum?.imageCount }} 张照片</span>
         </div>
+      </template>
+      <div class="album-detail" v-if="selectedAlbum">
 
-        <div ref="albumGridRef" class="album-images-masonry">
-          <div v-for="(col, colIdx) in albumColumns" :key="colIdx" class="masonry-col">
-            <div
-              v-for="img in col"
-              :key="img.id"
-              class="album-image-card"
-              @click="openLightbox(img)"
-            >
-              <LazyImage
-                :image-id="img.id"
-                :loader="loadThumb"
-                :ratio="aspectRatioOf(img)"
-                :alt="img.originalName"
-              />
-              <div class="album-image-hover-actions">
-                <el-button :icon="DocumentCopy" circle size="small" @click.stop="handleCopyUrl(img)" title="复制URL" />
+        <div class="album-images-scroll">
+          <div :ref="(el) => (albumGridRef = el as HTMLElement | null)" class="album-images-masonry">
+            <div v-for="(col, colIdx) in albumColumns" :key="colIdx" class="masonry-col">
+              <div
+                v-for="img in col"
+                :key="img.id"
+                class="album-image-card"
+                @click="openLightbox(img)"
+              >
+                <LazyImage
+                  :image-id="img.id"
+                  :loader="loadThumb"
+                  :ratio="aspectRatioOf(img)"
+                  :alt="img.originalName"
+                />
+                <div class="album-image-hover-actions">
+                  <el-button :icon="DocumentCopy" circle size="small" @click.stop="handleCopyUrl(img)" title="复制URL" />
+                </div>
               </div>
             </div>
+          </div>
+
+          <div class="album-footer" v-if="albumImages.length > 0">
+            <div v-if="albumHasMore" :ref="(el) => (albumSentinelRef = el as HTMLElement | null)" class="load-sentinel"></div>
+            <div v-if="albumLoadingMore" class="footer-tip">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>加载中...</span>
+            </div>
+            <el-button v-else-if="albumHasMore && !supportsObserver" text @click="loadAlbumImages">加载更多</el-button>
+            <span v-else-if="!albumHasMore" class="footer-tip">已全部加载</span>
           </div>
         </div>
 
@@ -120,16 +131,6 @@
         <div v-if="albumLoading" class="album-loading">
           <el-icon :size="28" class="is-loading"><Loading /></el-icon>
           <span>加载中...</span>
-        </div>
-
-        <div class="album-footer" v-if="albumImages.length > 0">
-          <div v-if="albumHasMore" ref="albumSentinelRef" class="load-sentinel"></div>
-          <div v-if="albumLoadingMore" class="footer-tip">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>加载中...</span>
-          </div>
-          <el-button v-else-if="albumHasMore && !supportsObserver" text @click="loadAlbumImages">加载更多</el-button>
-          <span v-else-if="!albumHasMore" class="footer-tip">已全部加载</span>
         </div>
       </div>
     </el-dialog>
@@ -160,6 +161,8 @@ const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = 12
 const total = ref(0)
+/** 每次访问随机一个种子，本次访问内翻页顺序保持一致 */
+const seed = ref(Math.floor(Math.random() * 2147483647))
 
 const albumDialogVisible = ref(false)
 const selectedAlbum = ref<AlbumResponse | null>(null)
@@ -169,7 +172,7 @@ const albumLoading = ref(false)
 const albumLoadingMore = ref(false)
 /** 已加载批次数，下一次请求的页号是它 +1 */
 const albumBatchIndex = ref(0)
-const ALBUM_BATCH_SIZE = 48
+const ALBUM_BATCH_SIZE = 24
 const albumTotal = ref(0)
 const albumHasMore = computed(() => albumImages.value.length < albumTotal.value)
 const supportsObserver = typeof IntersectionObserver !== 'undefined'
@@ -212,7 +215,7 @@ onUnmounted(() => {
 const loadAlbums = async () => {
   loading.value = true
   try {
-    const res = await getPublicAlbums(currentPage.value, pageSize)
+    const res = await getPublicAlbums(currentPage.value, pageSize, undefined, seed.value)
     if (res.data) {
       albums.value = res.data.records || []
       total.value = res.data.total || 0
@@ -297,7 +300,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
   border-radius: var(--ev-radius-xl);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   backdrop-filter: var(--ev-blur-md);
   -webkit-backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
@@ -338,7 +341,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
 }
 
 .album-card {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 18px;
@@ -406,7 +409,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
     right: 0;
     bottom: 0;
     height: 52px;
-    background: rgba(255, 255, 255, 0.72);
+    background: var(--ev-bg-glass-strong);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
@@ -441,6 +444,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
     margin-bottom: 8px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -507,39 +511,52 @@ const handleCopyUrl = async (img: ImageResponse) => {
 }
 
 .album-detail {
-  padding: 24px;
+  padding: 16px 20px;
 }
 
-.album-detail-header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--ev-border-subtle);
+.dialog-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  padding-right: 24px;
 
-  h2 {
-    font-size: 22px;
+  .dialog-title-name {
+    font-size: 18px;
     font-weight: 700;
     color: var(--ev-text-primary);
-    margin-bottom: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
-  p {
-    font-size: 14px;
-    color: var(--ev-text-secondary);
-    margin-bottom: 8px;
+  .dialog-title-desc {
+    font-size: 13px;
+    color: var(--ev-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
-  .detail-meta {
+  .dialog-title-meta {
     font-size: 12px;
     color: var(--ev-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: auto;
   }
+}
+
+.album-images-scroll {
+  max-height: 75vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .album-images-masonry {
   display: flex;
   gap: 12px;
-  max-height: 60vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  align-items: flex-start;
 }
 
 .masonry-col {
@@ -577,7 +594,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
   justify-content: center;
   gap: 6px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ev-bg-glass-strong);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   opacity: 0;

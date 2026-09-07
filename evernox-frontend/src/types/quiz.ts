@@ -36,3 +36,14 @@ export const QuizStatusType: Record<number, 'info' | 'success' | 'danger'> = {
   1: 'success',
   2: 'danger',
 }
+
+export interface AdminQuizListParams {
+  page: number
+  size: number
+  status?: number | null
+  keyword?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+}

@@ -1,10 +1,12 @@
 package com.evernox.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.evernox.common.NoteStatus;
+import com.evernox.common.ResultCode;
 import com.evernox.dto.NoteResponse;
 import com.evernox.dto.NoteStatsResponse;
 import com.evernox.entity.Note;
@@ -13,14 +15,18 @@ import com.evernox.exception.BusinessException;
 import com.evernox.repository.NoteRepository;
 import com.evernox.repository.UserRepository;
 import com.evernox.service.AdminNoteService;
+import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,24 +43,57 @@ public class AdminNoteServiceImpl implements AdminNoteService {
 
     private static final int MAX_PAGE_SIZE = 100;
 
+    /** 排序字段白名单 */
+    private static final Map<String, String> SORT_COLUMNS = Map.of(
+            "submittedAt", "submitted_at",
+            "updatedAt", "updated_at",
+            "createdAt", "created_at"
+    );
+
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
     private final NoteImageSupport noteImageSupport;
 
     @Override
-    public IPage<NoteResponse> listNotes(int page, int size, Integer status, String keyword) {
-        LambdaQueryWrapper<Note> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(status != null, Note::getStatus, status);
+    public IPage<NoteResponse> listNotes(int page, int size, Integer status, String keyword,
+                                         String username, String startDate, String endDate,
+                                         String sortField, String sortOrder) {
+        QueryWrapper<Note> wrapper = new QueryWrapper<>();
+        if (status != null) {
+            wrapper.eq("status", status);
+        }
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
-            wrapper.and(w -> w.like(Note::getTitle, kw).or().like(Note::getSummary, kw));
+            wrapper.and(w -> w.like("title", kw).or().like("summary", kw));
         }
-        // 待审批的按提交时间先来先审，其余按更新时间倒序
-        if (status != null && status == NoteStatus.PENDING) {
-            wrapper.orderByAsc(Note::getSubmittedAt);
-        } else {
-            wrapper.orderByDesc(Note::getUpdatedAt);
+        if (StringUtils.hasText(username)) {
+            List<Long> uids = userRepository.selectList(new LambdaQueryWrapper<User>()
+                            .like(User::getUsername, username.trim()))
+                    .stream()
+                    .map(User::getId)
+                    .toList();
+            if (uids.isEmpty()) {
+                return emptyPage(page, size);
+            }
+            wrapper.in("user_id", uids);
         }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge("submitted_at", start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            wrapper.lt("submitted_at", end.plusDays(1).atStartOfDay());
+        }
+
+        // 未指定排序时保留原默认：待审批按提交时间升序先来先审，其余按更新时间倒序
+        boolean pendingOnly = status != null && status == NoteStatus.PENDING;
+        String defaultColumn = pendingOnly ? "submitted_at" : "updated_at";
+        boolean defaultAsc = pendingOnly;
+        String column = SortColumnResolver.resolve(SORT_COLUMNS, sortField, defaultColumn);
+        boolean asc = sortField == null || sortField.isBlank() ? defaultAsc : "asc".equalsIgnoreCase(sortOrder);
+        wrapper.orderBy(true, asc, column);
+        wrapper.orderByDesc("id");
 
         IPage<Note> raw = noteRepository.selectPage(newPage(page, size), wrapper);
         Page<NoteResponse> result = new Page<>(raw.getCurrent(), raw.getSize(), raw.getTotal());
@@ -68,6 +107,23 @@ public class AdminNoteServiceImpl implements AdminNoteService {
             return dto;
         }).toList());
         return result;
+    }
+
+    private Page<NoteResponse> emptyPage(int page, int size) {
+        Page<NoteResponse> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE), 0);
+        p.setRecords(List.of());
+        return p;
+    }
+
+    private LocalDate parseDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
     }
 
     @Override

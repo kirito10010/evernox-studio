@@ -1,30 +1,30 @@
 <template>
   <div class="image-host-home">
-    <!-- Hero Banner -->
-    <div class="hero-banner">
-      <div class="banner-aurora"></div>
-      <div class="geo-shapes">
-        <div class="geo-ring ring-1"></div>
-        <div class="geo-ring ring-2"></div>
-        <div class="geo-dot dot-1"></div>
-        <div class="geo-dot dot-2"></div>
-      </div>
-      <div class="banner-content">
-        <div class="banner-pill">
-          <span class="pill-dot"></span>
-          客户端加密 · 零知识存储
-        </div>
-        <h1>安全<span class="aurora-text">图床</span>管理平台</h1>
-        <p>所有图片在浏览器端完成 AES-256-GCM 加密，服务器仅存储密文，确保您的照片绝对安全</p>
-        <el-button type="primary" class="upload-trigger" @click="showUpload = true">
-          <el-icon><Upload /></el-icon>
-          立即上传
-        </el-button>
-      </div>
-    </div>
-
     <div class="home-body">
       <div class="home-main">
+        <!-- Hero Banner -->
+        <div class="hero-banner">
+          <div class="banner-aurora"></div>
+          <div class="geo-shapes">
+            <div class="geo-ring ring-1"></div>
+            <div class="geo-ring ring-2"></div>
+            <div class="geo-dot dot-1"></div>
+            <div class="geo-dot dot-2"></div>
+          </div>
+          <div class="banner-content">
+            <div class="banner-pill">
+              <span class="pill-dot"></span>
+              客户端加密 · 零知识存储
+            </div>
+            <h1>安全<span class="aurora-text">图床</span>管理平台</h1>
+            <p>所有图片在浏览器端完成 AES-256-GCM 加密，服务器仅存储密文，确保您的照片绝对安全</p>
+            <el-button type="primary" class="upload-trigger" @click="showUpload = true">
+              <el-icon><Upload /></el-icon>
+              立即上传
+            </el-button>
+          </div>
+        </div>
+
         <!-- Quick Actions -->
         <div class="quick-section">
           <div class="section-header">
@@ -60,7 +60,7 @@
             <h2>最近上传</h2>
             <router-link to="/image-host/my-images" class="view-all-link">查看全部 →</router-link>
           </div>
-          <div class="masonry" ref="gridRef">
+          <div class="masonry" :ref="(el) => (gridRef = el as HTMLElement | null)">
             <div class="masonry-col" v-for="(col, colIndex) in columns" :key="colIndex">
               <div
                 v-for="img in col"
@@ -113,6 +113,17 @@
 
         <div class="side-storage">
           <div class="storage-title">存储空间</div>
+
+          <div class="storage-ring">
+            <el-progress
+              type="dashboard"
+              :percentage="Math.round(diskPercent)"
+              :color="diskBarColor"
+              :width="150"
+              :stroke-width="10"
+            />
+            <div class="ring-label">照片占用率</div>
+          </div>
 
           <div class="storage-row">
             <span class="row-label">照片占用</span>
@@ -254,6 +265,14 @@ const statList = computed(() => [
     accentRgb: '127, 178, 251',
     iconBg: 'linear-gradient(135deg, rgba(127,178,251,0.18), rgba(207,230,255,0.20))',
   },
+  {
+    label: '总图片',
+    value: myImageCount.value + publicImageCount.value,
+    icon: 'Picture',
+    accent: '#f5b942',
+    accentRgb: '245, 185, 66',
+    iconBg: 'linear-gradient(135deg, rgba(245,185,66,0.16), rgba(245,185,66,0.10))',
+  },
 ])
 
 onMounted(async () => {
@@ -341,7 +360,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
   position: relative;
   padding: 48px 44px;
   border-radius: var(--ev-radius-xl);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   -webkit-backdrop-filter: var(--ev-blur-md);
@@ -468,7 +487,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
   font-size: 14px !important;
 }
 
-/* Body: main + side */
+/* Body: main (left) + side (right) */
 .home-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
@@ -494,7 +513,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
 .side-stats,
 .side-storage {
   padding: 16px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 18px;
@@ -555,6 +574,19 @@ const handleCopyUrl = async (img: ImageResponse) => {
     font-size: 14px;
     font-weight: 700;
     color: var(--ev-text-primary);
+  }
+
+  .storage-ring {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+  }
+
+  .ring-label {
+    font-size: 12px;
+    color: var(--ev-text-secondary);
   }
 
   .storage-row {
@@ -648,7 +680,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
   align-items: center;
   gap: 8px;
   padding: 24px 16px;
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 16px;
@@ -726,7 +758,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
 }
 
 .recent-card {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: 16px;
@@ -775,7 +807,7 @@ const handleCopyUrl = async (img: ImageResponse) => {
     color: var(--ev-primary);
 
     &:hover {
-      background: #fff;
+      background: var(--ev-bg-elevated);
       border-color: var(--ev-border-active);
     }
   }

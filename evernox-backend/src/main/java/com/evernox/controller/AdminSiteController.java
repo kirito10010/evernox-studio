@@ -40,18 +40,22 @@ public class AdminSiteController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String sortField,
             @RequestParam(required = false) String sortOrder) {
-        return Result.success(adminSiteService.listSites(page, size, status, userId, keyword, sortField, sortOrder));
+        return Result.success(adminSiteService.listSites(
+                page, size, status, userId, keyword, username, startDate, endDate, sortField, sortOrder));
     }
 
-    /** 审批通过（必须带标签） */
+    /** 审批通过（必须带标签，可设权重） */
     @PostMapping("/{id}/approve")
     public Result<Void> approve(
             @PathVariable Long id,
             @Valid @RequestBody SiteReviewRequest request,
             HttpServletRequest httpRequest) {
-        adminSiteService.approve(id, request.getTagIds(), getUserId(httpRequest));
+        adminSiteService.approve(id, request.getTagIds(), request.getWeight(), getUserId(httpRequest));
         return Result.success("已通过审批", null);
     }
 
@@ -79,6 +83,15 @@ public class AdminSiteController {
             @Valid @RequestBody SiteReviewRequest request) {
         adminSiteService.updateTags(id, request.getTagIds());
         return Result.success("标签已更新", null);
+    }
+
+    /** 调整已公开站点的权重 */
+    @PutMapping("/{id}/weight")
+    public Result<Void> updateWeight(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") Integer weight) {
+        adminSiteService.updateWeight(id, weight);
+        return Result.success("权重已更新", null);
     }
 
     /** 标签库列表（含关联站点数） */

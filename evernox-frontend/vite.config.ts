@@ -23,6 +23,14 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // 使用现代 Sass API，消除 legacy-js-api 弃用警告
+        api: 'modern',
+      },
+    },
+  },
   optimizeDeps: {
     // 预置管理员页面独有的 element-plus 子组件：否则首次进入这些懒加载路由时
     // Vite 才发现新依赖 → 重新预构建 → 强制整页刷新

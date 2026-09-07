@@ -18,6 +18,20 @@
         <el-option label="已通过" :value="1" />
         <el-option label="已驳回" :value="2" />
       </el-select>
+      <el-date-picker
+        v-model="dateRange"
+        type="daterange"
+        value-format="YYYY-MM-DD"
+        range-separator="~"
+        start-placeholder="创建起"
+        end-placeholder="止"
+        class="filter-date"
+        @change="reload"
+      />
+      <el-select v-model="sortOrder" style="width: 100px" @change="reload">
+        <el-option label="降序" value="desc" />
+        <el-option label="升序" value="asc" />
+      </el-select>
       <el-button type="primary" @click="openCreate">新增题目</el-button>
       <el-upload
         :show-file-list="false"
@@ -53,23 +67,27 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="时间" width="170" />
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="时间" width="170">
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="openEdit(row as QuizQuestion)">编辑</el-button>
-          <el-button
-            v-if="(row as QuizQuestion).status === 0"
-            size="small"
-            type="success"
-            @click="handleApprove(row as QuizQuestion)"
-          >通过</el-button>
-          <el-button
-            v-if="(row as QuizQuestion).status === 0"
-            size="small"
-            type="warning"
-            @click="handleReject(row as QuizQuestion)"
-          >驳回</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(row as QuizQuestion)">删除</el-button>
+          <div class="op-btns">
+            <el-button size="small" @click="openEdit(row as QuizQuestion)">编辑</el-button>
+            <el-button
+              v-if="(row as QuizQuestion).status === 0"
+              size="small"
+              type="success"
+              @click="handleApprove(row as QuizQuestion)"
+            >通过</el-button>
+            <el-button
+              v-if="(row as QuizQuestion).status === 0"
+              size="small"
+              type="warning"
+              @click="handleReject(row as QuizQuestion)"
+            >驳回</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row as QuizQuestion)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -148,6 +166,8 @@ const page = ref(1)
 const size = ref(10)
 const keyword = ref('')
 const statusFilter = ref<number | null>(null)
+const dateRange = ref<[string, string] | null>(null)
+const sortOrder = ref<'asc' | 'desc'>('desc')
 const loading = ref(false)
 const selectedIds = ref<number[]>([])
 
@@ -167,6 +187,13 @@ const form = reactive<QuizQuestionRequest>({
 
 let keywordTimer: ReturnType<typeof setTimeout> | null = null
 
+const formatDateTime = (value: string): string => {
+  if (!value) return '—'
+  const d = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const load = async () => {
   loading.value = true
   try {
@@ -175,6 +202,10 @@ const load = async () => {
       size: size.value,
       status: statusFilter.value,
       keyword: keyword.value || undefined,
+      startDate: dateRange.value?.[0],
+      endDate: dateRange.value?.[1],
+      sortField: 'createdAt',
+      sortOrder: sortOrder.value,
     })
     list.value = res.data?.records || []
     total.value = res.data?.total || 0
@@ -326,8 +357,15 @@ load()
   .filter-bar {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 14px;
+
+    :deep(.filter-date) {
+      flex: none !important;
+      width: 250px !important;
+      max-width: 250px !important;
+    }
   }
 
   .expand-content {
@@ -346,6 +384,16 @@ load()
     justify-content: space-between;
     align-items: center;
     margin-top: 14px;
+  }
+
+  .op-btns {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+
+    :deep(.el-button + .el-button) {
+      margin-left: 6px;
+    }
   }
 }
 </style>

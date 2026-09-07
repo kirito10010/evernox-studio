@@ -64,8 +64,15 @@ public class AdminAnnouncementController {
     public Result<IPage<AnnouncementResponse>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(announcementService.listAdmin(page, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long tagId,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(announcementService.listAdmin(
+                page, size, keyword, tagId, username, startDate, endDate, sortField, sortOrder));
     }
 
     @PostMapping

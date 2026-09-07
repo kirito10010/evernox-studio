@@ -156,14 +156,14 @@ const formatSize = (bytes?: number): string => {
   justify-content: space-between;
   gap: 16px;
   padding: 10px 18px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--ev-bg-glass);
   border-bottom: 1px solid var(--ev-border-subtle);
   backdrop-filter: var(--ev-blur-md);
   -webkit-backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-inset-gloss);
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--ev-bg-glass-strong);
   }
 }
 
@@ -181,15 +181,15 @@ const formatSize = (bytes?: number): string => {
   gap: 10px;
 
   :deep(.el-button.is-circle) {
-    background: rgba(255, 255, 255, 0.82) !important;
+    background: var(--ev-bg-glass-strong) !important;
     border: 1px solid var(--ev-border-default) !important;
     color: var(--ev-text-secondary) !important;
-    box-shadow: var(--ev-shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    box-shadow: var(--ev-shadow-sm), var(--ev-inset-gloss) !important;
 
     &:hover {
       color: var(--ev-primary) !important;
       border-color: var(--ev-border-hover) !important;
-      background: #ffffff !important;
+      background: var(--ev-bg-elevated) !important;
     }
   }
 }
@@ -210,7 +210,7 @@ const formatSize = (bytes?: number): string => {
   object-fit: contain;
   border-radius: var(--ev-radius-md);
   box-shadow: 0 24px 60px -20px rgba(18, 48, 79, 0.45);
-  background: linear-gradient(135deg, var(--ev-mist) 0%, #ffffff 100%);
+  background: linear-gradient(135deg, var(--ev-mist) 0%, var(--ev-bg-elevated) 100%);
 }
 
 .lightbox-placeholder {
@@ -220,7 +220,7 @@ const formatSize = (bytes?: number): string => {
   gap: 12px;
   padding: 60px 80px;
   border-radius: var(--ev-radius-lg);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ev-bg-glass-strong);
   border: 1px solid var(--ev-border-subtle);
   color: var(--ev-text-muted);
   font-size: 13px;

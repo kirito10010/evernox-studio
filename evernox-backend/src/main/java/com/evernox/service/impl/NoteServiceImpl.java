@@ -17,6 +17,7 @@ import com.evernox.repository.ImageRepository;
 import com.evernox.repository.NoteImageRepository;
 import com.evernox.repository.NoteRepository;
 import com.evernox.repository.UserRepository;
+import com.evernox.service.AdminApprovalService;
 import com.evernox.service.ImageService;
 import com.evernox.service.NoteService;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,7 @@ public class NoteServiceImpl implements NoteService {
     private final ImageService imageService;
     private final NoteHtmlSanitizer sanitizer;
     private final NoteImageSupport noteImageSupport;
+    private final AdminApprovalService adminApprovalService;
 
     @Override
     @Transactional
@@ -181,6 +183,7 @@ public class NoteServiceImpl implements NoteService {
             throw new BusinessException("该笔记状态已变化，请刷新后重试");
         }
         log.info("笔记申请公开: id={}, user={}", id, userId);
+        adminApprovalService.notifyPending("记事本");
     }
 
     @Override

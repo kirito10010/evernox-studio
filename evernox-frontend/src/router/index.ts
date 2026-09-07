@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { trackVisit } from '@/api/visit'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -172,7 +173,20 @@ const routes: RouteRecordRaw[] = [
         path: 'super-member/org',
         name: 'SuperMemberOrg',
         component: () => import('@/views/super-member/SuperMemberOrg.vue'),
-        meta: { title: '组织积分' },
+        meta: { title: '火影组织管理' },
+      },
+      // 小游戏
+      {
+        path: 'games/sandbox',
+        name: 'GameSandbox',
+        component: () => import('@/views/game/Sandbox.vue'),
+        meta: { title: '沙盘争霸' },
+      },
+      {
+        path: 'games/support-board',
+        name: 'GameSupportBoard',
+        component: () => import('@/views/game/SupportBoard.vue'),
+        meta: { title: '应援板' },
       },
       // 管理员
       {
@@ -235,6 +249,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/AdminRedemption.vue'),
         meta: { title: '卡密管理', requiresAdmin: true },
       },
+      {
+        path: 'admin/visit',
+        name: 'AdminVisit',
+        component: () => import('@/views/admin/AdminVisit.vue'),
+        meta: { title: '访问数据', requiresAdmin: true },
+      },
+      {
+        path: 'admin/support-board',
+        name: 'AdminSupportBoard',
+        component: () => import('@/views/admin/AdminSupportBoard.vue'),
+        meta: { title: '应援板管理', requiresAdmin: true },
+      },
     ],
   },
   {
@@ -269,6 +295,9 @@ router.beforeEach(async (to, _from, next) => {
   }
 })
 
+// 访问上报防抖：同一 path 60 秒内不重复上报
+const visitDebounce = new Map<string, number>()
+
 router.afterEach((to) => {
   // 设置页面标题
   const baseTitle = 'EverNox - 永夜照相馆'
@@ -276,6 +305,16 @@ router.afterEach((to) => {
     document.title = `${to.meta.title} | ${baseTitle}`
   } else {
     document.title = baseTitle
+  }
+
+  // 记录访问（仅登录态页面）
+  if (to.meta.requiresAuth && localStorage.getItem('accessToken')) {
+    const now = Date.now()
+    const last = visitDebounce.get(to.path) || 0
+    if (now - last >= 60_000) {
+      visitDebounce.set(to.path, now)
+      trackVisit(to.path).catch(() => {})
+    }
   }
 })
 

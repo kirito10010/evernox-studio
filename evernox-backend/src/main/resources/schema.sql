@@ -1,6 +1,11 @@
 -- EverNox Database Schema
 -- 永夜照相馆数据库初始化脚本
 -- 应用启动时自动执行（spring.sql.init.mode=always）
+--
+-- 【重要·必读】本文件用 CREATE TABLE IF NOT EXISTS，只对「新建的表」生效。
+-- 若给「已存在的表」新增列，必须同时在
+--   src/main/java/com/evernox/config/SchemaMigration.java
+-- 的 run() 里登记 addColumnIfMissing("表","列","定义")，否则老库不会自动加列。
 
 CREATE DATABASE IF NOT EXISTS evernox_backend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -115,6 +120,7 @@ CREATE TABLE IF NOT EXISTS `site_link` (
     `description` TEXT NULL COMMENT '网站详情介绍',
     `cover_image_id` BIGINT NULL COMMENT '封面图片ID(image.id)',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0私有/1待审批/2已公开/3已驳回',
+    `weight` INT NOT NULL DEFAULT 0 COMMENT '排序权重，越大越靠前',
     `reject_reason` VARCHAR(500) NULL COMMENT '最近一次驳回原因',
     `submitted_at` DATETIME NULL COMMENT '最近一次提交审批时间',
     `reviewed_by` BIGINT NULL COMMENT '审批管理员ID',
@@ -680,3 +686,130 @@ CREATE TABLE IF NOT EXISTS `org_week_record` (
     UNIQUE KEY `uk_week_member` (`week_date`, `member_id`),
     KEY `idx_week_date` (`week_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织每周成员记录';
+
+-- 沙盘争霸城市（静态表，启动时种子填充）
+CREATE TABLE IF NOT EXISTS `game_city` (
+    `id`           BIGINT NOT NULL AUTO_INCREMENT COMMENT '城市ID',
+    `adcode`       VARCHAR(20) NOT NULL COMMENT '行政区划代码(唯一)',
+    `name`         VARCHAR(50) NOT NULL COMMENT '城市名',
+    `province`     VARCHAR(50) NOT NULL COMMENT '所属省份',
+    `center_lng`   DECIMAL(10,6) NOT NULL COMMENT '中心经度',
+    `center_lat`   DECIMAL(10,6) NOT NULL COMMENT '中心纬度',
+    `weight`       INT NOT NULL DEFAULT 1 COMMENT '基础权重，越大越值钱',
+    `base_defense` INT NOT NULL DEFAULT 100 COMMENT '基础守备力',
+    `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_adcode` (`adcode`),
+    KEY `idx_province` (`province`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市';
+
+-- 沙盘争霸城市邻接关系（静态，种子时按中心距离计算）
+CREATE TABLE IF NOT EXISTS `game_city_adjacency` (
+    `id`                BIGINT NOT NULL AUTO_INCREMENT COMMENT '邻接ID',
+    `city_id`           BIGINT NOT NULL COMMENT '城市ID',
+    `adjacent_city_id`  BIGINT NOT NULL COMMENT '相邻城市ID',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_pair` (`city_id`, `adjacent_city_id`),
+    KEY `idx_city` (`city_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市邻接';
+
+-- 沙盘争霸轮次（每周一轮）
+CREATE TABLE IF NOT EXISTS `game_round` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '轮次ID',
+    `round_no`   INT NOT NULL COMMENT '轮次号',
+    `status`     TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0未开始/1进行中/2已结算',
+    `start_at`   DATETIME NOT NULL COMMENT '开局时间(周一10点)',
+    `settle_at`  DATETIME NOT NULL COMMENT '结算时间(周日18点)',
+    `end_at`     DATETIME NOT NULL COMMENT '结束时间(下周一10点)',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸轮次';
+
+-- 沙盘争霸玩家每周参赛状态
+CREATE TABLE IF NOT EXISTS `game_player` (
+    `id`                BIGINT NOT NULL AUTO_INCREMENT COMMENT '参赛ID',
+    `round_id`          BIGINT NOT NULL COMMENT '轮次ID',
+    `user_id`           BIGINT NOT NULL COMMENT '用户ID',
+    `base_city_id`      BIGINT NOT NULL COMMENT '本营城市ID',
+    `force`             INT NOT NULL DEFAULT 0 COMMENT '当前兵力',
+    `action_points`     INT NOT NULL DEFAULT 0 COMMENT '当前体力',
+    `is_new`            TINYINT NOT NULL DEFAULT 0 COMMENT '本周新加入: 0否/1是',
+    `joined_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+    `last_grant_at`     DATETIME NULL COMMENT '上次小时发放时间',
+    `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_round_user` (`round_id`, `user_id`),
+    KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸玩家状态';
+
+-- 沙盘争霸城市归属（共享地图；无主城市不落行）
+CREATE TABLE IF NOT EXISTS `game_city_owner` (
+    `id`             BIGINT NOT NULL AUTO_INCREMENT COMMENT '归属ID',
+    `round_id`       BIGINT NOT NULL COMMENT '轮次ID',
+    `city_id`        BIGINT NOT NULL COMMENT '城市ID',
+    `owner_user_id`  BIGINT NOT NULL COMMENT '归属用户ID',
+    `level`          INT NOT NULL DEFAULT 0 COMMENT '城市等级(繁荣度)',
+    `garrison`       INT NOT NULL DEFAULT 0 COMMENT '驻防兵力',
+    `captured_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '占领时间',
+    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_round_city` (`round_id`, `city_id`),
+    KEY `idx_round_owner` (`round_id`, `owner_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市归属';
+
+-- 沙盘争霸结算发奖记录
+CREATE TABLE IF NOT EXISTS `game_reward` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '奖励ID',
+    `round_id`   BIGINT NOT NULL COMMENT '轮次ID',
+    `user_id`    BIGINT NOT NULL COMMENT '用户ID',
+    `rank`       INT NOT NULL DEFAULT 0 COMMENT '排名(参与奖为0)',
+    `points`     INT NOT NULL COMMENT '发放积分',
+    `board_type` VARCHAR(20) NOT NULL COMMENT '榜单类型: total/rookie/participation',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_round` (`round_id`),
+    KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸发奖记录';
+
+-- 平台访问日志（活跃度统计；admin 不记录；保留 90 天）
+CREATE TABLE IF NOT EXISTS `user_visit_log` (
+    `id`          BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `user_id`     BIGINT NOT NULL COMMENT '访问者ID',
+    `username`    VARCHAR(50) NOT NULL COMMENT '用户名快照',
+    `type`        VARCHAR(10) NOT NULL COMMENT 'LOGIN登录/VISIT访问',
+    `ip`          VARCHAR(64) NULL COMMENT '来源IP',
+    `user_agent`  VARCHAR(255) NULL COMMENT '浏览器/设备',
+    `path`        VARCHAR(200) NULL COMMENT '访问路径（仅VISIT）',
+    `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user` (`user_id`),
+    KEY `idx_type_time` (`type`, `created_at`),
+    KEY `idx_time` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台访问日志';
+
+-- 应援板（像素画板）
+CREATE TABLE IF NOT EXISTS `support_board` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '画板ID',
+    `name`       VARCHAR(100) NOT NULL COMMENT '画板名',
+    `width`      INT NOT NULL DEFAULT 1600 COMMENT '宽',
+    `height`     INT NOT NULL DEFAULT 900 COMMENT '高',
+    `active`     TINYINT NOT NULL DEFAULT 0 COMMENT '是否当前展示 0/1',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_active` (`active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='应援板画板';
+
+CREATE TABLE IF NOT EXISTS `support_pixel` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '像素ID',
+    `board_id`   BIGINT NOT NULL COMMENT '所属画板',
+    `x`          INT NOT NULL COMMENT '横坐标',
+    `y`          INT NOT NULL COMMENT '纵坐标',
+    `color`      VARCHAR(9) NOT NULL COMMENT '颜色 #RRGGBB',
+    `user_id`    BIGINT NOT NULL COMMENT '最后绘制该点的用户',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_board_xy` (`board_id`, `x`, `y`),
+    KEY `idx_board` (`board_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='应援板像素';
+

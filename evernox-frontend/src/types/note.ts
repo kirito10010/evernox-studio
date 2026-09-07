@@ -42,3 +42,15 @@ export interface NoteStats {
   published: number | null
   rejected: number | null
 }
+
+export interface AdminNoteListParams {
+  page: number
+  size: number
+  status?: number | null
+  keyword?: string
+  username?: string
+  startDate?: string
+  endDate?: string
+  sortField?: 'submittedAt' | 'updatedAt' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+}

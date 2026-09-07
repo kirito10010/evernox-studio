@@ -60,6 +60,7 @@ public class SecurityConfig {
 
                 // SSE 长连接：EventSource 无法带 Authorization 头，token 走 query 参数，控制器自行校验
                 .requestMatchers("/announcement/stream").permitAll()
+                .requestMatchers("/game/stream").permitAll()
 
                 // 官方公告本地图片：正文 <img src> 直接引用，无鉴权头，需公开
                 .requestMatchers("/hyol/announcement/image/**").permitAll()

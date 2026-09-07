@@ -326,4 +326,26 @@ load()
   padding: 4px 8px;
   word-break: break-word;
 }
+.hyol-detail-content p {
+  margin: 6px 0;
+}
+.hyol-detail-content ul,
+.hyol-detail-content ol {
+  margin: 8px 0;
+  padding-left: 1.6em;
+}
+.hyol-detail-content li {
+  margin: 2px 0;
+}
+.hyol-detail-content h1,
+.hyol-detail-content h2,
+.hyol-detail-content h3 {
+  margin: 12px 0 6px;
+  font-weight: 700;
+}
+.hyol-detail-content blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--ev-border-default);
+}
 </style>

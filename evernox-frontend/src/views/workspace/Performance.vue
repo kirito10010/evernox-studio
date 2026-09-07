@@ -64,7 +64,7 @@
     </div>
 
     <!-- 工作汇报弹窗 -->
-    <el-dialog v-model="reportsVisible" title="工作汇报" width="860px">
+    <el-dialog v-model="reportsVisible" title="工作汇报" width="1100px" align-center body-class="ev-dialog-body">
       <div class="records-toolbar">
         <el-button type="primary" @click="openRecordForm()">
           <el-icon style="margin-right: 4px"><Plus /></el-icon>添加记录
@@ -119,7 +119,7 @@
     </el-dialog>
 
     <!-- 添加记录 / 编辑弹窗（嵌套） -->
-    <el-dialog v-model="recordFormVisible" :title="editingId ? '编辑记录' : '添加记录'" width="480px" append-to-body>
+    <el-dialog v-model="recordFormVisible" :title="editingId ? '编辑记录' : '添加记录'" width="600px" align-center append-to-body>
       <el-form label-width="90px">
         <el-form-item label="日期">
           <el-date-picker v-model="form.workDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -152,7 +152,7 @@
     </el-dialog>
 
     <!-- 生产项目配置弹窗 -->
-    <el-dialog v-model="projectDialogVisible" title="生产项目配置" width="640px">
+    <el-dialog v-model="projectDialogVisible" title="生产项目配置" width="1100px" align-center body-class="ev-dialog-body">
       <div class="project-add-row">
         <el-input v-model="newProject.name" placeholder="项目名称" maxlength="100" class="p-name" />
         <el-input-number v-model="newProject.workQuota" :min="1" :precision="0" :step="1" placeholder="作业定额" class="p-quota" :controls="false" />
@@ -183,7 +183,7 @@
     </el-dialog>
 
     <!-- 加班记录弹窗 -->
-    <el-dialog v-model="overtimeVisible" title="加班记录" width="720px">
+    <el-dialog v-model="overtimeVisible" title="加班记录" width="1100px" align-center body-class="ev-dialog-body">
       <div class="records-toolbar">
         <el-button type="primary" @click="openOvertimeForm()">
           <el-icon style="margin-right: 4px"><Plus /></el-icon>添加记录
@@ -236,7 +236,7 @@
     </el-dialog>
 
     <!-- 加班添加 / 编辑弹窗 -->
-    <el-dialog v-model="overtimeFormVisible" :title="overtimeEditingId ? '编辑加班' : '添加加班'" width="460px" append-to-body>
+    <el-dialog v-model="overtimeFormVisible" :title="overtimeEditingId ? '编辑加班' : '添加加班'" width="500px" align-center append-to-body>
       <el-form label-width="90px">
         <el-form-item label="日期">
           <el-date-picker v-model="overtimeForm.workDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -260,7 +260,7 @@
     </el-dialog>
 
     <!-- 迟到记录弹窗 -->
-    <el-dialog v-model="lateVisible" title="迟到记录" width="720px">
+    <el-dialog v-model="lateVisible" title="迟到记录" width="1100px" align-center body-class="ev-dialog-body">
       <div class="records-toolbar">
         <el-button type="primary" @click="openLateForm()">
           <el-icon style="margin-right: 4px"><Plus /></el-icon>添加记录
@@ -312,7 +312,7 @@
     </el-dialog>
 
     <!-- 迟到添加弹窗 -->
-    <el-dialog v-model="lateFormVisible" title="添加迟到" width="460px" append-to-body>
+    <el-dialog v-model="lateFormVisible" title="添加迟到" width="500px" align-center append-to-body>
       <el-form label-width="90px">
         <el-form-item label="日期">
           <el-date-picker v-model="lateForm.workDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -1020,7 +1020,7 @@ onMounted(async () => {
 .card {
   border: 1px solid var(--ev-border-subtle, rgba(47, 124, 246, 0.08));
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--ev-bg-glass);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: 0 1px 2px rgba(18, 48, 79, 0.04), 0 8px 24px -8px rgba(47, 124, 246, 0.12);
@@ -1049,7 +1049,7 @@ onMounted(async () => {
   padding: 14px 16px;
   border: 1px solid var(--ev-border-subtle, rgba(47, 124, 246, 0.08));
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--ev-bg-glass-light);
 }
 
 .board-item {
@@ -1075,14 +1075,16 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+
+  :deep(.range-picker) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .month-picker {
   width: 140px;
-}
-
-.range-picker {
-  width: 260px;
 }
 
 /* 工作汇报弹窗 */
@@ -1100,14 +1102,16 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+
+  :deep(.f-range) {
+    flex: none !important;
+    width: 250px !important;
+    max-width: 250px !important;
+  }
 }
 
 .f-project {
   width: 160px;
-}
-
-.f-range {
-  width: 240px;
 }
 
 .records-list {
@@ -1115,8 +1119,6 @@ onMounted(async () => {
   flex-direction: column;
   gap: 6px;
   min-height: 200px;
-  max-height: 420px;
-  overflow-y: auto;
 }
 
 .record-item {
@@ -1126,7 +1128,7 @@ onMounted(async () => {
   padding: 10px 14px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
 
   &:hover {
     border-color: var(--el-color-primary-light-5);
@@ -1195,8 +1197,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 320px;
-  overflow-y: auto;
 }
 
 .project-item {
@@ -1206,7 +1206,7 @@ onMounted(async () => {
   padding: 8px 12px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--ev-bg-glass);
 }
 
 .project-name {

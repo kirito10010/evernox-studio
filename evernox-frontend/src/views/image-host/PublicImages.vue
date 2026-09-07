@@ -9,8 +9,29 @@
       </div>
     </div>
 
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <el-select v-model="orientation" placeholder="方向" clearable style="width: 110px" @change="resetAndLoad">
+        <el-option label="横图" value="landscape" />
+        <el-option label="竖图" value="portrait" />
+        <el-option label="方图" value="square" />
+      </el-select>
+      <el-select v-model="resolution" placeholder="分辨率" clearable style="width: 110px" @change="resetAndLoad">
+        <el-option label="标清" value="sd" />
+        <el-option label="高清" value="hd" />
+        <el-option label="超清" value="uhd" />
+      </el-select>
+      <el-select v-model="authorId" placeholder="作者" clearable style="width: 150px" @change="onAuthorChange">
+        <el-option v-for="a in authors" :key="a.id" :label="a.username" :value="a.id" />
+      </el-select>
+      <el-select v-model="albumFilter" placeholder="相册" clearable style="width: 150px" @change="resetAndLoad">
+        <el-option label="未分类" value="uncategorized" />
+        <el-option v-for="a in publicAlbums" :key="a.id" :label="a.name" :value="a.id" />
+      </el-select>
+    </div>
+
     <!-- Image Grid -->
-    <div v-if="images.length > 0" class="masonry" ref="gridRef">
+    <div v-if="images.length > 0" class="masonry" :ref="(el) => (gridRef = el as HTMLElement | null)">
       <div class="masonry-col" v-for="(col, colIndex) in columns" :key="colIndex">
         <div
           v-for="img in col"
@@ -65,7 +86,7 @@
 
     <!-- Infinite scroll footer -->
     <div class="list-footer" v-if="images.length > 0">
-      <div v-if="hasMore" ref="sentinelRef" class="load-sentinel"></div>
+      <div v-if="hasMore" :ref="(el) => (sentinelRef = el as HTMLElement | null)" class="load-sentinel"></div>
       <div v-if="loadingMore" class="footer-tip">
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>加载中...</span>
@@ -80,8 +101,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { getPublicImages, getImageThumbnail } from '@/api/image'
-import type { ImageResponse } from '@/api/image'
+import { getPublicImages, getImageThumbnail, getPublicImageAuthors, getPublicAlbums } from '@/api/image'
+import type { ImageResponse, AlbumResponse } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useMasonry } from '@/composables/useMasonry'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
@@ -105,6 +126,58 @@ const total = ref(0)
 const hasMore = computed(() => images.value.length < total.value)
 const supportsObserver = typeof IntersectionObserver !== 'undefined'
 
+// ========== 筛选 ==========
+const orientation = ref('')
+const resolution = ref('')
+const albumFilter = ref<string | number>('')
+const authorId = ref<string | number>('')
+const authors = ref<{ id: number; username: string }[]>([])
+const publicAlbums = ref<AlbumResponse[]>([])
+/** 每次访问随机一个种子，本次访问内翻页/加载顺序保持一致 */
+const seed = ref(Math.floor(Math.random() * 2147483647))
+
+const filters = computed(() => {
+  const f: {
+    orientation?: string
+    resolution?: string
+    albumId?: number
+    inAlbum?: boolean
+    authorId?: number
+    seed?: number
+  } = {}
+  if (orientation.value) f.orientation = orientation.value
+  if (resolution.value) f.resolution = resolution.value
+  if (albumFilter.value === 'uncategorized') f.inAlbum = false
+  else if (albumFilter.value !== '' && typeof albumFilter.value === 'number') f.albumId = albumFilter.value
+  if (authorId.value !== '' && typeof authorId.value === 'number') f.authorId = authorId.value
+  f.seed = seed.value
+  return f
+})
+
+const loadAuthors = async () => {
+  const res = await getPublicImageAuthors()
+  if (res.data) authors.value = res.data
+}
+
+const loadAlbums = async () => {
+  const uid = authorId.value === '' ? undefined : Number(authorId.value)
+  const res = await getPublicAlbums(1, 100, uid)
+  if (res.data) publicAlbums.value = res.data.records || []
+}
+
+const resetAndLoad = () => {
+  batchIndex.value = 0
+  images.value = []
+  total.value = 0
+  loadMore()
+}
+
+const onAuthorChange = () => {
+  albumFilter.value = ''
+  loadAlbums()
+  resetAndLoad()
+}
+
 const lightboxVisible = ref(false)
 const lightboxImage = ref<ImageResponse | null>(null)
 const lightboxSrc = ref<string | null>(null)
@@ -126,7 +199,11 @@ const openLightbox = async (img: ImageResponse) => {
 const ratioOf = (img: ImageResponse) => (img.width && img.height ? img.width / img.height : 1)
 const { gridRef, columns } = useMasonry(images, ratioOf, { minColumnWidth: 260 })
 
-onMounted(() => loadMore())
+onMounted(() => {
+  loadAuthors()
+  loadAlbums()
+  loadMore()
+})
 onUnmounted(() => {
   clearCache()
   clearThumbCache()
@@ -143,7 +220,7 @@ const loadMore = async () => {
   if (isFirstBatch) loading.value = true
   else loadingMore.value = true
   try {
-    const res = await getPublicImages(batchIndex.value + 1, BATCH_SIZE)
+    const res = await getPublicImages(batchIndex.value + 1, BATCH_SIZE, filters.value)
     if (res.data) {
       images.value.push(...(res.data.records || []))
       total.value = res.data.total || 0
@@ -193,7 +270,7 @@ const formatSize = (bytes: number): string => {
   border-radius: var(--ev-radius-xl);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--ev-bg-glass);
   -webkit-backdrop-filter: var(--ev-blur-md);
   backdrop-filter: var(--ev-blur-md);
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
@@ -235,6 +312,20 @@ const formatSize = (bytes: number): string => {
   }
 }
 
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--ev-border-subtle);
+  background: var(--ev-bg-glass);
+  -webkit-backdrop-filter: var(--ev-blur-md);
+  backdrop-filter: var(--ev-blur-md);
+}
+
 /* Masonry Layout */
 .masonry {
   display: flex;
@@ -251,7 +342,7 @@ const formatSize = (bytes: number): string => {
 }
 
 .image-card {
-  background: rgba(255, 255, 255, 0.66);
+  background: var(--ev-bg-glass);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: var(--ev-radius-md);
@@ -294,7 +385,7 @@ const formatSize = (bytes: number): string => {
 .card-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--ev-bg-glass-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -314,7 +405,7 @@ const formatSize = (bytes: number): string => {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--ev-bg-glass-strong);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--ev-border-subtle);

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 图片响应 DTO
@@ -36,6 +37,9 @@ public class ImageResponse {
 
     /** 上传者用户名 */
     private String uploaderName;
+
+    /** 所属相册名列表（列表查询时填充） */
+    private List<String> albumNames;
 
     public static ImageResponse from(Image image) {
         return ImageResponse.builder()

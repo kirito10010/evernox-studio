@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
+
 /**
  * 应援板用户侧接口
  */
@@ -40,6 +42,11 @@ public class SupportBoardController {
     public Result<Void> pixel(@RequestBody SupportPixelRequest request, HttpServletRequest http) {
         supportBoardService.setPixel(getUserId(http), request);
         return Result.success();
+    }
+
+    @PostMapping("/pixel-batch")
+    public Result<List<SupportPixelRequest>> pixelBatch(@RequestBody List<SupportPixelRequest> pixels, HttpServletRequest http) {
+        return Result.success(supportBoardService.setPixels(getUserId(http), pixels));
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

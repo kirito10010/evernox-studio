@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 应援板实时推送注册表（广播给所有在线观众）
@@ -21,6 +23,12 @@ public class SupportBoardSseRegistry {
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final ObjectMapper objectMapper;
+    /** 单线程异步广播：避免慢客户端阻塞请求线程，同时保持事件顺序 */
+    private final ExecutorService sseExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "support-board-sse");
+        t.setDaemon(true);
+        return t;
+    });
 
     public SseEmitter register() {
         SseEmitter emitter = new SseEmitter(0L);
@@ -37,14 +45,17 @@ public class SupportBoardSseRegistry {
         return emitter;
     }
 
+    /** 单个像素变更（用于批量推送） */
+    public record PixelChange(int x, int y, String color, Integer locked) {}
+
     @SuppressWarnings("null")
-    public void broadcast(Long boardId, int x, int y, String color, Integer locked) {
+    public void broadcastBatch(Long boardId, List<PixelChange> changes) {
+        if (changes == null || changes.isEmpty()) {
+            return;
+        }
         Map<String, Object> data = new HashMap<>();
         data.put("boardId", boardId);
-        data.put("x", x);
-        data.put("y", y);
-        data.put("color", color);
-        data.put("locked", locked);
+        data.put("pixels", changes);
         String payload;
         try {
             payload = objectMapper.writeValueAsString(data);
@@ -52,12 +63,14 @@ public class SupportBoardSseRegistry {
             log.warn("应援板像素变更序列化失败: {}", e.getMessage());
             return;
         }
-        for (SseEmitter emitter : emitters) {
-            try {
-                emitter.send(SseEmitter.event().name("pixel-changed").data(payload));
-            } catch (Exception e) {
-                emitters.remove(emitter);
+        sseExecutor.submit(() -> {
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event().name("pixel-changed").data(payload));
+                } catch (Exception e) {
+                    emitters.remove(emitter);
+                }
             }
-        }
+        });
     }
 }

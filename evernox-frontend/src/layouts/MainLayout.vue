@@ -168,6 +168,21 @@
             </el-menu-item>
           </el-sub-menu>
 
+          <el-sub-menu index="utility">
+            <template #title>
+              <el-icon><Compass /></el-icon>
+              <span>生活服务</span>
+            </template>
+            <el-menu-item index="/utility/earthquake">
+              <el-icon><Location /></el-icon>
+              <template #title>地震信息</template>
+            </el-menu-item>
+            <el-menu-item index="/utility/weather">
+              <el-icon><PartlyCloudy /></el-icon>
+              <template #title>天气查询</template>
+            </el-menu-item>
+          </el-sub-menu>
+
           <el-sub-menu v-if="userStore.isAdmin" index="admin">
             <template #title>
               <el-icon><Setting /></el-icon>
@@ -400,6 +415,10 @@ const loadOrgPending = async () => {
 
 let pointsSource: EventSource | null = null
 const connectPointsStream = () => {
+  if (pointsSource) {
+    pointsSource.close()
+    pointsSource = null
+  }
   const token = localStorage.getItem('accessToken')
   if (!token) return
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -427,6 +446,9 @@ onMounted(() => {
   }
   connectPointsStream()
 })
+
+// token 变化（登录 / 登出 / 自动续期）时重连，避免 SSE 一直拿着旧 token 报 401
+watch(() => userStore.token, () => connectPointsStream())
 
 onBeforeUnmount(() => {
   if (approvalTimer) window.clearInterval(approvalTimer)

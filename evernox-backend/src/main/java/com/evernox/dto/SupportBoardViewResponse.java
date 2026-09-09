@@ -18,5 +18,6 @@ public class SupportBoardViewResponse {
     private Integer width;
     private Integer height;
     private Integer active;
-    private List<SupportPixelItem> pixels;
+    /** 扁平数组：[x, y, colorInt, locked, ...] */
+    private List<Integer> pixels;
 }

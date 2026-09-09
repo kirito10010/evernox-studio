@@ -17,6 +17,9 @@ public interface SupportBoardService {
     /** 绘制/擦除像素（作用于当前展示画板） */
     void setPixel(Long userId, SupportPixelRequest request);
 
+    /** 批量绘制/擦除像素（作用于当前展示画板），返回被跳过的像素（越界/锁定/非本人擦除） */
+    List<SupportPixelRequest> setPixels(Long userId, List<SupportPixelRequest> pixels);
+
     /** 管理员锁定像素（作用于当前展示画板） */
     void lockPixel(Long adminId, int x, int y);
 

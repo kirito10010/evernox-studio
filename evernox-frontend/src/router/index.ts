@@ -188,6 +188,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/game/SupportBoard.vue'),
         meta: { title: '应援板' },
       },
+      // 生活服务
+      {
+        path: 'utility/earthquake',
+        name: 'UtilityEarthquake',
+        component: () => import('@/views/utility/Earthquake.vue'),
+        meta: { title: '地震信息' },
+      },
+      {
+        path: 'utility/weather',
+        name: 'UtilityWeather',
+        component: () => import('@/views/utility/Weather.vue'),
+        meta: { title: '天气查询' },
+      },
       // 管理员
       {
         path: 'admin/users',

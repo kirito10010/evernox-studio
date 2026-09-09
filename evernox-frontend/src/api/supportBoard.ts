@@ -1,20 +1,26 @@
 import { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
 
-export interface SupportPixelItem {
-  x: number
-  y: number
-  color: string
-  locked: number
-}
-
 export interface SupportBoardView {
   id: number
   name: string
   width: number
   height: number
   active: number
-  pixels: SupportPixelItem[]
+  /** 扁平数组：[x, y, colorInt, locked, ...] */
+  pixels: number[]
+}
+
+export interface SupportPixelChange {
+  x: number
+  y: number
+  color: string | null
+  locked: number | null
+}
+
+export interface SupportPixelChangeEvent {
+  boardId: number
+  pixels: SupportPixelChange[]
 }
 
 export interface SupportBoardItem {
@@ -24,14 +30,6 @@ export interface SupportBoardItem {
   height: number
   active: number
   createdAt: string
-}
-
-export interface SupportPixelChange {
-  boardId: number
-  x: number
-  y: number
-  color: string | null
-  locked: number | null
 }
 
 export const getActiveSupportBoard = (): Promise<Result<SupportBoardView>> => {
@@ -44,6 +42,12 @@ export const drawSupportPixel = (
   color: string | null
 ): Promise<Result<void>> => {
   return post('/support-board/pixel', { x, y, color })
+}
+
+export const drawSupportPixels = (
+  pixels: { x: number; y: number; color: string | null }[]
+): Promise<Result<{ x: number; y: number }[]>> => {
+  return post('/support-board/pixel-batch', pixels)
 }
 
 export const lockSupportPixel = (x: number, y: number): Promise<Result<void>> => {

@@ -185,9 +185,9 @@ const renderChart = () => {
   const dates = trendList.value.map((t) => t.date)
   chart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['访问量', '活跃用户', '登录次数'] },
-    grid: { left: 40, right: 20, top: 40, bottom: 30 },
-    xAxis: { type: 'category', data: dates, boundaryGap: false },
+    legend: { top: 6, left: 'center', itemGap: 16, data: ['访问量', '活跃用户', '登录次数'] },
+    grid: { left: 50, right: 24, top: 48, bottom: 40, containLabel: true },
+    xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { hideOverlap: true } },
     yAxis: { type: 'value', minInterval: 1 },
     series: [
       { name: '访问量', type: 'line', smooth: true, data: trendList.value.map((t) => t.visits) },

@@ -201,6 +201,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/utility/Weather.vue'),
         meta: { title: '天气查询' },
       },
+      // AI 资讯
+      {
+        path: 'ai/news',
+        name: 'AiNews',
+        component: () => import('@/views/ai/AiNews.vue'),
+        meta: { title: 'AI 编程资讯' },
+      },
+      {
+        path: 'ai/leaderboard',
+        name: 'AiModelLeaderboard',
+        component: () => import('@/views/ai/AiModelLeaderboard.vue'),
+        meta: { title: 'AI 模型排行榜' },
+      },
       // 管理员
       {
         path: 'admin/users',

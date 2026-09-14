@@ -8,6 +8,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -77,14 +78,17 @@ public class SupportBoardPixelCache {
                 redis.opsForHash().put(k, EMPTY_MARK, "1");
                 return;
             }
+            // 先拼成 Map，再一次 putAll（单条 HMSET），避免逐像素多次 Redis 往返
+            Map<String, String> map = new HashMap<>(pixels.size());
             for (SupportPixelItem p : pixels) {
                 String color = p.getColor();
                 if (color == null) {
                     continue;
                 }
                 int locked = p.getLocked() != null && p.getLocked() == 1 ? 1 : 0;
-                redis.opsForHash().put(k, p.getX() + ":" + p.getY(), locked + "|" + color);
+                map.put(p.getX() + ":" + p.getY(), locked + "|" + color);
             }
+            redis.opsForHash().putAll(k, map);
         } catch (Exception e) {
             log.warn("写入画板像素缓存失败: {}", e.getMessage());
         }

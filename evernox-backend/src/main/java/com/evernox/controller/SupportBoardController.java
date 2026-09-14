@@ -38,6 +38,11 @@ public class SupportBoardController {
         return Result.success(supportBoardService.getActive());
     }
 
+    @GetMapping(value = "/active-binary", produces = "application/octet-stream")
+    public byte[] activeBinary() {
+        return supportBoardService.getActiveBinary();
+    }
+
     @PostMapping("/pixel")
     public Result<Void> pixel(@RequestBody SupportPixelRequest request, HttpServletRequest http) {
         supportBoardService.setPixel(getUserId(http), request);

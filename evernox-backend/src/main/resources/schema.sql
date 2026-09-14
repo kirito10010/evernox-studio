@@ -813,3 +813,72 @@ CREATE TABLE IF NOT EXISTS `support_pixel` (
     KEY `idx_board` (`board_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='应援板像素';
 
+CREATE TABLE IF NOT EXISTS `ai_news_item` (
+    `id`           BIGINT NOT NULL AUTO_INCREMENT COMMENT '条目ID',
+    `source`       VARCHAR(50) NOT NULL COMMENT '来源: hackernews/reddit/bilibili/juejin/sspai',
+    `external_id`  VARCHAR(128) NOT NULL COMMENT '源内唯一ID',
+    `title`        VARCHAR(512) NOT NULL COMMENT '标题',
+    `title_zh`     VARCHAR(512) NULL COMMENT '中文标题(自动翻译)',
+    `url`          VARCHAR(1024) NOT NULL COMMENT '原文链接',
+    `summary`      TEXT NULL COMMENT '摘要(可选)',
+    `summary_zh`   TEXT NULL COMMENT '中文摘要(自动翻译)',
+    `tag`          VARCHAR(50) NULL COMMENT '分类标签',
+    `score`        INT NOT NULL DEFAULT 0 COMMENT '热度(分数)',
+    `published_at` DATETIME NOT NULL COMMENT '发布时间',
+    `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '入库时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_source_external` (`source`, `external_id`),
+    KEY `idx_published` (`published_at`),
+    KEY `idx_tag` (`tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI编程资讯';
+
+CREATE TABLE IF NOT EXISTS `ai_news_favorite` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT,
+    `user_id`    BIGINT NOT NULL COMMENT '用户ID',
+    `item_id`    BIGINT NOT NULL COMMENT '资讯条目ID',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_item` (`user_id`, `item_id`),
+    KEY `idx_item` (`item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI资讯收藏';
+
+CREATE TABLE IF NOT EXISTS `ai_model_rank` (
+    `id`           BIGINT NOT NULL AUTO_INCREMENT,
+    `category`     VARCHAR(50) NOT NULL COMMENT '分类: overall/coding/reasoning/knowledge/professional',
+    `rank`         INT NOT NULL COMMENT '排名',
+    `model_name`   VARCHAR(200) NOT NULL COMMENT '模型名',
+    `provider`     VARCHAR(100) NULL COMMENT '厂商',
+    `release_date` VARCHAR(20) NULL COMMENT '上线日期',
+    `evidence`     VARCHAR(50) NULL COMMENT '评测证据',
+    `confidence`   VARCHAR(50) NULL COMMENT '置信度',
+    `input_price`  VARCHAR(20) NULL COMMENT '输入价格',
+    `output_price` VARCHAR(20) NULL COMMENT '输出价格',
+    `score`        DOUBLE NULL COMMENT '共识指数',
+    `updated_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_category_rank` (`category`, `rank`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型排行榜';
+
+CREATE TABLE IF NOT EXISTS `ai_zhizhi_rank` (
+    `id`            BIGINT NOT NULL AUTO_INCREMENT,
+    `category`      VARCHAR(50) NOT NULL COMMENT '分类: logic/code_v3/vision',
+    `report_date`   VARCHAR(20) NULL COMMENT '榜单月份(YYYY-MM)',
+    `rank`          INT NOT NULL COMMENT '排名',
+    `model_name`    VARCHAR(200) NOT NULL COMMENT '模型名',
+    `extreme_score` DOUBLE NULL COMMENT '极限分数',
+    `median_score`  DOUBLE NULL COMMENT '中位分数',
+    `median_gap`    VARCHAR(20) NULL COMMENT '中位差距',
+    `change`        VARCHAR(20) NULL COMMENT '变更',
+    `avg_time`      VARCHAR(20) NULL COMMENT '平均耗时(秒)',
+    `token`         VARCHAR(20) NULL COMMENT 'Token',
+    `test_cost`     VARCHAR(20) NULL COMMENT '测试成本(元)',
+    `price`         VARCHAR(20) NULL COMMENT '价格(元/百万)',
+    `release_date`  VARCHAR(20) NULL COMMENT '发布时间',
+    `think`         TINYINT NULL DEFAULT 0 COMMENT '是否推理模型 0/1',
+    `country`       VARCHAR(20) NULL COMMENT '模型国家: china/usa/other',
+    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_category_rank` (`category`, `rank`),
+    KEY `idx_category_report` (`category`, `report_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='致知模型排行榜';
+

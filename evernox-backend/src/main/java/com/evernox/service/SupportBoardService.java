@@ -14,6 +14,9 @@ public interface SupportBoardService {
     /** 当前展示画板 + 所有像素 */
     SupportBoardViewResponse getActive();
 
+    /** 当前画板的紧凑二进制表示（用于前端快速加载渲染） */
+    byte[] getActiveBinary();
+
     /** 绘制/擦除像素（作用于当前展示画板） */
     void setPixel(Long userId, SupportPixelRequest request);
 

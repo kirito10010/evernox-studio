@@ -199,7 +199,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   drawSupportPixels,
-  getActiveSupportBoard,
+  getActiveSupportBoardBinary,
   lockSupportPixels,
   unlockSupportPixels,
 } from '@/api/supportBoard'
@@ -252,9 +252,16 @@ const brushSize = ref(1)
 const brushSizes = [1, 3, 5, 9, 17]
 const toolSupportsSize = computed(() => tool.value !== 'brush' && tool.value !== 'guide' && !(tool.value === 'lock' && lockMode.value === 'region'))
 const cursorHint = ref<{ x: number; y: number } | null>(null)
-const pixelColors = new Map<string, string>()
-const lockedSet = new Set<string>()
-let paintedKeys = new Set<string>()
+const pixelColors = new Map<number, string>()
+const lockedSet = new Set<number>()
+let paintedKeys = new Set<number>()
+// 像素键：x*10000+y，避免字符串拼接与哈希，大幅提升 45 万像素的存取速度
+const pixelKey = (x: number, y: number) => x * 10000 + y
+// 画板像素二进制（每像素 [R,G,B,flags]），用于首次快速渲染
+let pixelBytes: Uint8Array | null = null
+// 拖拽期间的待提交绘制（画笔/橡皮/锁定/解锁），松开鼠标时一次性分片提交，避免每帧都发请求导致超时
+let pendingPaintTool: 'brush' | 'eraser' | 'lock' | 'unlock' | null = null
+const pendingPaintPixels: { x: number; y: number; color?: string | null; snapshot?: string }[] = []
 let wrapLeft = 0
 let wrapTop = 0
 
@@ -341,17 +348,28 @@ const onEditColor = (i: number, e: Event) => {
 const load = async () => {
   loading.value = true
   try {
-    const res = await getActiveSupportBoard()
-    board.value = res.data ?? null
+    const buf = await getActiveSupportBoardBinary()
+    const dv = new DataView(buf)
+    const w = dv.getInt32(0, true)
+    const h = dv.getInt32(4, true)
+    const id = dv.getInt32(8, true)
+    board.value = { id, name: '', width: w, height: h, active: 1, pixels: [] }
+    pixelBytes = new Uint8Array(buf, 12)
     pixelColors.clear()
     lockedSet.clear()
-    const flatPixels = board.value?.pixels ?? []
-    for (let i = 0; i < flatPixels.length; i += 4) {
-      const x = flatPixels[i]
-      const y = flatPixels[i + 1]
-      pixelColors.set(`${x},${y}`, intToHex(flatPixels[i + 2]))
-      if (flatPixels[i + 3] === 1) {
-        lockedSet.add(`${x},${y}`)
+    const bytes = pixelBytes
+    for (let i = 0; i < w * h; i++) {
+      const flags = bytes[i * 4 + 3]
+      if (flags & 1) {
+        const x = i % w
+        const y = (i / w) | 0
+        const r = bytes[i * 4]
+        const g = bytes[i * 4 + 1]
+        const b = bytes[i * 4 + 2]
+        pixelColors.set(pixelKey(x, y), intToHex((r << 16) | (g << 8) | b))
+        if (flags & 2) {
+          lockedSet.add(pixelKey(x, y))
+        }
       }
     }
     await nextTick()
@@ -370,7 +388,7 @@ const intToHex = (n: number) => `#${(n & 0xffffff).toString(16).padStart(6, '0')
 
 const renderBoard = () => {
   const canvas = canvasRef.value
-  if (!canvas || !board.value) return
+  if (!canvas || !board.value || !pixelBytes) return
   ctx = canvas.getContext('2d')
   if (!ctx) return
   const w = board.value.width
@@ -378,25 +396,25 @@ const renderBoard = () => {
   // 用 ImageData 一次性写入所有像素，比逐点 fillRect 快很多（首次加载/刷新）
   const img = ctx.createImageData(w, h)
   const data = img.data
-  data.fill(0)
-  for (let i = 3; i < data.length; i += 4) {
-    data[i] = 255
-  }
-  const flat = board.value.pixels
+  const bytes = pixelBytes
   const showLockOverlay = isAdmin.value && showLockStyle.value
-  for (let i = 0; i < flat.length; i += 4) {
-    const x = flat[i]
-    const y = flat[i + 1]
-    const colorInt = flat[i + 2]
-    const idx = (y * w + x) * 4
-    data[idx] = (colorInt >> 16) & 255
-    data[idx + 1] = (colorInt >> 8) & 255
-    data[idx + 2] = colorInt & 255
-    // 锁定像素直接混入红色，避免逐点 fillRect（锁定像素多时首次加载会很慢）
-    if (showLockOverlay && flat[i + 3] === 1) {
-      data[idx] = Math.round(data[idx] * 0.28 + 255 * 0.72)
-      data[idx + 1] = Math.round(data[idx + 1] * 0.28 + 82 * 0.72)
-      data[idx + 2] = Math.round(data[idx + 2] * 0.28 + 82 * 0.72)
+  for (let i = 0; i < w * h; i++) {
+    const o = i * 4
+    const flags = bytes[o + 3]
+    data[o + 3] = 255 // 画板为不透明黑底
+    if (flags & 1) {
+      const r = bytes[o]
+      const g = bytes[o + 1]
+      const b = bytes[o + 2]
+      if (showLockOverlay && (flags & 2)) {
+        data[o] = Math.round(r * 0.28 + 255 * 0.72)
+        data[o + 1] = Math.round(g * 0.28 + 82 * 0.72)
+        data[o + 2] = Math.round(b * 0.28 + 82 * 0.72)
+      } else {
+        data[o] = r
+        data[o + 1] = g
+        data[o + 2] = b
+      }
     }
   }
   ctx.putImageData(img, 0, 0)
@@ -404,7 +422,7 @@ const renderBoard = () => {
 
 const applyPixelChange = (x: number, y: number, color: string | null, locked: number | null) => {
   if (!ctx) return
-  const key = `${x},${y}`
+  const key = pixelKey(x, y)
   if (color) {
     pixelColors.set(key, color)
   } else {
@@ -554,7 +572,7 @@ const onMouseMove = (e: MouseEvent) => {
     return
   }
   // 悬停锁定状态（O(1)，仅用于光标提示颜色，不再做连通块 flood-fill）
-  hoverLocked.value = !!pos && isAdmin.value && lockedSet.has(`${pos.x},${pos.y}`)
+  hoverLocked.value = !!pos && isAdmin.value && lockedSet.has(pixelKey(pos.x, pos.y))
 }
 
 const onMouseUp = () => {
@@ -564,6 +582,47 @@ const onMouseUp = () => {
   paintedKeys = new Set()
   hoverLocked.value = false
   cursorHint.value = null
+  void flushPendingPaint()
+}
+
+const flushPendingPaint = async () => {
+  if (pendingPaintPixels.length === 0) {
+    pendingPaintTool = null
+    return
+  }
+  const pixels = pendingPaintPixels.splice(0)
+  const tool = pendingPaintTool
+  pendingPaintTool = null
+  const CHUNK = 10000
+  try {
+    if (tool === 'brush') {
+      for (let i = 0; i < pixels.length; i += CHUNK) {
+        const batch = pixels.slice(i, i + CHUNK)
+        await drawSupportPixels(batch.map((p) => ({ x: p.x, y: p.y, color: p.color! })))
+      }
+    } else if (tool === 'eraser') {
+      for (let i = 0; i < pixels.length; i += CHUNK) {
+        const batch = pixels.slice(i, i + CHUNK)
+        const snapMap = new Map(batch.map((p) => [`${p.x},${p.y}`, p.snapshot ?? '#000000']))
+        const res = await drawSupportPixels(batch.map((p) => ({ x: p.x, y: p.y, color: null })))
+        const skipped = res?.data ?? []
+        for (const s of skipped) {
+          applyPixelChange(s.x, s.y, snapMap.get(`${s.x},${s.y}`) ?? '#000000', null)
+        }
+      }
+    } else if (tool === 'lock') {
+      for (let i = 0; i < pixels.length; i += CHUNK) {
+        await lockSupportPixels(pixels.slice(i, i + CHUNK).map((p) => ({ x: p.x, y: p.y })))
+      }
+    } else if (tool === 'unlock') {
+      for (let i = 0; i < pixels.length; i += CHUNK) {
+        await unlockSupportPixels(pixels.slice(i, i + CHUNK).map((p) => ({ x: p.x, y: p.y })))
+      }
+    }
+    if (showLockMark.value) renderLockMark()
+  } catch {
+    /* 提示已在请求层 */
+  }
 }
 
 const findRegion = (sx: number, sy: number, inRegion: (x: number, y: number) => boolean) => {
@@ -605,9 +664,8 @@ const renderLockMark = () => {
   const d = img.data // 默认全透明
   // 锁定像素标记为半透明品红，艺术内容仍可见，且与普通颜色明显区分
   for (const key of lockedSet) {
-    const i = key.indexOf(',')
-    const x = Number(key.slice(0, i))
-    const y = Number(key.slice(i + 1))
+    const x = Math.floor(key / 10000)
+    const y = key % 10000
     if (x < 0 || y < 0 || x >= w || y >= h) continue
     const idx = (y * w + x) * 4
     d[idx] = 255
@@ -640,7 +698,7 @@ const selectLockMode = (mode: LockMode) => {
 
 const lockRegionAt = async (sx: number, sy: number) => {
   if (locking.value) return
-  const region = findRegion(sx, sy, (x, y) => pixelColors.has(`${x},${y}`))
+  const region = findRegion(sx, sy, (x, y) => pixelColors.has(pixelKey(x, y)))
   if (region.length === 0) return
   locking.value = true
   lockProgress.value = 0
@@ -656,7 +714,7 @@ const lockRegionAt = async (sx: number, sy: number) => {
         batch.map((p) => ({
           x: p.x,
           y: p.y,
-          color: pixelColors.get(`${p.x},${p.y}`) ?? '#000000',
+          color: pixelColors.get(pixelKey(p.x, p.y)) ?? '#000000',
           locked: 1,
         })),
       )
@@ -664,7 +722,7 @@ const lockRegionAt = async (sx: number, sy: number) => {
       lockProgress.value = Math.floor((done / total) * 100)
     }
     // 同步锁定集合并刷新锁定标记（避免等待 rAF 才更新）
-    for (const p of region) lockedSet.add(`${p.x},${p.y}`)
+    for (const p of region) lockedSet.add(pixelKey(p.x, p.y))
     if (showLockMark.value) renderLockMark()
     ElMessage.success(`已锁定 ${total} 个像素`)
   } catch {
@@ -844,7 +902,7 @@ const confirmImport = async () => {
       const x = s.posX + px
       const y = s.posY + py
       if (x < 0 || y < 0 || x >= board.value.width || y >= board.value.height) continue
-      if (lockedSet.has(`${x},${y}`)) {
+      if (lockedSet.has(pixelKey(x, y))) {
         skippedLocked++
         continue
       }
@@ -915,53 +973,40 @@ const screenToPixel = (clientX: number, clientY: number) => {
   return { x, y }
 }
 
-const paintBatch = async (pixels: { x: number; y: number }[]) => {
+const paintBatch = (pixels: { x: number; y: number }[]) => {
   if (tool.value === 'lock') {
-    // 先本地即时生效（乐观更新），再后台同步
-    for (const p of pixels) {
-      applyPixelChange(p.x, p.y, pixelColors.get(`${p.x},${p.y}`) ?? '#000000', 1)
-    }
-    try {
-      await lockSupportPixels(pixels)
-      if (showLockMark.value) renderLockMark()
-    } catch {
-      /* 提示已在请求层 */
-    }
+    const changes = pixels.map((p) => {
+      const color = pixelColors.get(pixelKey(p.x, p.y)) ?? '#000000'
+      pendingPaintPixels.push({ x: p.x, y: p.y })
+      return { x: p.x, y: p.y, color, locked: 1 }
+    })
+    pendingPaintTool = 'lock'
+    queuePixelChanges(changes)
   } else if (tool.value === 'unlock') {
-    for (const p of pixels) {
-      applyPixelChange(p.x, p.y, pixelColors.get(`${p.x},${p.y}`) ?? '#000000', 0)
-    }
-    try {
-      await unlockSupportPixels(pixels)
-      if (showLockMark.value) renderLockMark()
-    } catch {
-      /* 提示已在请求层 */
-    }
+    const changes = pixels.map((p) => {
+      const color = pixelColors.get(pixelKey(p.x, p.y)) ?? '#000000'
+      pendingPaintPixels.push({ x: p.x, y: p.y })
+      return { x: p.x, y: p.y, color, locked: 0 }
+    })
+    pendingPaintTool = 'unlock'
+    queuePixelChanges(changes)
   } else if (tool.value === 'eraser') {
     // 快照原色，用于后端跳过（非本人像素）时回滚
-    const snapshots = new Map<string, string>()
-    for (const p of pixels) {
-      snapshots.set(`${p.x},${p.y}`, pixelColors.get(`${p.x},${p.y}`) ?? '#000000')
-      applyPixelChange(p.x, p.y, null, null)
-    }
-    try {
-      const res = await drawSupportPixels(pixels.map((p) => ({ x: p.x, y: p.y, color: null })))
-      const skipped = res?.data ?? []
-      for (const s of skipped) {
-        applyPixelChange(s.x, s.y, snapshots.get(`${s.x},${s.y}`) ?? '#000000', null)
-      }
-    } catch {
-      /* 提示已在请求层 */
-    }
+    const changes = pixels.map((p) => {
+      const snapshot = pixelColors.get(pixelKey(p.x, p.y)) ?? '#000000'
+      pendingPaintPixels.push({ x: p.x, y: p.y, color: null, snapshot })
+      return { x: p.x, y: p.y, color: null, locked: null }
+    })
+    pendingPaintTool = 'eraser'
+    queuePixelChanges(changes)
   } else {
-    for (const p of pixels) {
-      applyPixelChange(p.x, p.y, currentColor.value, 0)
-    }
-    try {
-      await drawSupportPixels(pixels.map((p) => ({ x: p.x, y: p.y, color: currentColor.value })))
-    } catch {
-      /* 提示已在请求层 */
-    }
+    const color = currentColor.value
+    const changes = pixels.map((p) => {
+      pendingPaintPixels.push({ x: p.x, y: p.y, color })
+      return { x: p.x, y: p.y, color, locked: 0 }
+    })
+    pendingPaintTool = 'brush'
+    queuePixelChanges(changes)
   }
 }
 
@@ -975,7 +1020,7 @@ const paintAt = (pos: { x: number; y: number }) => {
       const x = pos.x + dx
       const y = pos.y + dy
       if (x < 0 || y < 0 || x >= board.value.width || y >= board.value.height) continue
-      const key = `${x},${y}`
+      const key = pixelKey(x, y)
       if (paintedKeys.has(key)) continue
       // 画笔/橡皮不能作用于已锁定像素
       if ((tool.value === 'brush' || tool.value === 'eraser') && lockedSet.has(key)) continue

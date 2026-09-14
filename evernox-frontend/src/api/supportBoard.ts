@@ -1,4 +1,4 @@
-import { get, post, put, del } from '@/utils/request'
+import request, { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
 
 export interface SupportBoardView {
@@ -34,6 +34,12 @@ export interface SupportBoardItem {
 
 export const getActiveSupportBoard = (): Promise<Result<SupportBoardView>> => {
   return get('/support-board/active')
+}
+
+/** 拉取画板紧凑二进制（8 字节头 + 每像素 [R,G,B,flags]），用于快速加载渲染 */
+export const getActiveSupportBoardBinary = async (): Promise<ArrayBuffer> => {
+  const res = await request.get('/support-board/active-binary', { responseType: 'arraybuffer' })
+  return res.data as ArrayBuffer
 }
 
 export const drawSupportPixel = (

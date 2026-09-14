@@ -62,6 +62,55 @@ public class SupportBoardServiceImpl implements SupportBoardService {
                 .build();
     }
 
+    @Override
+    public byte[] getActiveBinary() {
+        SupportBoard board = activeBoard();
+        if (board == null) {
+            return new byte[0];
+        }
+        List<SupportPixelItem> pixels = pixelCache.get(board.getId());
+        if (pixels == null) {
+            pixels = loadPixels(board.getId());
+            pixelCache.putAll(board.getId(), pixels);
+        }
+        int w = board.getWidth();
+        int h = board.getHeight();
+        // 布局：12 字节头（width, height, id 各 int32 小端）+ width*height*4 字节，每像素 [R, G, B, flags]
+        // flags：bit0 = 已绘制，bit1 = 已锁定
+        byte[] buf = new byte[12 + w * h * 4];
+        buf[0] = (byte) (w & 0xFF);
+        buf[1] = (byte) ((w >> 8) & 0xFF);
+        buf[2] = (byte) ((w >> 16) & 0xFF);
+        buf[3] = (byte) ((w >> 24) & 0xFF);
+        buf[4] = (byte) (h & 0xFF);
+        buf[5] = (byte) ((h >> 8) & 0xFF);
+        buf[6] = (byte) ((h >> 16) & 0xFF);
+        buf[7] = (byte) ((h >> 24) & 0xFF);
+        int id = board.getId().intValue();
+        buf[8] = (byte) (id & 0xFF);
+        buf[9] = (byte) ((id >> 8) & 0xFF);
+        buf[10] = (byte) ((id >> 16) & 0xFF);
+        buf[11] = (byte) ((id >> 24) & 0xFF);
+        for (SupportPixelItem p : pixels) {
+            int x = p.getX();
+            int y = p.getY();
+            if (x < 0 || y < 0 || x >= w || y >= h) {
+                continue;
+            }
+            int colorInt = colorToInt(p.getColor());
+            int idx = 12 + (y * w + x) * 4;
+            buf[idx] = (byte) ((colorInt >> 16) & 0xFF);
+            buf[idx + 1] = (byte) ((colorInt >> 8) & 0xFF);
+            buf[idx + 2] = (byte) (colorInt & 0xFF);
+            int flags = 1;
+            if (p.getLocked() != null && p.getLocked() == 1) {
+                flags |= 2;
+            }
+            buf[idx + 3] = (byte) flags;
+        }
+        return buf;
+    }
+
     /** 像素对象列表 → 扁平数组 [x, y, colorInt, locked, ...]，缩小首次加载体积 */
     private List<Integer> toFlatPixels(List<SupportPixelItem> pixels) {
         List<Integer> flat = new ArrayList<>(pixels.size() * 4);
@@ -205,22 +254,69 @@ public class SupportBoardServiceImpl implements SupportBoardService {
         List<PixelChange> changes = new ArrayList<>(draw.size() + erase.size());
         batchInsertDraw(board.getId(), userId, draw, changes);
 
-        for (SupportPixelRequest req : erase) {
-            int x = req.getX();
-            int y = req.getY();
-            int deleted = jdbcTemplate.update(
-                    "DELETE FROM support_pixel WHERE board_id=? AND x=? AND y=? AND user_id=?",
-                    board.getId(), x, y, userId);
-            if (deleted == 0) {
-                skipped.add(req);
-                continue;
-            }
-            changes.add(new PixelChange(x, y, null, null));
-            pixelCache.erasePixel(board.getId(), x, y);
+        // 橡皮：先查本人像素，再批量删除，避免逐点 DELETE
+        if (!erase.isEmpty()) {
+            eraseOwnPixels(board.getId(), userId, erase, skipped, changes);
         }
 
         sseRegistry.broadcastBatch(board.getId(), changes);
         return skipped;
+    }
+
+    /** 橡皮：批量删除本人像素，非本人像素跳过（返回给前端回滚） */
+    private void eraseOwnPixels(Long boardId, Long userId, List<SupportPixelRequest> erase,
+            List<SupportPixelRequest> skipped, List<PixelChange> changes) {
+        Set<String> own = queryOwnKeys(boardId, userId, erase);
+        List<SupportPixelRequest> toDelete = new ArrayList<>();
+        for (SupportPixelRequest req : erase) {
+            if (own.contains(req.getX() + "," + req.getY())) {
+                toDelete.add(req);
+            } else {
+                skipped.add(req);
+            }
+        }
+        jdbcTemplate.batchUpdate(
+                "DELETE FROM support_pixel WHERE board_id=? AND x=? AND y=?",
+                toDelete,
+                500,
+                (ps, req) -> {
+                    ps.setLong(1, boardId);
+                    ps.setInt(2, req.getX());
+                    ps.setInt(3, req.getY());
+                });
+        for (SupportPixelRequest req : toDelete) {
+            changes.add(new PixelChange(req.getX(), req.getY(), null, null));
+            pixelCache.erasePixel(boardId, req.getX(), req.getY());
+        }
+    }
+
+    /** 查询 erase 列表中属于本人（user_id）的像素坐标 */
+    private Set<String> queryOwnKeys(Long boardId, Long userId, List<SupportPixelRequest> erase) {
+        Set<String> keys = new HashSet<>();
+        final int BATCH = 500;
+        for (int s = 0; s < erase.size(); s += BATCH) {
+            int e = Math.min(erase.size(), s + BATCH);
+            List<SupportPixelRequest> slice = erase.subList(s, e);
+            StringBuilder sql = new StringBuilder(
+                    "SELECT x, y FROM support_pixel WHERE board_id=? AND user_id=? AND (x, y) IN (");
+            List<Object> args = new ArrayList<>(slice.size() * 2 + 2);
+            args.add(boardId);
+            args.add(userId);
+            for (int i = 0; i < slice.size(); i++) {
+                if (i > 0) {
+                    sql.append(',');
+                }
+                sql.append("(?,?)");
+                args.add(slice.get(i).getX());
+                args.add(slice.get(i).getY());
+            }
+            sql.append(')');
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(Objects.requireNonNull(sql.toString()), args.toArray());
+            for (Map<String, Object> row : rows) {
+                keys.add(row.get("x") + "," + row.get("y"));
+            }
+        }
+        return keys;
     }
 
     /** 批量写入彩绘像素：按 1000 行一组拼接多行 INSERT，避免逐条数据库往返 */

@@ -17,6 +17,7 @@
 - **火影忍者OL**：官方公告、忍者图鉴（含技能）、忍者测验（Excel 批量导入）、组织积分（周积分/礼包/Excel 导入）
 - **个人工作台**：记事本（富文本 + 图片）、待办、记账、绩效（项目/加班/迟到）、工资
 - **话题集中营**：圈子、帖子、评论、点赞、收藏
+- **AI 工具**：AI 编程资讯（Hacker News，自动翻译）、Code Arena 模型排行榜（arena.ai，12 个分类 + 价格筛选）、Ollama 模型库（本地可下载模型与变体）
 - **账号体系**：注册 / 登录 / JWT 无状态鉴权 / 邮箱找回密码（163 SMTP）/ 积分与会员（每日签到、积分自助升级、卡密兑换）
 - **管理员后台**：用户、资产、网站审批、笔记审批、公告、话题、测验、积分与会员、卡密管理（待审批红点 + 邮件提醒）
 
@@ -26,14 +27,21 @@
 evernox-studio/
 ├── evernox-backend/                # Spring Boot 后端
 │   ├── config/application.yml      # 外置敏感配置（已 gitignore，需自行创建）
+│   ├── data/                       # 上传的图片（自动创建，本地可随时清空）
 │   ├── src/main/java/com/evernox/  # controller / service / repository / entity / dto / config / security / util
 │   └── src/main/resources/         # application.yml / application-dev.yml / schema.sql
 ├── evernox-frontend/               # Vue 3 前端
 │   └── src/                        # api / views / components / router / stores / types / utils / styles
-├── nginx-1.30.4/                   # Nginx（生产部署，已 gitignore）
+├── nginx-1.30.4/                   # Nginx 二进制（已 gitignore）+ conf/nginx.conf（已纳入版本管理）
+├── Redis-8.10.1-Windows-x64/       # Redis 二进制（已 gitignore）
+├── jwt-keys/                       # JWT 密钥对，首启动自动生成（已 gitignore）
+├── fetch-arena-leaderboard.bat     # 本地抓取模型排行榜数据并打包（双击运行）
 ├── start.bat                       # 本地一键启动脚本
+├── 使用手册.md                     # 部署运维 + 重装恢复 + 功能说明（重点看这个）
 └── README.md
 ```
+
+> `jwt-keys/` 也可能出现在 `evernox-backend/jwt-keys/`（取决于启动时的工作目录），两处都会自动生成、都已 gitignore，不用管。
 
 ## 环境要求
 
@@ -71,7 +79,8 @@ evernox:
 ```
 
 > 说明：数据库 `evernox_backend` 会在首次启动时自动创建，表结构由 `src/main/resources/schema.sql` 自动初始化（`CREATE TABLE IF NOT EXISTS`）。
-> `codec.secret / codec.salt` 一旦有图片数据后不可再修改，否则已存图片无法解码。
+> `codec.secret / codec.salt` 一旦有图片数据后不可再修改，否则已存图片无法解码。**`codec.salt` 必须是合法 Base64 字符串**（否则启动报 `初始化图片编解码密钥失败`），本地开发可直接用 `bG9jYWwtZGV2LXNhbHQtMDE=`。
+> 上面这个文件是**本地开发唯一需要手动准备的东西**：JWT 密钥、图片目录、数据库、数据表全部自动生成。本地开发**不需要备份任何东西**（重装系统见「使用手册.md」第 5A 节）。
 
 ### 2. 启动
 
@@ -116,6 +125,8 @@ npm run build
 
 ## 注意事项
 
-- **`evernox-backend/config/application.yml` 含明文密钥，已被 gitignore，切勿提交。** 部署或克隆后需自行补建。
-- JWT 密钥对（`jwt-keys/`）会在首次启动时自动生成，无需手动维护。
-- 图片以加密形式存储在本地磁盘（`evernox-backend/data/`），无云对象存储依赖。
+- **`evernox-backend/config/application.yml` 含明文密钥，已被 gitignore，切勿提交。** 克隆后需自行创建（模板见上文「本地开发」）。
+- JWT 密钥对（`jwt-keys/`，可能在项目根目录或 `evernox-backend/` 下）会在首次启动时自动生成，无需手动维护、也无需备份，删除后会自动重建。
+- 图片以加密形式存储在本地磁盘（`evernox-backend/data/`），无云对象存储依赖；本地开发可随意清空，**只有服务器上的 `data/` 才需要备份**。
+- **服务器**需要备份的只有 3 样：`config/application.yml`、数据库转储 `.sql`、`data/` 目录（详见「使用手册.md」第 4 节）。
+- 完整部署运维与重装恢复流程见 **[使用手册.md](./使用手册.md)**。

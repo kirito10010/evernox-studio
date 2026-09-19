@@ -32,8 +32,8 @@ evernox-studio/
 │   └── src/main/resources/         # application.yml / application-dev.yml / schema.sql
 ├── evernox-frontend/               # Vue 3 前端
 │   └── src/                        # api / views / components / router / stores / types / utils / styles
-├── nginx-1.30.4/                   # Nginx 二进制（已 gitignore）+ conf/nginx.conf（已纳入版本管理）
-├── Redis-8.10.1-Windows-x64/       # Redis 二进制（已 gitignore）
+├── nginx-1.30.5/                   # Nginx 二进制（已 gitignore）+ conf/nginx.conf（已纳入版本管理）
+├── Redis-*/                        # Redis 二进制（已 gitignore；实际目录名 Redis-8.10.1-Windows-x64，忽略规则已通配）
 ├── jwt-keys/                       # JWT 密钥对，首启动自动生成（已 gitignore）
 ├── fetch-arena-leaderboard.bat     # 本地抓取模型排行榜数据并打包（双击运行）
 ├── start.bat                       # 本地一键启动脚本
@@ -121,7 +121,7 @@ npm run build
 # 产物：dist/
 ```
 
-生产环境使用 Nginx 托管 `dist` 静态文件（对外端口 80），并将 `/api` 反向代理到后端 jar（后端端口 11002，context-path `/api`）。后端部署时需把 `config/application.yml` 放到 jar 同级目录。
+生产环境使用 Nginx 托管 `dist` 静态文件（对外端口 80），并将 `/api` 反向代理到后端 jar（后端默认端口 11002，context-path `/api`）。服务器上用 `切换端口11002.bat` / `切换端口11003.bat` 在 11002 / 11003 之间轮换运行，所以 `nginx.conf` 里的 `proxy_pass` 必须与后端**当前实际监听的端口**一致（仓库当前快照是 `11003`）。后端部署时需把 `config/application.yml` 放到 jar 同级目录。
 
 ## 注意事项
 

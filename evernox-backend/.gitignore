@@ -30,4 +30,7 @@ logs/
 *.log
 
 # Application
+# 敏感配置：数据库口令 / 图片编解码密钥 / SMTP / 管理员账号
+# 根目录 .gitignore 也排除了它，这里再挡一次做双保险（防止本目录被单独拷贝或拆库）
+config/application.yml
 application-local.yml

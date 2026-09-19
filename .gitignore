@@ -24,15 +24,22 @@ evernox-backend/target/
 evernox-frontend/node_modules/
 evernox-frontend/dist/
 
+# ===== 前端锁文件：本项目统一用 npm，pnpm 产物一律不入库 =====
+evernox-frontend/pnpm-lock.yaml
+evernox-frontend/pnpm-workspace.yaml
+
 # ===== Nginx 二进制发行包（从官网重下）=====
 # 例外：只把自己改过的 nginx.conf 纳入版本管理，重装后直接就有部署配置
-/nginx-1.30.4/*
-!/nginx-1.30.4/conf/
-/nginx-1.30.4/conf/*
-!/nginx-1.30.4/conf/nginx.conf
+# 通配版本号，以后升级 nginx 只改目录名，不用再动这里
+# 注意：必须写 /nginx-*/*（排除目录内容），不能写 /nginx-*/（排除目录本身），
+#       否则下面 ! 开头的重新包含规则会失效
+/nginx-*/*
+!/nginx-*/conf/
+/nginx-*/conf/*
+!/nginx-*/conf/nginx.conf
 
 # ===== Redis 二进制发行包（从官网重下；dump.rdb 是缓存快照，丢了无影响）=====
-/Redis-8.10.1-Windows-x64/
+/Redis-*/
 
 # ===== Comate 本地规格文档（AI 生成的设计文档，不是运行所需）=====
 /.comate/

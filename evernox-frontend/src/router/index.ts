@@ -210,9 +210,15 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'ai/leaderboard',
-        name: 'AiModelLeaderboard',
-        component: () => import('@/views/ai/AiModelLeaderboard.vue'),
-        meta: { title: 'AI 模型排行榜' },
+        name: 'AiArenaLeaderboard',
+        component: () => import('@/views/ai/AiArenaLeaderboard.vue'),
+        meta: { title: 'Code Arena 模型排行榜' },
+      },
+      {
+        path: 'ai/ollama',
+        name: 'AiOllamaModels',
+        component: () => import('@/views/ai/AiOllamaModels.vue'),
+        meta: { title: 'Ollama 模型库' },
       },
       // 管理员
       {

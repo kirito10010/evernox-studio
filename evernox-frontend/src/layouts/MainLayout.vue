@@ -196,6 +196,10 @@
               <el-icon><Trophy /></el-icon>
               <template #title>模型排行榜</template>
             </el-menu-item>
+            <el-menu-item index="/ai/ollama">
+              <el-icon><Box /></el-icon>
+              <template #title>Ollama 模型库</template>
+            </el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu v-if="userStore.isAdmin" index="admin">

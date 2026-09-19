@@ -55,6 +55,7 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElUpload: typeof import('element-plus/es')['ElUpload']
     ExpenseChart: typeof import('./components/ExpenseChart.vue')['default']
     ExpensePieChart: typeof import('./components/ExpensePieChart.vue')['default']

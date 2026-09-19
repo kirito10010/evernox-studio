@@ -2,9 +2,7 @@ package com.evernox.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.evernox.common.Result;
-import com.evernox.dto.AiModelRankItem;
 import com.evernox.dto.AiNewsItemResponse;
-import com.evernox.entity.AiZhizhiRank;
 import com.evernox.security.JwtTokenProvider;
 import com.evernox.service.AiNewsService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,23 +43,6 @@ public class AiNewsController {
     @GetMapping("/tags")
     public Result<List<String>> tags() {
         return Result.success(aiNewsService.tags());
-    }
-
-    @GetMapping("/leaderboard")
-    public Result<List<AiModelRankItem>> leaderboard(@RequestParam(defaultValue = "overall") String category) {
-        return Result.success(aiNewsService.getLeaderboard(category));
-    }
-
-    @GetMapping("/zhizhi-rank")
-    public Result<List<AiZhizhiRank>> zhizhiRank(
-            @RequestParam(defaultValue = "logic") String category,
-            @RequestParam(required = false) String month) {
-        return Result.success(aiNewsService.getZhizhiRank(category, month));
-    }
-
-    @GetMapping("/zhizhi-months")
-    public Result<List<String>> zhizhiMonths(@RequestParam(defaultValue = "logic") String category) {
-        return Result.success(aiNewsService.getZhizhiMonths(category));
     }
 
     @PostMapping("/{id}/favorite")

@@ -1,31 +1,49 @@
-# sensitive config (plaintext secrets) - never commit
+# ============================================================
+# 哪些东西不进 GitHub —— 别删这里的规则，删了密钥/数据就会上传
+# 重装系统的完整恢复步骤见「使用手册.md」第 5 节
+# ============================================================
+
+# ===== 敏感文件：绝对不能提交（重装后从 U 盘恢复）=====
 evernox-backend/config/application.yml
-
-# runtime data (uploaded images)
-evernox-backend/data/
-
-# JWT key pair (duplicate copy at repo root)
 /jwt-keys/
 
-# frontend build artifacts and dependencies
+# 通用密钥类文件兜底，防止以后新增的密钥文件被误提交
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.env
+
+# ===== 运行时数据：用户上传的图片（体积大且是用户数据，单独备份）=====
+evernox-backend/data/
+
+# ===== 构建产物与依赖（重装后重新构建即可）=====
+evernox-backend/target/
 evernox-frontend/node_modules/
 evernox-frontend/dist/
 
-# nginx binary distribution (deployment, not source)
-/nginx-1.30.4/
+# ===== Nginx 二进制发行包（从官网重下）=====
+# 例外：只把自己改过的 nginx.conf 纳入版本管理，重装后直接就有部署配置
+/nginx-1.30.4/*
+!/nginx-1.30.4/conf/
+/nginx-1.30.4/conf/*
+!/nginx-1.30.4/conf/nginx.conf
 
-# redis binary distribution (deployment, not source)
+# ===== Redis 二进制发行包（从官网重下；dump.rdb 是缓存快照，丢了无影响）=====
 /Redis-8.10.1-Windows-x64/
 
-# comate local spec docs
+# ===== Comate 本地规格文档（AI 生成的设计文档，不是运行所需）=====
 /.comate/
 
-# IDE / OS
+# ===== IDE / 操作系统 =====
 .vscode/
 .idea/
 *.iml
 .DS_Store
 Thumbs.db
 
-# logs
+# ===== 日志与临时产物 =====
 *.log
+arena-lb-*.zip

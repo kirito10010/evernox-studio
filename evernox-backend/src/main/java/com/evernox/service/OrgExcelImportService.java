@@ -61,14 +61,13 @@ public class OrgExcelImportService {
         HEADER_MAP.put("玩家名", Field.NAME);
         // 职务（成员导入）
         HEADER_MAP.put("职务", Field.POSITION);
-        HEADER_MAP.put("职位", Field.POSITION);
         // 周记录活动字段
         HEADER_MAP.put("参战次数", Field.NINJA_BATTLE);
         HEADER_MAP.put("战斗力", Field.TOTAL_POWER);
         HEADER_MAP.put("捐献贡献", Field.COPPER);
         HEADER_MAP.put("献祭通灵查克拉", Field.BEAST);
         HEADER_MAP.put("缉拿叛忍数", Field.RENEGADE);
-        HEADER_MAP.put("车头", Field.RENEGADE_LEADER);
+        HEADER_MAP.put("叛忍车头", Field.RENEGADE_LEADER);
     }
 
     @Transactional

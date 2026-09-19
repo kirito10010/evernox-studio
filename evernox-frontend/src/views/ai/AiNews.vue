@@ -91,10 +91,7 @@ const keyword = ref('')
 const sort = ref('time')
 const onlyFav = ref(false)
 
-const sourceOptions = [
-  { label: 'HN', value: 'hackernews' },
-  { label: 'AI HOT', value: 'aihot' },
-]
+const sourceOptions = [{ label: 'HN', value: 'hackernews' }]
 
 const tagOptions = [
   { label: '模型', value: 'model' },
@@ -247,7 +244,6 @@ onMounted(() => {
     border-radius: 4px;
 
     &.src-hackernews { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
-    &.src-aihot { color: #7c3aed; background: rgba(124, 58, 237, 0.12); }
   }
 
   .item-time {

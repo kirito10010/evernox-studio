@@ -48,12 +48,6 @@ public class SchemaMigration implements ApplicationRunner {
                 "VARCHAR(512) NULL COMMENT '中文标题(自动翻译)'");
         addColumnIfMissing("ai_news_item", "summary_zh",
                 "TEXT NULL COMMENT '中文摘要(自动翻译)'");
-
-        // 致知模型排行榜：榜单月份 + 模型国家
-        addColumnIfMissing("ai_zhizhi_rank", "report_date",
-                "VARCHAR(20) NULL COMMENT '榜单月份(YYYY-MM)'");
-        addColumnIfMissing("ai_zhizhi_rank", "country",
-                "VARCHAR(20) NULL COMMENT '模型国家: china/usa/other'");
         // ===== 上面是登记区 =====
     }
 

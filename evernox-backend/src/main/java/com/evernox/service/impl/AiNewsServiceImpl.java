@@ -3,16 +3,11 @@ package com.evernox.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.evernox.dto.AiModelRankItem;
 import com.evernox.dto.AiNewsItemResponse;
-import com.evernox.entity.AiModelRank;
 import com.evernox.entity.AiNewsFavorite;
 import com.evernox.entity.AiNewsItem;
-import com.evernox.entity.AiZhizhiRank;
-import com.evernox.repository.AiModelRankRepository;
 import com.evernox.repository.AiNewsFavoriteRepository;
 import com.evernox.repository.AiNewsItemRepository;
-import com.evernox.repository.AiZhizhiRankRepository;
 import com.evernox.service.AiNewsCrawler;
 import com.evernox.service.AiNewsService;
 import com.evernox.service.AiNewsTranslator;
@@ -24,12 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -49,8 +41,6 @@ public class AiNewsServiceImpl implements AiNewsService {
 
     private final AiNewsItemRepository itemRepository;
     private final AiNewsFavoriteRepository favoriteRepository;
-    private final AiModelRankRepository rankRepository;
-    private final AiZhizhiRankRepository zhizhiRankRepository;
     private final AiNewsCrawler crawler;
     private final AiNewsTranslator translator;
 
@@ -67,7 +57,7 @@ public class AiNewsServiceImpl implements AiNewsService {
             String key = item.getSource() + ":" + item.getExternalId();
             AiNewsItem exist = existingMap.get(key);
             if (exist != null) {
-                // 已存在：更新热度（HN 分数 / AIHOT 评分会变化）
+                // 已存在：更新热度（HN 分数会变化）
                 if (item.getScore() != null && !item.getScore().equals(exist.getScore())) {
                     exist.setScore(item.getScore());
                     itemRepository.updateById(exist);
@@ -98,6 +88,12 @@ public class AiNewsServiceImpl implements AiNewsService {
         int deleted = 0;
         int retagged = 0;
         for (AiNewsItem item : all) {
+            if (!isActiveSource(item.getSource())) {
+                // 已下线来源（AIHOT）的历史条目直接清理，避免页面上再出现该来源的数据
+                itemRepository.deleteById(item.getId());
+                deleted++;
+                continue;
+            }
             if (!crawler.isRelevant(item.getTitle())) {
                 itemRepository.deleteById(item.getId());
                 deleted++;
@@ -111,7 +107,7 @@ public class AiNewsServiceImpl implements AiNewsService {
             }
         }
         if (deleted > 0 || retagged > 0) {
-            log.info("AI 资讯重分类：删除误判 {} 条，修正标签 {} 条", deleted, retagged);
+            log.info("AI 资讯重分类：删除无效 {} 条，修正标签 {} 条", deleted, retagged);
         }
     }
 
@@ -129,7 +125,7 @@ public class AiNewsServiceImpl implements AiNewsService {
     }
 
     private void translateAndUpdate(AiNewsItem item) {
-        if (!isEnglishSource(item.getSource())) {
+        if (!isActiveSource(item.getSource())) {
             return;
         }
         boolean changed = false;
@@ -156,7 +152,8 @@ public class AiNewsServiceImpl implements AiNewsService {
         }
     }
 
-    private boolean isEnglishSource(String source) {
+    /** 当前仍在采集的来源（均为英文，需翻译）；AIHOT 已下线 */
+    private boolean isActiveSource(String source) {
         return "hackernews".equals(source);
     }
 
@@ -190,141 +187,6 @@ public class AiNewsServiceImpl implements AiNewsService {
     @Override
     public List<String> tags() {
         return TAGS;
-    }
-
-    @Override
-    public List<AiModelRankItem> getLeaderboard(String category) {
-        String cat = (category == null || category.isBlank()) ? "overall" : category;
-        return rankRepository.selectList(new LambdaQueryWrapper<AiModelRank>()
-                        .eq(AiModelRank::getCategory, cat)
-                        .orderByAsc(AiModelRank::getRank))
-                .stream()
-                .map(r -> AiModelRankItem.builder()
-                        .rank(r.getRank())
-                        .modelName(r.getModelName())
-                        .provider(r.getProvider())
-                        .releaseDate(r.getReleaseDate())
-                        .evidence(r.getEvidence())
-                        .confidence(r.getConfidence())
-                        .inputPrice(r.getInputPrice())
-                        .outputPrice(r.getOutputPrice())
-                        .score(r.getScore())
-                        .build())
-                .toList();
-    }
-
-    @Override
-    @Transactional
-    public void crawlLeaderboard() {
-        String[] categories = {"overall", "coding", "reasoning", "knowledge", "professional"};
-        for (String cat : categories) {
-            List<AiModelRankItem> items = crawler.scrapeLeaderboard(cat);
-            if (items.isEmpty()) {
-                continue;
-            }
-            // 覆盖式更新：删旧插入新
-            rankRepository.delete(new LambdaQueryWrapper<AiModelRank>().eq(AiModelRank::getCategory, cat));
-            LocalDateTime now = LocalDateTime.now();
-            for (AiModelRankItem it : items) {
-                rankRepository.insert(AiModelRank.builder()
-                        .category(cat)
-                        .rank(it.getRank())
-                        .modelName(it.getModelName())
-                        .provider(it.getProvider())
-                        .releaseDate(it.getReleaseDate())
-                        .evidence(it.getEvidence())
-                        .confidence(it.getConfidence())
-                        .inputPrice(it.getInputPrice())
-                        .outputPrice(it.getOutputPrice())
-                        .score(it.getScore())
-                        .updatedAt(now)
-                        .build());
-            }
-        }
-        log.info("AI 模型排行榜抓取入库完成");
-    }
-
-    @Override
-    public List<AiZhizhiRank> getZhizhiRank(String category, String month) {
-        String cat = (category == null || category.isBlank()) ? "logic" : category;
-        String target = (month == null || month.isBlank()) ? latestZhizhiMonth(cat) : month.trim();
-        if (target == null) {
-            return List.of();
-        }
-        return zhizhiRankRepository.selectList(new LambdaQueryWrapper<AiZhizhiRank>()
-                .eq(AiZhizhiRank::getCategory, cat)
-                .eq(AiZhizhiRank::getReportDate, target)
-                .orderByAsc(AiZhizhiRank::getRank));
-    }
-
-    @Override
-    public List<String> getZhizhiMonths(String category) {
-        String cat = (category == null || category.isBlank()) ? "logic" : category;
-        return zhizhiRankRepository.selectList(new LambdaQueryWrapper<AiZhizhiRank>()
-                        .select(AiZhizhiRank::getReportDate)
-                        .eq(AiZhizhiRank::getCategory, cat))
-                .stream()
-                .map(AiZhizhiRank::getReportDate)
-                .filter(Objects::nonNull)
-                .filter(m -> !m.isBlank())
-                .distinct()
-                .sorted(Comparator.reverseOrder())
-                .toList();
-    }
-
-    private String latestZhizhiMonth(String category) {
-        AiZhizhiRank latest = zhizhiRankRepository.selectOne(new LambdaQueryWrapper<AiZhizhiRank>()
-                .eq(AiZhizhiRank::getCategory, category)
-                .isNotNull(AiZhizhiRank::getReportDate)
-                .orderByDesc(AiZhizhiRank::getReportDate)
-                .last("LIMIT 1"));
-        return latest == null ? null : latest.getReportDate();
-    }
-
-    @Override
-    @Transactional
-    public void crawlZhizhiRank() {
-        String[] categories = {"logic", "code_v3", "vision"};
-        int inserted = 0;
-        for (String cat : categories) {
-            List<String> months = crawler.fetchZhizhiMonths(cat);
-            if (months.isEmpty()) {
-                continue;
-            }
-            // 已入库的月份集合
-            Set<String> existing = zhizhiRankRepository.selectList(new LambdaQueryWrapper<AiZhizhiRank>()
-                            .select(AiZhizhiRank::getReportDate)
-                            .eq(AiZhizhiRank::getCategory, cat))
-                    .stream()
-                    .map(AiZhizhiRank::getReportDate)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            // 最新月始终刷新；其余月份仅在缺失时抓取
-            String latest = months.get(0);
-            Set<String> toFetch = new LinkedHashSet<>();
-            for (String m : months) {
-                if (m.equals(latest) || !existing.contains(m)) {
-                    toFetch.add(m);
-                }
-            }
-            for (String m : toFetch) {
-                List<AiZhizhiRank> items = crawler.fetchZhizhiRank(cat, m);
-                if (items.isEmpty()) {
-                    continue;
-                }
-                // 覆盖式更新该月数据
-                zhizhiRankRepository.delete(new LambdaQueryWrapper<AiZhizhiRank>()
-                        .eq(AiZhizhiRank::getCategory, cat)
-                        .eq(AiZhizhiRank::getReportDate, m));
-                LocalDateTime now = LocalDateTime.now();
-                for (AiZhizhiRank it : items) {
-                    it.setUpdatedAt(now);
-                    zhizhiRankRepository.insert(it);
-                    inserted++;
-                }
-            }
-        }
-        log.info("致知模型排行榜抓取入库完成，共 {} 条", inserted);
     }
 
     @Override

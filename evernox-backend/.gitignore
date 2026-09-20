@@ -11,23 +11,15 @@ pom.xml.next
 release.properties
 dependency-reduced-pom.xml
 
-# IDE
-.idea/
-*.iml
+# IDE（通用项 .idea/、*.iml、.vscode/ 由根目录 .gitignore 统一覆盖）
 *.iws
 *.ipr
-.vscode/
 .settings/
 .project
 .classpath
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+# Logs（*.log 由根目录 .gitignore 统一覆盖，这里只补目录本身）
 logs/
-*.log
 
 # Application
 # 敏感配置：数据库口令 / 图片编解码密钥 / SMTP / 管理员账号

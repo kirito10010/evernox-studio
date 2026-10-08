@@ -1,6 +1,9 @@
 import { get, post, put, del } from '@/utils/request'
 import request from '@/utils/request'
 import type { Result } from '@/types/user'
+import type { PageResult } from '@/types/api'
+
+export type { PageResult }
 
 // ========== 类型定义 ==========
 
@@ -33,14 +36,6 @@ export interface AlbumResponse {
   updatedAt: string
   creatorName: string
   imageCount: number
-}
-
-export interface PageResult<T> {
-  records: T[]
-  total: number
-  size: number
-  current: number
-  pages: number
 }
 
 export interface ImageStats {

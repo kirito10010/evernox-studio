@@ -19,6 +19,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -117,7 +119,7 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
         }
         log.info("组织加入申请: userId={}, organizationId={}", userId, organizationId);
         User applicant = userRepository.selectById(userId);
-        notifyOwner(org, applicant == null ? null : applicant.getUsername());
+        notifyOwnerAfterCommit(org, applicant == null ? null : applicant.getUsername());
     }
 
     @Override
@@ -239,6 +241,27 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
             throw new BusinessException("无权限审批该申请");
         }
         return app;
+    }
+
+    /**
+     * 事务提交后再发通知邮件。
+     *
+     * 为什么必须延后：apply() 带 @Transactional，而 SMTP 是一次秒级网络往返，
+     * 在事务内发送会让数据库连接与行锁被这段 IO 一直占着。
+     * 延后到 afterCommit 还顺带保证「事务回滚则不发信」。
+     */
+    private void notifyOwnerAfterCommit(OrgOrganization org, String applicantName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    notifyOwner(org, applicantName);
+                }
+            });
+        } else {
+            // 无事务上下文（例如被非事务方法调用）时直接发送
+            notifyOwner(org, applicantName);
+        }
     }
 
     private void notifyOwner(OrgOrganization org, String applicantName) {

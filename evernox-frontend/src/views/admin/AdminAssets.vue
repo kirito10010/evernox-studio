@@ -400,6 +400,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import { Folder, PictureFilled, Refresh, Search } from '@element-plus/icons-vue'
 import LazyImage from '@/components/LazyImage.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
@@ -428,13 +429,6 @@ const statItems = computed(() => [
   { label: '相册总数', value: stats.value?.totalAlbums ?? '—' },
   { label: '图片占用', value: stats.value ? formatBytes(stats.value.imagesUsedBytes) : '—' },
 ])
-
-const formatDateTime = (value: string): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 // ==================== 图片列表 ====================
 

@@ -1,4 +1,4 @@
-import { get, post } from '@/utils/request'
+import request, { get, post } from '@/utils/request'
 import type { Result } from '@/types/user'
 
 export interface ArenaRankItem {
@@ -100,5 +100,21 @@ export const importArenaPackage = (file: File): Promise<Result<ArenaSyncStatus>>
     // 2MB 数据包在 5M 带宽下上传 + 服务端解析入库，放宽到 5 分钟
     timeout: 300000,
   })
+}
+
+/**
+ * 下载「本地抓取」用的单文件脚本。
+ *
+ * 由后端按 AiArenaCrawler.CATEGORIES 动态生成，所以脚本里的分类列表不会和服务器漂移；
+ * 脚本内不含任何密钥，抓完仍需在本页「导入数据包」上传 zip。
+ */
+export const downloadArenaFetcher = async (): Promise<Blob> => {
+  const response = await request.get('/ai-arena/fetcher', {
+    responseType: 'blob',
+    // 同 api/image.ts：走 fetch 适配器，避开扩展 hook XHR 读 responseText 的报错
+    adapter: 'fetch',
+    timeout: 30000,
+  })
+  return response.data as Blob
 }
 

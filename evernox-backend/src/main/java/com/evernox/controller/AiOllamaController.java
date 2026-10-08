@@ -64,4 +64,17 @@ public class AiOllamaController {
         aiOllamaService.triggerSyncAsync();
         return Result.<Void>success("已开始同步", null);
     }
+
+    /**
+     * 按关键词从官网「按需补全」模型库（只增不删）。
+     *
+     * 官网默认列表页只返回官方库、社区模型无法枚举，所以「官网有、本地没有」的模型
+     * 只能按关键词抓回来。搜索页无结果时由前端调用。
+     */
+    @PostMapping("/backfill")
+    @PreAuthorize("hasRole('admin')")
+    public Result<Void> backfill(@RequestParam String keyword) {
+        aiOllamaService.triggerBackfillAsync(keyword);
+        return Result.<Void>success("已开始从官网搜索并补全", null);
+    }
 }

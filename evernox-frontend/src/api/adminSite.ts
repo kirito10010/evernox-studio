@@ -1,18 +1,8 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { PageResult } from '@/api/image'
 import type { Result } from '@/types/user'
 import type { AdminSiteListParams, SiteLink, SiteStats, SiteTag } from '@/types/site'
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 /** 站点列表（管理端，可按状态筛选） */
 export const getAdminSites = (

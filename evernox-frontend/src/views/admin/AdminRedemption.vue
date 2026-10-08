@@ -141,6 +141,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
 import { Search } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import {
@@ -249,26 +250,10 @@ const doGenerate = async () => {
   }
 }
 
+const { copy } = useClipboard()
+
 const copyText = async (text: string) => {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      // 服务器走 http（非安全上下文）时 Clipboard API 不可用，降级到 execCommand
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.setAttribute('readonly', '')
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    }
-    ElMessage.success('已复制')
-  } catch {
-    ElMessage.warning('复制失败，请手动复制')
-  }
+  await copy(text)
 }
 
 const copyCode = (row: RedemptionCode) => copyText(row.code)

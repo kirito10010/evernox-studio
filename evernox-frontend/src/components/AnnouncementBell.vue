@@ -78,6 +78,7 @@ import {
   markAnnouncementRead,
 } from '@/api/announcement'
 import type { AnnouncementResponse } from '@/types/announcement'
+import { formatTime } from '@/utils/format'
 
 const { decryptImage: decryptAnnouncement, clearCache: clearAnnouncementCache } =
   useImageDecrypt(getAnnouncementImageBlob)
@@ -128,11 +129,6 @@ const openDetail = async (item: AnnouncementResponse) => {
   } catch {
     // 标记失败不阻断查看
   }
-}
-
-const formatTime = (value?: string) => {
-  if (!value) return ''
-  return value.replace('T', ' ').slice(0, 16)
 }
 
 // 打开弹层时拉最新列表与未读数

@@ -154,6 +154,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import {
@@ -185,12 +186,6 @@ const dateRange = ref<[string, string] | null>(null)
 const sortField = ref<'createdAt' | 'title' | ''>('')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 
-const formatDateTime = (value: string): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 const loading = ref(false)
 const submitting = ref(false)
 const selectedIds = ref<number[]>([])

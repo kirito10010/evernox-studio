@@ -244,6 +244,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import LazyImage from '@/components/LazyImage.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { getAdminImageBlob } from '@/api/adminAsset'
@@ -305,13 +306,6 @@ const filteredTags = computed(() => {
   if (!kw) return tags.value
   return tags.value.filter((t) => t.name.includes(kw))
 })
-
-const formatDateTime = (value: string): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 const loadSites = async () => {
   loading.value = true

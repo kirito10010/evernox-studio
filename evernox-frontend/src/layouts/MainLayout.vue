@@ -341,7 +341,11 @@
         <el-main class="main-content">
           <router-view v-slot="{ Component }">
             <transition name="page-fade" mode="out-in">
-              <component :is="Component" />
+              <!-- 只缓存 KEEP_ALIVE_NAMES 里的只读页；其余页面不匹配 include → 照旧每次重挂。
+                   名字对不上时只是不缓存，不会报错（安全降级）。 -->
+              <keep-alive :include="KEEP_ALIVE_NAMES" :max="6">
+                <component :is="Component" />
+              </keep-alive>
             </transition>
           </router-view>
         </el-main>
@@ -379,6 +383,18 @@ watch(
 
 const isCollapse = ref(false)
 const themeDrawerVisible = ref(false)
+
+/**
+ * 需要 keep-alive 缓存的页面组件名。
+ *
+ * 只放「只读、且不依赖实时数据」的页：模型排行榜与 Ollama 模型库。
+ * 它们各自都有手动同步按钮，二次进入直接复用缓存组件——不重挂、也不重新发列表请求，
+ * 所以切菜单几乎瞬时；其余页面照旧每次重挂，保证数据实时性。
+ *
+ * 名字由各页的 defineOptions({ name }) 声明。名字对不上时 keep-alive 只是不缓存
+ * （不会报错），属于安全降级。
+ */
+const KEEP_ALIVE_NAMES = ['AiArenaLeaderboard', 'AiOllamaModels']
 
 const activeMenu = computed(() => route.path)
 

@@ -231,6 +231,8 @@ import { useMasonry } from '@/composables/useMasonry'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { Delete, DocumentCopy, Folder, Plus, Edit, FolderOpened, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDate } from '@/utils/format'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
 import { aspectRatioOf } from '@/utils/image'
@@ -495,20 +497,11 @@ const handleRemoveImage = async (img: ImageResponse) => {
   } catch { /* cancelled */ }
 }
 
+const { copy } = useClipboard()
+
 const handleCopyUrl = async (img: ImageResponse) => {
   const url = `${window.location.origin}/api/image/${img.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制到剪贴板')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制到剪贴板')
-  }
+  await copy(url, '链接已复制到剪贴板')
 }
 
 const handleToggleAlbumVisibility = async (album: AlbumResponse) => {
@@ -530,11 +523,6 @@ const handleToggleAlbumVisibility = async (album: AlbumResponse) => {
   } catch { /* ignore */ }
 }
 
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 </script>
 
 <style scoped lang="scss">

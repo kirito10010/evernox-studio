@@ -10,10 +10,10 @@
                 <el-icon><User /></el-icon>{{ image.uploaderName || '未知' }}
               </span>
               <span class="meta-item">
-                <el-icon><Clock /></el-icon>{{ formatDate(image.createdAt) }}
+                <el-icon><Clock /></el-icon>{{ formatDateTime(image.createdAt, '-') }}
               </span>
               <span class="meta-item">
-                <el-icon><Document /></el-icon>{{ formatSize(image.fileSize) }}
+                <el-icon><Document /></el-icon>{{ image.fileSize ? formatBytes(image.fileSize) : '-' }}
               </span>
               <span v-if="image.width" class="meta-item">
                 <el-icon><FullScreen /></el-icon>{{ image.width }} × {{ image.height }}
@@ -59,7 +59,9 @@ import {
   Picture,
   User,
 } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDateTime } from '@/utils/format'
+import { formatBytes } from '@/utils/image'
 import type { ImageResponse } from '@/api/image'
 
 const props = defineProps<{
@@ -96,41 +98,14 @@ onUnmounted(() => {
   document.body.style.overflow = ''
 })
 
+const { copy } = useClipboard()
+
 const handleCopyUrl = async () => {
   if (!props.image) return
   const url = `${window.location.origin}/api/image/${props.image.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('图片URL已复制')
-  } catch {
-    // 非 HTTPS 或无剪贴板权限时降级
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('图片URL已复制')
-  }
+  await copy(url, '图片URL已复制')
 }
 
-const formatDate = (dateStr?: string): string => {
-  if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate()
-  ).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(
-    2,
-    '0'
-  )}`
-}
-
-const formatSize = (bytes?: number): string => {
-  if (!bytes) return '-'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(2) + ' MB'
-}
 </script>
 
 <style scoped lang="scss">

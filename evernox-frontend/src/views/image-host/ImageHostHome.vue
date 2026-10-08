@@ -84,7 +84,7 @@
                 </div>
                 <div class="recent-info">
                   <span class="recent-name" :title="img.originalName">{{ img.originalName }}</span>
-                  <span class="recent-meta">{{ formatSize(img.fileSize) }} · {{ formatDate(img.createdAt) }}</span>
+                  <span class="recent-meta">{{ formatBytes(img.fileSize) }} · {{ formatDateShort(img.createdAt) }}</span>
                 </div>
               </div>
             </div>
@@ -180,7 +180,8 @@ import { getImageStats, getAlbumStats, getMyImages, getStorageStats, getImageThu
 import type { ImageResponse, StorageStats } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useMasonry } from '@/composables/useMasonry'
-import { ElMessage } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDateShort } from '@/utils/format'
 import { DocumentCopy, View, FolderOpened, PictureFilled, Folder, Upload } from '@element-plus/icons-vue'
 import UploadModal from '@/components/UploadModal.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
@@ -319,32 +320,11 @@ const onUploaded = () => {
   loadStorage()
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
+const { copy } = useClipboard()
 
 const handleCopyUrl = async (img: ImageResponse) => {
   const url = `${window.location.origin}/api/image/${img.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制')
-  }
+  await copy(url, '链接已复制')
 }
 </script>
 
@@ -383,7 +363,8 @@ const handleCopyUrl = async (img: ImageResponse) => {
     rgba(47, 124, 246, 0.08) 100%
   );
   background-size: 300% 300%;
-  animation: aurora-drift 28s ease-in-out infinite;
+  /* transform 版漂移：合成层插值，避免每帧重绘这层大面积渐变 */
+  animation: aurora-drift-transform 28s ease-in-out infinite;
 }
 
 .geo-shapes {

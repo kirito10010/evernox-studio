@@ -9,15 +9,19 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,6 +44,15 @@ public class AiOllamaCrawler {
     private static final String ACCEPT_LANGUAGE = "en-US,en;q=0.9";
     /** 最多翻页数，兜底防死循环 */
     private static final int PAGE_SIZE_GUARD = 60;
+    /**
+     * 按需补全（按关键词）时的翻页上限。
+     *
+     * 30 页 × 20 条 ≈ 最多 600 个模型：实测宽泛关键词的深度都在这个范围内
+     * （Qwen3.8 约 19 页、abliterated 约 29 页）。
+     * 它是**安全上界而不是目标**——窄关键词拿到末页就停（如 Bonsai 2 27B 只有 1 页）。
+     * 触到上限时 complete=false，Service 会在状态消息里如实提示「可能还有更多」。
+     */
+    public static final int ADHOC_PAGE_LIMIT = 30;
     /** 请求间隔，避免给官网压力 */
     private static final long THROTTLE_MS = 300L;
     private static final int REQUEST_TIMEOUT_MS = 15000;
@@ -54,6 +67,15 @@ public class AiOllamaCrawler {
     private static final String CLOUD = "cloud";
     private static final String ABLITERATED = "abliterated";
 
+    /** 采集入口：官方库。默认列表页只返回官方 /library/* 模型，不含任何社区模型 */
+    private static final String PATH_OFFICIAL = "/search";
+    /**
+     * 采集入口：abliterated 定向检索。
+     * 社区模型（如 huihui_ai/Qwen3.6-abliterated）不会出现在默认列表页，必须显式带 q 才拿得到；
+     * 该检索约 16~29 页、≈400 个模型，分页哨兵会保留 &q=abliterated。
+     */
+    private static final String PATH_ABLITERATED = "/search?q=abliterated";
+
     /** 厂商关键词表（有序，先命中先生效） */
     private static final List<VendorRule> VENDOR_RULES = buildVendorRules();
 
@@ -64,6 +86,11 @@ public class AiOllamaCrawler {
     /**
      * 抓取全量本地可下载模型（云端模型已剔除）。
      *
+     * 【多采集入口·重要】ollama.com 的默认列表页是「官方库」视图，只返回 /library/* 的官方模型，
+     * 社区模型（带命名空间的，如 huihui_ai/Qwen3.6-abliterated）一条都不会出现。
+     * 而 abliterated 模型几乎全是社区模型，因此必须额外走 `?q=abliterated` 定向检索，
+     * 否则库中永远抓不到任何 abliterated 模型（版本筛选会恒为空）。
+     *
      * 【分页机制·重要】ollama.com 的搜索页是 htmx 驱动的懒加载：
      *  - 列表接口只有在带 `HX-Request: true` 头时才认 `page` 参数；
      *    不带该头时服务端会把 `/search?page=N` 退回第一页（浏览器地址栏直接访问也会被重定向），
@@ -71,44 +98,92 @@ public class AiOllamaCrawler {
      *  - 真正的"还有下一页"信号是片段末尾的哨兵 `<li hx-get="/search?page=N+1">`，
      *    最后一页没有哨兵。这里直接跟随哨兵，不自己拼页码。
      *
-     * complete=false 表示抓取过程中出现失败或分页失效，调用方不应据此删除库中数据。
+     * complete=false 表示任一入口出现失败或分页失效，调用方不应据此删除库中数据。
      */
     public ScrapeOutcome fetchAllModels() {
-        List<OllamaModelDto> all = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        boolean complete = true;
-        String path = "/search";
-        for (int page = 1; page <= PAGE_SIZE_GUARD; page++) {
+        // 按 name 去重且保序：先官方、后 abliterated
+        Map<String, OllamaModelDto> merged = new LinkedHashMap<>();
+        boolean officialComplete = crawlInto(PATH_OFFICIAL, false, merged, PAGE_SIZE_GUARD);
+        sleepQuietly();
+        boolean abliteratedComplete = crawlInto(PATH_ABLITERATED, true, merged, PAGE_SIZE_GUARD);
+
+        List<OllamaModelDto> all = new ArrayList<>(merged.values());
+        // 任一入口抓取失败都算本次不完整 → 调用方据此跳过删除阶段，
+        // 否则上次同步进来的社区模型会被整批误删
+        boolean complete = officialComplete && abliteratedComplete;
+
+        log.info("Ollama 模型列表抓取完成：{} 个模型（official complete={}，abliterated complete={}），complete={}",
+                all.size(), officialComplete, abliteratedComplete, complete);
+        return new ScrapeOutcome(all, complete);
+    }
+
+    /**
+     * 按关键词抓取官网搜索结果，供「按需补全」使用。
+     *
+     * 背景：官网默认列表页只返回官方库，社区模型无法枚举（无 sitemap、无"列出全部"入口），
+     * 所以「官网有、本地没有」的模型只能靠指定关键词抓回来。
+     *
+     * 只抓这一个查询入口，不与官方库 / abliterated 合并；是否删除由调用方决定
+     * （补全场景必须「只增不删」）。空格编码成 `+`，与官网地址栏形态一致
+     * （实测 `?q=Bonsai+2+27B` 可用）。
+     */
+    public ScrapeOutcome fetchByKeyword(String keyword, int maxPages) {
+        String path = "/search?q=" + URLEncoder.encode(keyword.trim(), StandardCharsets.UTF_8);
+        Map<String, OllamaModelDto> merged = new LinkedHashMap<>();
+        // forceAbliterated=false：通用关键词不该把结果一律标成 abliterated，只按名字判定
+        boolean complete = crawlInto(path, false, merged, maxPages);
+        log.info("Ollama 关键词抓取：q={}，{} 个模型，complete={}", keyword, merged.size(), complete);
+        return new ScrapeOutcome(new ArrayList<>(merged.values()), complete);
+    }
+
+    /**
+     * 按分页哨兵抓完一条采集入口，把结果并入 out。
+     * 同名模型若已由另一入口收录，则 is_abliterated 取「或」。
+     *
+     * @param maxPages 本入口最多翻几页（全量抓取传 {@link #PAGE_SIZE_GUARD}，按需补全传
+     *                 {@link #ADHOC_PAGE_LIMIT}）
+     * @return 该入口是否完整抓完；false = 中途请求失败、分页未生效或触到页数上限
+     */
+    private boolean crawlInto(String initialPath, boolean forceAbliterated,
+                              Map<String, OllamaModelDto> out, int maxPages) {
+        Set<String> seenHere = new HashSet<>();
+        String path = initialPath;
+        for (int page = 1; page <= maxPages; page++) {
             Document doc = fetchSearchDocument(BASE + path);
             if (doc == null) {
-                // 抓取失败：停止翻页，并标记本次抓取不完整
-                complete = false;
-                break;
+                // 抓取失败：停止翻页，并标记该入口不完整
+                return false;
             }
-            int added = 0;
-            for (OllamaModelDto m : parseModelList(doc)) {
-                if (seen.add(m.getName())) {
-                    all.add(m);
-                    added++;
+            int fresh = 0;
+            for (OllamaModelDto m : parseModelList(doc, forceAbliterated)) {
+                if (!seenHere.add(m.getName())) {
+                    continue;  // 本入口内的重复行
+                }
+                fresh++;
+                OllamaModelDto exist = out.get(m.getName());
+                if (exist == null) {
+                    out.put(m.getName(), m);
+                } else if (isAbliterated(m) && !isAbliterated(exist)) {
+                    exist.setIsAbliterated(1);  // 另一入口已收录，标记取「或」
                 }
             }
             String next = nextPagePath(doc);
-            if (added == 0) {
-                // 有下一页却拿不到新数据 → 分页未生效（拿到的是重复页），标记不完整以免误删
-                if (next != null) {
-                    complete = false;
-                }
-                break;
+            if (fresh == 0) {
+                // 没有新模型：有下一页说明分页未生效（拿到的是重复页）→ 该入口不完整
+                return next == null;
             }
             if (next == null) {
                 // 无哨兵即最后一页
-                break;
+                return true;
             }
             path = next;
             sleepQuietly();
         }
-        log.info("Ollama 模型列表抓取完成：{} 个模型，complete={}", all.size(), complete);
-        return new ScrapeOutcome(all, complete);
+        return false;  // 触到页数上限
+    }
+
+    private boolean isAbliterated(OllamaModelDto dto) {
+        return dto.getIsAbliterated() != null && dto.getIsAbliterated() == 1;
     }
 
     /**
@@ -187,7 +262,7 @@ public class AiOllamaCrawler {
 
     // ===== 列表页解析 =====
 
-    private List<OllamaModelDto> parseModelList(Document doc) {
+    private List<OllamaModelDto> parseModelList(Document doc, boolean forceAbliterated) {
         List<OllamaModelDto> models = new ArrayList<>();
         // 列表页与 htmx 片段结构不同：片段是裸 <li> 列表（无 ul[role=list] 包裹），
         // 所以按 li 全量扫描，再用「有 a[href] 且有 h2」筛出真正的结果行（分页哨兵两者皆无）。
@@ -275,7 +350,7 @@ public class AiOllamaCrawler {
                     .tagCount(tagCount)
                     .capabilities(capabilities)
                     .sizes(sizes)
-                    .isAbliterated(containsAbliterated(name) ? 1 : 0)
+                    .isAbliterated((forceAbliterated || containsAbliterated(name)) ? 1 : 0)
                     .sourceUpdatedAt(sourceUpdatedAt)
                     .build());
         }

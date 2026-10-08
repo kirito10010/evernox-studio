@@ -75,7 +75,7 @@
           <div class="card-actions">
             <div class="action-info">
               <span class="action-name" :title="img.originalName">{{ img.originalName }}</span>
-              <span class="action-meta">{{ formatSize(img.fileSize) }}</span>
+              <span class="action-meta">{{ formatBytes(img.fileSize) }}</span>
             </div>
             <el-button
               type="danger"
@@ -106,7 +106,7 @@
         </div>
         <div class="list-info">
           <span class="list-name">{{ img.originalName }}</span>
-          <span class="list-meta">{{ img.mimeType }} · {{ formatSize(img.fileSize) }}</span>
+          <span class="list-meta">{{ img.mimeType }} · {{ formatBytes(img.fileSize) }}</span>
         </div>
         <div class="list-badges">
           <span class="vis-badge" :class="img.visibility === 1 ? 'public' : 'private'">
@@ -217,11 +217,13 @@ import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useMasonry } from '@/composables/useMasonry'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDate } from '@/utils/format'
 import { Delete, Grid, List, DocumentCopy, View, Hide, FolderAdd, ZoomIn, PictureFilled, Upload, Loading } from '@element-plus/icons-vue'
 import UploadModal from '@/components/UploadModal.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
-import { aspectRatioOf, skeletonRatio } from '@/utils/image'
+import { aspectRatioOf, formatBytes, skeletonRatio } from '@/utils/image'
 
 const { decryptImage, clearCache } = useImageDecrypt()
 const { decryptImage: loadThumb, clearCache: clearThumbCache } = useImageDecrypt(getImageThumbnail)
@@ -355,21 +357,12 @@ const onUploaded = () => {
   void resetAndLoad()
 }
 
+const { copy } = useClipboard()
+
 // ========== Copy URL ==========
 const handleCopyUrl = async (img: ImageResponse) => {
   const url = `${window.location.origin}/api/image/${img.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制到剪贴板')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制到剪贴板')
-  }
+  await copy(url, '链接已复制到剪贴板')
 }
 
 // ========== Toggle Visibility ==========
@@ -427,17 +420,6 @@ const toggleAlbumForImage = async (albumId: number, addToAlbum: boolean) => {
   } catch { /* ignore */ }
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 </script>
 
 <style scoped lang="scss">

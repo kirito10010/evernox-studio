@@ -59,7 +59,7 @@
           <img :src="file.preview" class="preview-thumb" />
           <div class="file-info">
             <span class="file-name" :title="file.file.name">{{ file.file.name }}</span>
-            <span class="file-size">{{ formatSize(file.file.size) }}</span>
+            <span class="file-size">{{ formatBytes(file.file.size) }}</span>
           </div>
           <div class="remove-btn" @click="removeFile(index)">
             <el-icon :size="14"><Close /></el-icon>
@@ -139,6 +139,7 @@ import { ref, computed, watch } from 'vue'
 import { uploadImage, getMyAlbums } from '@/api/image'
 import type { AlbumResponse } from '@/api/image'
 import { ElMessage } from 'element-plus'
+import { formatBytes } from '@/utils/image'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -307,11 +308,6 @@ const finishUpload = () => {
   visible.value = false
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
 </script>
 
 <style scoped lang="scss">

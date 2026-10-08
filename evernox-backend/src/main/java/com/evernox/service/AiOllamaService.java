@@ -31,4 +31,11 @@ public interface AiOllamaService {
 
     /** 异步触发同步（单飞，已在跑则忽略） */
     void triggerSyncAsync();
+
+    /**
+     * 按关键词从官网「按需补全」模型库（异步，只增不删）。
+     * 用于「官网有、本地没有」的场景：官网默认列表页只返回官方库，社区模型无法枚举，
+     * 只能按关键词抓回来。关键词为空/过长/已有同步在跑时同步抛业务异常。
+     */
+    void triggerBackfillAsync(String keyword);
 }

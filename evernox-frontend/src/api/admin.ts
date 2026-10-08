@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type {
   AdminUserCreateRequest,
   AdminUserListParams,
@@ -14,17 +15,6 @@ import type {
   UserStats,
 } from '@/types/user'
 import type { PageResult } from '@/api/image'
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 /** 分页查询用户（后端已排除管理员账号） */
 export const getAdminUsers = (

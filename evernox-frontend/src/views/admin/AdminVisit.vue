@@ -72,7 +72,7 @@
             <el-table-column prop="ip" label="IP" min-width="130" />
             <el-table-column prop="path" label="路径" min-width="140" show-overflow-tooltip />
             <el-table-column label="时间" min-width="160">
-              <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+              <template #default="{ row }">{{ formatTime(row.createdAt) || '-' }}</template>
             </el-table-column>
           </el-table>
           <div class="pager">
@@ -94,7 +94,7 @@
             <el-table-column prop="username" label="用户名" min-width="140" />
             <el-table-column prop="visitCount" label="访问次数" min-width="110" sortable />
             <el-table-column label="最近访问" min-width="170">
-              <template #default="{ row }">{{ formatTime(row.lastVisitAt) }}</template>
+              <template #default="{ row }">{{ formatTime(row.lastVisitAt) || '-' }}</template>
             </el-table-column>
           </el-table>
         </el-tab-pane>
@@ -110,6 +110,7 @@ import { LineChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { getVisitOverview, getVisitRank, getVisitRecent, getVisitTrend } from '@/api/visit'
+import { formatTime } from '@/utils/format'
 import type {
   VisitLogItem,
   VisitOverview,
@@ -195,11 +196,6 @@ const renderChart = () => {
       { name: '登录次数', type: 'line', smooth: true, data: trendList.value.map((t) => t.logins) },
     ],
   })
-}
-
-const formatTime = (v?: string) => {
-  if (!v) return '-'
-  return v.replace('T', ' ').slice(0, 16)
 }
 
 onMounted(() => {

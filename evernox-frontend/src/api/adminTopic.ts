@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
 import type {
@@ -10,16 +11,6 @@ import type {
   TopicComment,
   TopicPost,
 } from '@/types/topic'
-
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 // ========== 帖子 ==========
 

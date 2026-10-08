@@ -40,6 +40,7 @@
 import RichTextViewer from '@/components/RichTextViewer.vue'
 import { likePost, favoritePost } from '@/api/topic'
 import type { TopicPost } from '@/types/topic'
+import { formatTime } from '@/utils/format'
 
 const props = defineProps<{
   post: TopicPost
@@ -66,10 +67,6 @@ const onFavorite = async () => {
   }
 }
 
-const formatTime = (value?: string) => {
-  if (!value) return ''
-  return value.replace('T', ' ').slice(0, 16)
-}
 </script>
 
 <style scoped lang="scss">

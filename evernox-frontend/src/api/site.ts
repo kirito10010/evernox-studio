@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { PageResult } from '@/api/image'
 import type { Result } from '@/types/user'
 import type {
@@ -8,17 +9,6 @@ import type {
   SiteStats,
   SiteTag,
 } from '@/types/site'
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 /** 新建分享（后端强制落为私有） */
 export const createSite = (data: SiteLinkPayload): Promise<Result<SiteLink>> => {

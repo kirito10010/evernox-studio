@@ -22,13 +22,21 @@
         <el-button v-if="userStore.isAdmin" type="primary" :loading="status.running" @click="handleSync">
           {{ status.running ? '同步中…' : '立即同步' }}
         </el-button>
+        <el-button
+          v-if="userStore.isAdmin"
+          :loading="downloadingFetcher"
+          @click="handleDownloadFetcher"
+        >
+          下载抓取脚本
+        </el-button>
         <el-tooltip v-if="userStore.isAdmin" placement="bottom-end">
           <template #content>
             <div class="import-tip">
-              服务器 IP 被官网风控拦截（HTTP 403）时用这条通道：<br />
-              在本地能打开 arena.ai 的电脑上运行<br />
-              <b>fetch-arena-leaderboard.bat</b> 抓取并打包，<br />
-              再在这里选择生成的 zip 文件导入。
+              服务器 IP 被官网风控拦截（HTTP 403），抓取要在能打开 arena.ai 的电脑上做：<br />
+              <b>①</b> 点左边「下载抓取脚本」拿到 <b>fetch-arena-leaderboard.bat</b>；<br />
+              <b>②</b> 双击运行它（首次运行若被 SmartScreen 拦，点「更多信息 → 仍要运行」），<br />
+              　 它会在同目录生成 <b>arena-lb-日期-时间.zip</b>；<br />
+              <b>③</b> 回到这里点「导入数据包」，选那个 zip。
             </div>
           </template>
           <el-upload
@@ -115,12 +123,12 @@
       <el-table :data="items" v-loading="loading" stripe row-key="id">
         <el-table-column label="排名" width="80" align="center">
           <template #default="{ row }">
-            <span class="rank" :class="{ top3: row.rank != null && row.rank <= 3 }">{{ rankText(row.rank) }}</span>
+            <span class="rank" :class="{ top3: row.rank != null && row.rank <= 3 }">{{ row._rank }}</span>
           </template>
         </el-table-column>
         <el-table-column label="排名区间" width="100" align="center">
           <template #default="{ row }">
-            <span class="muted">{{ spreadText(row) }}</span>
+            <span class="muted">{{ row._spread }}</span>
           </template>
         </el-table-column>
         <el-table-column label="模型" min-width="230">
@@ -134,23 +142,23 @@
                 <el-tag size="small" type="info" effect="plain">Preliminary</el-tag>
               </el-tooltip>
             </div>
-            <div class="model-meta">{{ orgLicense(row) }}</div>
+            <div class="model-meta">{{ row._orgLicense }}</div>
           </template>
         </el-table-column>
         <el-table-column label="分数" width="140" align="center">
           <template #default="{ row }">
-            <span class="score">{{ scoreText(row) }}</span>
-            <span class="ci">{{ ciText(row) }}</span>
+            <span class="score">{{ row._score }}</span>
+            <span class="ci">{{ row._ci }}</span>
           </template>
         </el-table-column>
         <el-table-column label="投票数" width="100" align="right">
-          <template #default="{ row }">{{ votesText(row) }}</template>
+          <template #default="{ row }">{{ row._votes }}</template>
         </el-table-column>
         <el-table-column label="输入价格" width="110" align="right">
-          <template #default="{ row }">{{ priceText(row.inputPrice) }}</template>
+          <template #default="{ row }">{{ row._inputPrice }}</template>
         </el-table-column>
         <el-table-column label="输出价格" width="110" align="right">
-          <template #default="{ row }">{{ priceText(row.outputPrice) }}</template>
+          <template #default="{ row }">{{ row._outputPrice }}</template>
         </el-table-column>
         <el-table-column label="上下文" width="110" align="center">
           <template #default="{ row }">{{ row.contextText || '-' }}</template>
@@ -158,15 +166,28 @@
       </el-table>
       <el-empty v-if="!loading && items.length === 0" description="暂无数据" />
     </div>
+
+    <!-- 前端分页：接口一次返回整类榜单（可能数百行），这里只渲染当前页，避免挂载时同步渲染大量 DOM -->
+    <div v-if="total > PAGE_SIZE" class="table-footer">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="PAGE_SIZE"
+        :total="total"
+        layout="total, prev, pager, next, jumper"
+        @current-change="onPageChange"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onDeactivated, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { formatDate } from '@/utils/format'
 import type { UploadFile } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import {
+  downloadArenaFetcher,
   getArenaCategories,
   getArenaFilters,
   getArenaItems,
@@ -178,6 +199,10 @@ import {
   type ArenaRankItem,
   type ArenaSyncStatus,
 } from '@/api/arenaRank'
+
+// 显式声明组件名：MainLayout 的 <keep-alive :include="..."> 按组件名匹配缓存，
+// <script setup> 的推断名虽然通常可用，但显式声明更稳。
+defineOptions({ name: 'AiArenaLeaderboard' })
 
 const userStore = useUserStore()
 
@@ -203,10 +228,34 @@ const QUICK_RANGES: QuickRange[] = [
 ]
 
 const categories = ref<ArenaCategoryOption[]>([])
-const items = ref<ArenaRankItem[]>([])
+/** 每页行数：整类榜单可能有数百行，分页后一次只渲染 50 行 */
+const PAGE_SIZE = 50
+
+/**
+ * 展示行：把每行的显示字符串在**数据加载时算一次**。
+ * 原来是在模板里直接调函数（每行 8 个：rank/spread/orgLicense/score/ci/votes/价格×2），
+ * 每次重渲染都要为每一行重算一遍；分页前有数百行时这笔开销很可观。
+ */
+interface ArenaRow extends ArenaRankItem {
+  _rank: string
+  _spread: string
+  _orgLicense: string
+  _score: string
+  _ci: string
+  _votes: string
+  _inputPrice: string
+  _outputPrice: string
+}
+
+const items = ref<ArenaRow[]>([])
+const page = ref(1)
+const total = ref(0)
+/** 接口返回的完整列表（未分页）。翻页只切展示，不重新请求 */
+let allRows: ArenaRankItem[] = []
 const options = ref<ArenaFilterOptions>({ ...EMPTY_OPTIONS })
 const loading = ref(false)
 const importing = ref(false)
+const downloadingFetcher = ref(false)
 
 const category = ref('overall')
 const filters = reactive({
@@ -240,7 +289,7 @@ const categoryGroups = computed(() => [
   { key: 'domain', label: '领域', items: categories.value.filter((c) => c.group === 'domain') },
 ])
 
-const syncText = computed(() => (status.value.lastRunAt ? formatDate(status.value.lastRunAt) : '未同步'))
+const syncText = computed(() => (status.value.lastRunAt ? formatDate(status.value.lastRunAt, '-') : '未同步'))
 
 const progressPercent = computed(() => {
   if (!status.value.categoryTotal) return 0
@@ -255,13 +304,6 @@ const progressText = computed(() => {
 })
 
 const hasPriceFilter = computed(() => filters.minPrice != null || filters.maxPrice != null)
-
-const formatDate = (s: string | null) => {
-  if (!s) return '-'
-  const d = new Date(s.replace(' ', 'T'))
-  if (Number.isNaN(d.getTime())) return s
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 const rankText = (r: number | null) => (r == null ? '-' : String(r))
 
@@ -299,6 +341,29 @@ const orgLicense = (raw: unknown) => {
   return row.org || row.license || '-'
 }
 
+/** 把接口行转成展示行（显示字符串只算一次） */
+const toRow = (r: ArenaRankItem): ArenaRow => ({
+  ...r,
+  _rank: rankText(r.rank),
+  _spread: spreadText(r),
+  _orgLicense: orgLicense(r),
+  _score: scoreText(r),
+  _ci: ciText(r),
+  _votes: votesText(r),
+  _inputPrice: priceText(r.inputPrice),
+  _outputPrice: priceText(r.outputPrice),
+})
+
+/** 按当前页码切出要渲染的那一页 */
+const slicePage = () => {
+  const start = (page.value - 1) * PAGE_SIZE
+  items.value = allRows.slice(start, start + PAGE_SIZE).map(toRow)
+}
+
+const onPageChange = () => {
+  slicePage()
+}
+
 const isQuickActive = (r: QuickRange) => filters.minPrice === r.min && filters.maxPrice === r.max
 
 const loadCategories = async () => {
@@ -320,7 +385,13 @@ const loadItems = async () => {
       maxPrice: filters.maxPrice ?? undefined,
       keyword: filters.keyword || undefined,
     })
-    items.value = res.data ?? []
+    allRows = res.data ?? []
+    total.value = allRows.length
+    // 换了筛选条件后结果变少，当前页可能已越界 → 回到第 1 页
+    if ((page.value - 1) * PAGE_SIZE >= total.value) {
+      page.value = 1
+    }
+    slicePage()
   } finally {
     loading.value = false
   }
@@ -343,6 +414,7 @@ const applyFilters = () => {
     ElMessage.warning('价格下限不能大于上限')
     return
   }
+  page.value = 1
   void loadItems()
 }
 
@@ -350,18 +422,21 @@ const onCategoryChange = () => {
   filters.org = ''
   filters.minPrice = null
   filters.maxPrice = null
+  page.value = 1
   void Promise.all([loadItems(), loadOptions()])
 }
 
 const onPriceTypeChange = () => {
   filters.minPrice = null
   filters.maxPrice = null
+  page.value = 1
   void loadItems()
 }
 
 const applyQuickRange = (r: QuickRange) => {
   filters.minPrice = r.min
   filters.maxPrice = r.max
+  page.value = 1
   void loadItems()
 }
 
@@ -371,6 +446,7 @@ const resetFilters = () => {
   filters.minPrice = null
   filters.maxPrice = null
   filters.keyword = ''
+  page.value = 1
   void loadItems()
 }
 
@@ -411,6 +487,28 @@ const handleSync = async () => {
   startPolling()
 }
 
+/**
+ * 下载本地抓取脚本。
+ *
+ * 不能直接用 <a href>：接口要 JWT，而 <a> 不会带 Authorization 头（会 401），
+ * 所以取回 blob 后自己造一个链接触发保存。
+ */
+const handleDownloadFetcher = async () => {
+  downloadingFetcher.value = true
+  try {
+    const blob = await downloadArenaFetcher()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'fetch-arena-leaderboard.bat'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('脚本已下载，双击运行即可抓取')
+  } finally {
+    downloadingFetcher.value = false
+  }
+}
+
 const onPackageChange = async (file: UploadFile) => {
   const raw = file.raw
   if (!raw) return
@@ -437,6 +535,9 @@ onMounted(async () => {
   }
 })
 
+// 本页被 keep-alive 缓存后，切走只会触发 onDeactivated（不会 onUnmounted），
+// 轮询必须在这里一起停掉，否则会在后台空转到结束。
+onDeactivated(stopPolling)
 onUnmounted(stopPolling)
 </script>
 
@@ -615,6 +716,12 @@ onUnmounted(stopPolling)
     .muted {
       color: var(--ev-text-muted);
     }
+  }
+
+  .table-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 4px 0;
   }
 }
 </style>

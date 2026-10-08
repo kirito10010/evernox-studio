@@ -17,7 +17,7 @@
         </template>
       </el-table-column>
       <el-table-column label="创建时间" min-width="160">
-        <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+        <template #default="{ row }">{{ formatTime(row.createdAt) || '-' }}</template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
@@ -32,6 +32,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatTime } from '@/utils/format'
 import {
   createSupportBoard,
   deleteSupportBoard,
@@ -76,11 +77,6 @@ const remove = async (row: SupportBoardItem) => {
   await deleteSupportBoard(row.id)
   ElMessage.success('删除成功')
   await load()
-}
-
-const formatTime = (v?: string) => {
-  if (!v) return '-'
-  return v.replace('T', ' ').slice(0, 16)
 }
 
 onMounted(load)

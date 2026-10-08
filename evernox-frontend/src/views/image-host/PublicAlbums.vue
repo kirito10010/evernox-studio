@@ -146,7 +146,8 @@ import type { AlbumResponse, ImageResponse } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useMasonry } from '@/composables/useMasonry'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
-import { ElMessage } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDate } from '@/utils/format'
 import { DocumentCopy } from '@element-plus/icons-vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
@@ -264,26 +265,11 @@ const loadAlbumImages = async () => {
   }
 }
 
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const { copy } = useClipboard()
 
 const handleCopyUrl = async (img: ImageResponse) => {
   const url = `${window.location.origin}/api/image/${img.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制到剪贴板')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制到剪贴板')
-  }
+  await copy(url, '链接已复制到剪贴板')
 }
 </script>
 

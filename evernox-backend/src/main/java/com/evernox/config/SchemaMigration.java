@@ -19,8 +19,9 @@ import org.springframework.stereotype.Component;
  *
  * 用法（在 run() 里追加一行）：
  *   addColumnIfMissing("表名", "列名", "列定义(类型/默认值/注释)");
+ *   addIndexIfMissing("表名", "索引名", "`列1`, `列2`");
  *
- * 本类是幂等的：先查 information_schema，列已存在则跳过，不会重复执行。
+ * 本类是幂等的：先查 information_schema，列/索引已存在则跳过，不会重复执行。
  */
 @Slf4j
 @Component
@@ -48,6 +49,10 @@ public class SchemaMigration implements ApplicationRunner {
                 "VARCHAR(512) NULL COMMENT '中文标题(自动翻译)'");
         addColumnIfMissing("ai_news_item", "summary_zh",
                 "TEXT NULL COMMENT '中文摘要(自动翻译)'");
+
+        // 组织周记录：5+ 处查询都是 organization_id + week_date 组合过滤，
+        // 原表只有 idx_week_date(week_date)，缺 organization_id 打头的索引
+        addIndexIfMissing("org_week_record", "idx_org_week", "`organization_id`, `week_date`");
         // ===== 上面是登记区 =====
     }
 
@@ -69,6 +74,34 @@ public class SchemaMigration implements ApplicationRunner {
                 "SELECT COUNT(*) FROM information_schema.COLUMNS " +
                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
                 Integer.class, table, column);
+    }
+
+    /** 索引是否已存在。按索引名判重（同名索引在同一张表里只能有一个） */
+    private Integer indexCount(String table, String indexName) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, indexName);
+    }
+
+    /**
+     * 幂等加索引：先查 information_schema.STATISTICS，已存在则跳过。
+     *
+     * MySQL 8 对二级索引的 ADD INDEX 是 INPLACE 在线 DDL，不会锁表。
+     * 失败只记日志、不阻断启动，并打印出可手工执行的 ALTER 语句。
+     */
+    private void addIndexIfMissing(String table, String indexName, String columns) {
+        try {
+            Integer count = indexCount(table, indexName);
+            if (count != null && count > 0) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE `" + table + "` ADD INDEX `" + indexName + "` (" + columns + ")");
+            log.info("自动迁移完成：表 {} 新增索引 {} ({})", table, indexName, columns);
+        } catch (Exception e) {
+            log.error("自动迁移失败：表 {} 新增索引 {} 失败，请手动执行 ALTER：{}",
+                    table, indexName, e.getMessage());
+        }
     }
 
     private void addColumnIfMissing(String table, String column, String definition) {

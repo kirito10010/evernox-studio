@@ -57,7 +57,7 @@
             <span class="meta-name">{{ img.originalName }}</span>
             <div class="meta-bottom">
               <span class="meta-user">{{ img.uploaderName }}</span>
-              <span class="meta-size">{{ formatSize(img.fileSize) }}</span>
+              <span class="meta-size">{{ formatBytes(img.fileSize) }}</span>
             </div>
           </div>
         </div>
@@ -106,11 +106,11 @@ import type { ImageResponse, AlbumResponse } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useMasonry } from '@/composables/useMasonry'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
-import { ElMessage } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
 import { DocumentCopy, Loading } from '@element-plus/icons-vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
-import { aspectRatioOf, skeletonRatio } from '@/utils/image'
+import { aspectRatioOf, formatBytes, skeletonRatio } from '@/utils/image'
 
 const { decryptImage, clearCache } = useImageDecrypt()
 const { decryptImage: loadThumb, clearCache: clearThumbCache } = useImageDecrypt(getImageThumbnail)
@@ -234,27 +234,13 @@ const loadMore = async () => {
   }
 }
 
+const { copy } = useClipboard()
+
 const handleCopyUrl = async (img: ImageResponse) => {
   const url = `${window.location.origin}/api/image/${img.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制到剪贴板')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制到剪贴板')
-  }
+  await copy(url, '链接已复制到剪贴板')
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
 </script>
 
 <style scoped lang="scss">

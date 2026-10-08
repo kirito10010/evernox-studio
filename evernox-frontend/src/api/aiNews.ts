@@ -1,5 +1,8 @@
 import { get, post, del } from '@/utils/request'
 import type { Result } from '@/types/user'
+import type { PageResult } from '@/types/api'
+
+export type { PageResult }
 
 export interface AiNewsItem {
   id: number
@@ -13,13 +16,6 @@ export interface AiNewsItem {
   score: number
   publishedAt: string
   favorited: boolean
-}
-
-export interface PageResult<T> {
-  records: T[]
-  total: number
-  size: number
-  current: number
 }
 
 export const getAiNewsList = (params: {

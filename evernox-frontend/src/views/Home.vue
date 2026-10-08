@@ -196,7 +196,8 @@ const featureColors = [
     rgba(207, 230, 255, 0.16) 100%
   );
   background-size: 300% 300%;
-  animation: aurora-drift 26s ease-in-out infinite;
+  /* transform 版漂移：合成层插值，避免每帧重绘这层大面积渐变 */
+  animation: aurora-drift-transform 26s ease-in-out infinite;
 }
 
 /* Decorative geometric shapes */

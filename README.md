@@ -32,10 +32,9 @@ evernox-studio/
 │   └── src/main/resources/         # application.yml / application-dev.yml / schema.sql
 ├── evernox-frontend/               # Vue 3 前端
 │   └── src/                        # api / views / components / router / stores / types / utils / styles
-├── nginx-1.30.5/                   # Nginx 二进制（已 gitignore）+ conf/nginx.conf（已纳入版本管理）
-├── Redis-*/                        # Redis 二进制（已 gitignore；实际目录名 Redis-8.10.1-Windows-x64，忽略规则已通配）
+├── nginx-1.30.4/                   # Nginx 二进制（已 gitignore）+ conf/nginx.conf（已纳入版本管理）
+├── Redis/                          # Redis 二进制（已 gitignore；忽略规则 /Redis*/ 也兼容带版本号的目录名）
 ├── jwt-keys/                       # JWT 密钥对，首启动自动生成（已 gitignore）
-├── fetch-arena-leaderboard.bat     # 本地抓取模型排行榜数据并打包（双击运行）
 ├── start.bat                       # 本地一键启动脚本
 ├── 使用手册.md                     # 部署运维 + 重装恢复 + 功能说明（重点看这个）
 └── README.md

@@ -39,25 +39,32 @@
       <div class="chart-expand-hint">查看完整图表（共 {{ records.length }} 人）</div>
     </div>
 
-    <el-table v-if="isAdmin || !!joinedMembership" :data="filteredRecords" border stripe :default-sort="{ prop: 'totalPoints', order: 'descending' }">
+    <el-table
+      v-if="isAdmin || !!joinedMembership"
+      :data="pagedRecords"
+      border
+      stripe
+      :default-sort="{ prop: 'totalPoints', order: 'descending' }"
+      @sort-change="onSortChange"
+    >
       <el-table-column prop="memberName" label="玩家名" min-width="90" fixed="left" />
       <el-table-column prop="position" label="职务" min-width="90" />
-      <el-table-column prop="ninjaBattleCount" v-if="pointsConfig?.ninjaBattleVisible !== 0" label="忍战次数" min-width="90" sortable />
-      <el-table-column prop="totalPower" v-if="pointsConfig?.totalPowerVisible !== 0" label="总战力" min-width="100" sortable />
-      <el-table-column prop="powerIncrease" v-if="pointsConfig?.powerIncreaseVisible !== 0" label="战力增幅" min-width="90" sortable />
-      <el-table-column prop="copperContribution" v-if="pointsConfig?.copperVisible !== 0" label="铜币" min-width="80" sortable />
-      <el-table-column prop="beastSacrifice" v-if="pointsConfig?.beastVisible !== 0" label="通灵兽" min-width="80" sortable />
-      <el-table-column prop="renegadeCount" v-if="pointsConfig?.renegadeVisible !== 0" label="叛忍" min-width="70" sortable />
+      <el-table-column prop="ninjaBattleCount" v-if="pointsConfig?.ninjaBattleVisible !== 0" label="忍战次数" min-width="90" sortable="custom" />
+      <el-table-column prop="totalPower" v-if="pointsConfig?.totalPowerVisible !== 0" label="总战力" min-width="100" sortable="custom" />
+      <el-table-column prop="powerIncrease" v-if="pointsConfig?.powerIncreaseVisible !== 0" label="战力增幅" min-width="90" sortable="custom" />
+      <el-table-column prop="copperContribution" v-if="pointsConfig?.copperVisible !== 0" label="铜币" min-width="80" sortable="custom" />
+      <el-table-column prop="beastSacrifice" v-if="pointsConfig?.beastVisible !== 0" label="通灵兽" min-width="80" sortable="custom" />
+      <el-table-column prop="renegadeCount" v-if="pointsConfig?.renegadeVisible !== 0" label="叛忍" min-width="70" sortable="custom" />
       <el-table-column v-if="pointsConfig?.renegadeLeaderVisible !== 0" label="车头" min-width="70">
         <template #default="{ row }">{{ row.isRenegadeLeader === 1 ? '是' : '' }}</template>
       </el-table-column>
-      <el-table-column label="上周剩余" min-width="100" sortable prop="lastWeekPoints">
+      <el-table-column label="上周剩余" min-width="100" sortable="custom" prop="lastWeekPoints">
         <template #default="{ row }">{{ fmt(row.lastWeekPoints) }}</template>
       </el-table-column>
-      <el-table-column label="本周积分" min-width="100" sortable prop="thisWeekPoints">
+      <el-table-column label="本周积分" min-width="100" sortable="custom" prop="thisWeekPoints">
         <template #default="{ row }">{{ fmt(row.thisWeekPoints) }}</template>
       </el-table-column>
-      <el-table-column label="总积分" min-width="110" sortable prop="totalPoints">
+      <el-table-column label="总积分" min-width="110" sortable="custom" prop="totalPoints">
         <template #default="{ row }">
           <span class="total-points">{{ fmt(row.totalPoints) }}</span>
         </template>
@@ -65,10 +72,20 @@
       <el-table-column prop="rewardPackageName" label="奖励礼包" min-width="130">
         <template #default="{ row }">{{ row.rewardPackageName || '-' }}</template>
       </el-table-column>
-      <el-table-column label="扣除后积分" min-width="110" sortable prop="pointsAfterDeduction">
+      <el-table-column label="扣除后积分" min-width="110" sortable="custom" prop="pointsAfterDeduction">
         <template #default="{ row }">{{ fmt(row.pointsAfterDeduction) }}</template>
       </el-table-column>
     </el-table>
+
+    <!-- 前端分页：一个组织一周可能有上百名成员，这里只渲染当前页 -->
+    <div v-if="filteredRecords.length > PAGE_SIZE" class="table-footer">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="PAGE_SIZE"
+        :total="filteredRecords.length"
+        layout="total, prev, pager, next, jumper"
+      />
+    </div>
 
     <el-empty v-if="!loading && records.length === 0 && (isAdmin || !!joinedMembership)" description="暂无该周数据" />
 
@@ -136,6 +153,51 @@ const filteredRecords = computed(() => {
   const kw = recordKeyword.value.trim().toLowerCase()
   if (!kw) return records.value
   return records.value.filter((r) => r.memberName.toLowerCase().includes(kw))
+})
+
+/** 每页行数：一个组织一周可能有上百名成员，分页后一次只渲染 50 行 */
+const PAGE_SIZE = 50
+const page = ref(1)
+
+/**
+ * 排序状态。表格列改成了 sortable="custom"，排序在这里对**全量**做、再切当前页——
+ * el-table 的本地排序只作用于它收到的数组，分页后那样就只会排当前页，结果是错的。
+ */
+const sortProp = ref('totalPoints')
+const sortOrder = ref<'ascending' | 'descending' | null>('descending')
+
+const sortedRecords = computed(() => {
+  const prop = sortProp.value
+  const order = sortOrder.value
+  const list = filteredRecords.value
+  if (!prop || !order) return list
+  const dir = order === 'ascending' ? 1 : -1
+  return [...list].sort((a, b) => {
+    const av = (a as unknown as Record<string, unknown>)[prop]
+    const bv = (b as unknown as Record<string, unknown>)[prop]
+    // 空值统一排到最后，避免它们插在中间
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+    return String(av).localeCompare(String(bv)) * dir
+  })
+})
+
+const pagedRecords = computed(() => {
+  const start = (page.value - 1) * PAGE_SIZE
+  return sortedRecords.value.slice(start, start + PAGE_SIZE)
+})
+
+const onSortChange = ({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) => {
+  sortProp.value = prop ?? ''
+  sortOrder.value = order
+  page.value = 1
+}
+
+// 换了搜索词就回到第 1 页
+watch(recordKeyword, () => {
+  page.value = 1
 })
 const loading = ref(false)
 const pointsConfig = ref<OrgPointsConfig | null>(null)
@@ -216,6 +278,8 @@ const loadRecords = async () => {
     records.value = []
     return
   }
+  // 换组织/换周后回到第 1 页
+  page.value = 1
   loading.value = true
   try {
     const res = await getPublicOrgRecords(selectedOrgId.value, selectedWeek.value)
@@ -562,6 +626,12 @@ onBeforeUnmount(() => {
 
   :deep(.el-table th .cell) {
     white-space: nowrap;
+  }
+
+  .table-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 4px 0;
   }
 }
 </style>

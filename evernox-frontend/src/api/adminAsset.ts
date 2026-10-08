@@ -1,4 +1,5 @@
 import request, { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { AlbumResponse, ImageResponse, PageResult } from '@/api/image'
 import type { Result } from '@/types/user'
 
@@ -45,17 +46,6 @@ export interface AlbumUpdateRequest {
   description?: string | null
   coverImageId?: number | null
   visibility: number
-}
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
 }
 
 /** 筛选下拉用的用户清单 */

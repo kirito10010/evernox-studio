@@ -175,13 +175,32 @@ body {
 
 /* ---------- Keyframe Animations ---------- */
 
-/* Misty mesh background drift（背景专用，周期拉长以保持轻盈） */
+/* Misty mesh background drift（背景专用，周期拉长以保持轻盈）
+   ⚠️ 本动画只动 background-position —— 那是「只能重绘、不能合成」的属性，
+   每帧都要重新光栅化元素；若元素上还挂着 filter: blur()，模糊会被每帧重算，
+   在高分辨率屏上直接把 GPU 打满（详见 aurora-drift-transform 的说明）。
+   仅保留给「靠 transform 定位、不能占用 transform 做动画」的元素使用。 */
 @keyframes aurora-drift {
   0%   { background-position: 0% 50%; }
   25%  { background-position: 50% 0%; }
   50%  { background-position: 100% 50%; }
   75%  { background-position: 50% 100%; }
   100% { background-position: 0% 50%; }
+}
+
+/* 背景漂移（合成层友好版）：只动 transform。
+   transform / opacity 能在 GPU 合成层上插值——光栅结果（含 filter 模糊）只算一次并被复用，
+   之后每帧只是一次矩阵变换；而 background-position 每帧都要重新光栅化 + 重算模糊。
+   两者观感等价，但每帧成本差一个数量级。上面的 backdrop-filter（sidebar/header）也依赖这一点：
+   背后的画面不再每帧变化，它们才不用每帧重新采样。
+   ⚠️ 只能用在「不靠 transform 定位」的元素上。像 Login/Register/ForgotPassword 的 .blob-3
+   那样用 transform: translate(-50%,-50%) 做居中的，**必须继续用 aurora-drift**——
+   动画里的 transform 会覆盖居中的 translate，元素会瞬间跳位。 */
+@keyframes aurora-drift-transform {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  25%      { transform: translate3d(3%, -2%, 0) scale(1.06); }
+  50%      { transform: translate3d(5%, 2%, 0) scale(1.1); }
+  75%      { transform: translate3d(-2%, 3%, 0) scale(1.06); }
 }
 
 /* Floating particle */
@@ -216,10 +235,10 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes page-leave {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(-8px); }
-}
+/* 说明：原有一个 page-leave（淡出 + 上移）已移除。
+   router-view 用的是 mode="out-in"——旧页面必须离场完才挂载新页面，
+   所以那 0.1s 淡出会变成每次切菜单/开页面的固定空等（加上入场 0.12s ≈ 220ms）。
+   现在离场不做动画（见下方 .page-fade-leave-active），Vue 会立即挂载新页面。 */
 
 /* Gradient border rotation */
 @keyframes border-rotate {
@@ -295,8 +314,14 @@ textarea:focus-visible,
   animation: page-enter 0.12s var(--ev-ease-out) both;
 }
 
+/* 离场不做动画：router-view 用的是 mode="out-in"，旧页面离场完才会挂载新页面。
+   给它 0.1s 淡出 = 每次切菜单/开页面白等 100ms（加上入场 0.12s ≈ 220ms 固定停顿）。
+   置为 none 后 Vue 判定「无过渡」→ 立即完成离场、马上挂载新页面；
+   入场淡入保留，观感几乎不变，但切换不再有可感知的停顿。
+   刻意不用「新旧页面重叠交叉淡化」：那要把离场元素绝对定位，
+   容易引入位置/高度跳动，收益不值这个风险。 */
 .page-fade-leave-active {
-  animation: page-leave 0.1s var(--ev-ease-out) both;
+  animation: none;
 }
 
 /* ---------- Reduced motion ---------- */

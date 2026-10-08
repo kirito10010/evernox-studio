@@ -187,6 +187,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import { Plus, Search, UserFilled } from '@element-plus/icons-vue'
 import {
   getAdminUsers, getAdminUserStats, createAdminUser, updateAdminUser,
@@ -230,13 +231,6 @@ type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 
 const roleName = (role: UserRole) => UserRoleMap[role] ?? role
 const roleTagType = (role: UserRole): TagType => (UserRoleColor[role] as TagType) ?? 'info'
-
-const formatDateTime = (value: string): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 const loadUsers = async () => {
   loading.value = true

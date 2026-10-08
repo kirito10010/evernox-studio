@@ -69,6 +69,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatTime } from '@/utils/format'
 import RichTextViewer from '@/components/RichTextViewer.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useUserStore } from '@/stores/user'
@@ -203,10 +204,6 @@ watch(
 
 onBeforeUnmount(clearCache)
 
-const formatTime = (value?: string) => {
-  if (!value) return ''
-  return value.replace('T', ' ').slice(0, 16)
-}
 </script>
 
 <style scoped lang="scss">

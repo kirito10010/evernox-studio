@@ -29,17 +29,25 @@ evernox-frontend/pnpm-lock.yaml
 evernox-frontend/pnpm-workspace.yaml
 
 # ===== Nginx 二进制发行包（从官网重下）=====
-# 例外：只把自己改过的 nginx.conf 纳入版本管理，重装后直接就有部署配置
-# 通配版本号，以后升级 nginx 只改目录名，不用再动这里
+# 只把**服务器那一份** nginx.conf 纳入版本管理（重装后拉代码就有部署配置）。
+#
+# 为什么钉死目录名 nginx-1.30.4 而不用通配：
+#   服务器上的目录就叫 nginx-1.30.4（切换端口*.bat 里也写死了这个名字），
+#   而本地可能并存别的版本（如 nginx-1.30.5）。若用通配 /nginx-*/conf/nginx.conf，
+#   两份 nginx.conf 会同时变成可提交 —— 提交错一份，服务器恢复时就拿到错配置。
+#   所以只放行服务器这一份，其余 nginx-* 目录整份忽略。
+#
 # 注意：必须写 /nginx-*/*（排除目录内容），不能写 /nginx-*/（排除目录本身），
 #       否则下面 ! 开头的重新包含规则会失效
 /nginx-*/*
 !/nginx-*/conf/
 /nginx-*/conf/*
-!/nginx-*/conf/nginx.conf
+!/nginx-1.30.4/conf/nginx.conf
 
 # ===== Redis 二进制发行包（从官网重下；dump.rdb 是缓存快照，丢了无影响）=====
-/Redis-*/
+# 用 /Redis*/ 而不是 /Redis-*/：服务器上的目录就叫 Redis（没有版本号后缀），
+# 写 /Redis-*/ 会匹配不上 → redis-server.exe / dump.rdb 变成可提交。
+/Redis*/
 
 # ===== Comate 本地规格文档（AI 生成的设计文档，不是运行所需）=====
 /.comate/

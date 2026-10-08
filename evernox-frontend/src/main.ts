@@ -1,15 +1,13 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 
 import App from './App.vue'
 import router from './router'
+import * as appIcons from './icons'
 import './styles/main.scss'
 import { useThemeStore } from './stores/theme'
 
@@ -20,14 +18,20 @@ dayjs.locale('zh-cn')
 const app = createApp(App)
 const pinia = createPinia()
 
-// 注册Element Plus图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+// 只注册项目实际用到的图标（见 ./icons）。
+// 原来这里是 `import * as ElementPlusIconsVue` + 循环注册全部 293 个，
+// 会让整个图标包进 bundle。
+for (const [key, component] of Object.entries(appIcons)) {
   app.component(key, component)
 }
 
 app.use(pinia)
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
+
+// 注意：这里刻意**不再** `import ElementPlus from 'element-plus'` + `app.use(ElementPlus)`。
+// vite.config.ts 已用 ElementPlusResolver 配置了按需引入（组件与指令都会自动引入），
+// 再整库 use 一次会把按需引入完全抵消——主 chunk 会因此涨到 1.26MB。
+// Element Plus 的中文 locale 改由 App.vue 的 <el-config-provider :locale="zhCn"> 提供。
 
 // 应用持久化主题（index.html 已预置，此处再同步 store，保证后续切换一致）
 useThemeStore(pinia).apply()

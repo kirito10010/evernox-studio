@@ -146,6 +146,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import type { UploadFile } from 'element-plus'
 import {
   approveQuiz,
@@ -186,13 +187,6 @@ const form = reactive<QuizQuestionRequest>({
 })
 
 let keywordTimer: ReturnType<typeof setTimeout> | null = null
-
-const formatDateTime = (value: string): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 const load = async () => {
   loading.value = true

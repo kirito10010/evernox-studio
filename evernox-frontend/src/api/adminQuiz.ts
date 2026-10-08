@@ -1,17 +1,8 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
 import type { AdminQuizListParams, QuizImportResult, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
-
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 export const getAdminQuizList = (
   params: AdminQuizListParams

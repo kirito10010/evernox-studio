@@ -1,18 +1,8 @@
 import { get, post } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { PageResult } from '@/api/image'
 import type { Result } from '@/types/user'
 import type { AdminNoteListParams, Note, NoteStats } from '@/types/note'
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 /** 笔记审批列表 */
 export const getAdminNotes = (

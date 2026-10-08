@@ -125,7 +125,7 @@ public class GameServiceImpl implements GameService {
             List<GameCityOwner> owned = ownedCities(round.getId(), userId);
             ownedCount = owned.size();
             Map<Long, GameCity> cityMap = cities.stream().collect(Collectors.toMap(GameCity::getId, Function.identity()));
-            powerScore = powerScore(player, cityMap);
+            powerScore = powerScore(owned, cityMap);
             Set<Long> ownedIds = owned.stream().map(GameCityOwner::getCityId).collect(Collectors.toSet());
             completedProvinces = completedProvinceCount(cityMap, ownedIds);
         }
@@ -164,17 +164,15 @@ public class GameServiceImpl implements GameService {
 
         List<GameRankItemDto> result = new ArrayList<>();
         int rank = 0;
-        for (GamePlayer p : players.stream()
-                .sorted(Comparator.comparingDouble((GamePlayer x) -> powerScore(x, cityMap)).reversed())
-                .toList()) {
+        for (ScoredPlayer sp : scoreAndRank(round.getId(), players, cityMap)) {
             rank++;
             result.add(GameRankItemDto.builder()
                     .rank(rank)
-                    .userId(p.getUserId())
-                    .username(names.get(p.getUserId()))
-                    .ownedCityCount(ownedCities(round.getId(), p.getUserId()).size())
-                    .force(p.getForce())
-                    .powerScore(powerScore(p, cityMap))
+                    .userId(sp.player().getUserId())
+                    .username(names.get(sp.player().getUserId()))
+                    .ownedCityCount(sp.ownedCityCount())
+                    .force(sp.player().getForce())
+                    .powerScore(sp.score())
                     .build());
         }
         return result;
@@ -360,13 +358,12 @@ public class GameServiceImpl implements GameService {
             return; // 已标记 SETTLED，无需发奖
         }
 
-        List<GamePlayer> ranked = players.stream()
-                .sorted(Comparator.comparingDouble((GamePlayer x) -> powerScore(x, cityMap)).reversed())
-                .toList();
+        List<ScoredPlayer> ranked = scoreAndRank(round.getId(), players, cityMap);
 
         int rookieRank = 0;
         for (int i = 0; i < ranked.size(); i++) {
-            GamePlayer p = ranked.get(i);
+            ScoredPlayer sp = ranked.get(i);
+            GamePlayer p = sp.player();
             int totalRank = i + 1;
             int totalPts = totalBoardPoints(totalRank);
 
@@ -385,7 +382,7 @@ public class GameServiceImpl implements GameService {
                 insertReward(round.getId(), p.getUserId(), mainRank, mainPts, boardType);
             }
 
-            int ownedCount = ownedCities(round.getId(), p.getUserId()).size();
+            int ownedCount = sp.ownedCityCount();
             if (ownedCount > 0) {
                 pointsService.award(p.getUserId(), 10, "沙盘争霸参与奖");
                 insertReward(round.getId(), p.getUserId(), 0, 10, "participation");
@@ -440,10 +437,40 @@ public class GameServiceImpl implements GameService {
         playerRepository.updateById(player);
     }
 
-    private double powerScore(GamePlayer player, Map<Long, GameCity> cityMap) {
+    /** 玩家的一次性评分结果：排序与结果构建共用，避免重复查库与重复计算 */
+    private record ScoredPlayer(GamePlayer player, double score, int ownedCityCount) {}
+
+    /**
+     * 一次性为全部玩家算分并排序。
+     *
+     * 修复前：排序比较器里直接调 powerScore，而 powerScore 内部会查库，
+     * 于是比较器被调用多少次就查多少次库（O(N log N) 条 SQL）。
+     * 修复后：本轮占领记录只查 1 条 SQL，按 ownerUserId 分组后内存计算。
+     */
+    private List<ScoredPlayer> scoreAndRank(Long roundId, List<GamePlayer> players,
+                                            Map<Long, GameCity> cityMap) {
+        Map<Long, List<GameCityOwner>> ownedByUser = ownerRepository.selectList(
+                        new LambdaQueryWrapper<GameCityOwner>().eq(GameCityOwner::getRoundId, roundId))
+                .stream().collect(Collectors.groupingBy(GameCityOwner::getOwnerUserId));
+
+        List<ScoredPlayer> scored = new ArrayList<>(players.size());
+        for (GamePlayer p : players) {
+            List<GameCityOwner> owned = ownedByUser.getOrDefault(p.getUserId(), List.of());
+            scored.add(new ScoredPlayer(p, powerScore(owned, cityMap), owned.size()));
+        }
+        // List.sort 是稳定排序，与原先 Stream.sorted 的并列名次行为一致
+        scored.sort(Comparator.comparingDouble(ScoredPlayer::score).reversed());
+        return scored;
+    }
+
+    /**
+     * 势力分：只看地盘与等级，避免「囤兵不打」反而排名更高。
+     * @param owned 该玩家已占领的城市，由调用方批量预取，避免逐玩家查库
+     */
+    private double powerScore(List<GameCityOwner> owned, Map<Long, GameCity> cityMap) {
         double score = 0;
         Set<Long> ownedIds = new HashSet<>();
-        for (GameCityOwner o : ownedCities(player.getRoundId(), player.getUserId())) {
+        for (GameCityOwner o : owned) {
             ownedIds.add(o.getCityId());
             GameCity c = cityMap.get(o.getCityId());
             if (c != null) {

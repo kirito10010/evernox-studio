@@ -62,11 +62,11 @@
               </span>
               <span class="meta-item">
                 <el-icon><Clock /></el-icon>
-                {{ formatDate(image.createdAt) }}
+                {{ formatDateTime(image.createdAt, '') }}
               </span>
               <span class="meta-item">
                 <el-icon><Document /></el-icon>
-                {{ formatSize(image.fileSize) }}
+                {{ formatBytes(image.fileSize) }}
               </span>
               <span class="meta-item" v-if="image.width">
                 <el-icon><FullScreen /></el-icon>
@@ -91,6 +91,9 @@ import type { ImageResponse } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDateTime } from '@/utils/format'
+import { formatBytes } from '@/utils/image'
 import {
   Loading, WarningFilled, ArrowLeft, DocumentCopy, View, Hide,
   Delete, Lock, User, Clock, Document, FullScreen
@@ -153,21 +156,12 @@ onUnmounted(() => {
   clearCache()
 })
 
+const { copy } = useClipboard()
+
 const handleCopyUrl = async () => {
   if (!image.value) return
   const url = `${window.location.origin}/api/image/${image.value.id}/file`
-  try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
-  } catch {
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    document.execCommand('copy')
-    document.body.removeChild(input)
-    ElMessage.success('链接已复制')
-  }
+  await copy(url, '链接已复制')
 }
 
 const handleToggleVisibility = async () => {
@@ -192,17 +186,6 @@ const handleDelete = async () => {
   } catch { /* cancelled */ }
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
 </script>
 
 <style scoped lang="scss">

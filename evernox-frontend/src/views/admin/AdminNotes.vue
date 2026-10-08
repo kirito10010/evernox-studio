@@ -118,6 +118,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDateTime } from '@/utils/format'
 import RichTextViewer from '@/components/RichTextViewer.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { getAdminImageBlob } from '@/api/adminAsset'
@@ -156,13 +157,6 @@ const stats = ref<NoteStats>({ mine: null, pending: null, published: null, rejec
 const previewVisible = ref(false)
 const previewLoading = ref(false)
 const preview = ref<Note | null>(null)
-
-const formatDateTime = (value: string | null): string => {
-  if (!value) return '—'
-  const d = new Date(value)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 const statusTagType = (status: number) => {
   switch (status) {

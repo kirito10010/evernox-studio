@@ -102,6 +102,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatTime } from '@/utils/format'
 import {
   deleteMySubmission,
   getMySubmissions,
@@ -236,11 +237,6 @@ const onDelete = async (s: QuizQuestion) => {
   await deleteMySubmission(s.id)
   ElMessage.success('删除成功')
   await loadSubmissions()
-}
-
-const formatTime = (value?: string) => {
-  if (!value) return ''
-  return value.replace('T', ' ').slice(0, 16)
 }
 
 onMounted(loadSubmissions)

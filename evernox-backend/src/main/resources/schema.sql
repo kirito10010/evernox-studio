@@ -684,7 +684,8 @@ CREATE TABLE IF NOT EXISTS `org_week_record` (
     `updated_at`            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_week_member` (`week_date`, `member_id`),
-    KEY `idx_week_date` (`week_date`)
+    KEY `idx_week_date` (`week_date`),
+    KEY `idx_org_week` (`organization_id`, `week_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织每周成员记录';
 
 -- 沙盘争霸城市（静态表，启动时种子填充）

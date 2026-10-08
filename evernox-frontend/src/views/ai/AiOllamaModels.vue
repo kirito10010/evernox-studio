@@ -55,6 +55,19 @@
         <el-option label="按更新时间" value="new" />
         <el-option label="按参数量" value="size" />
       </el-select>
+      <!--
+        按需补全：官网默认列表页只返回官方库、社区模型无法枚举，
+        所以任何关键词（无论本地有没有结果）都允许从官网补回来。只增不删。
+        无关键词时置灰而非隐藏，避免布局跳动并提示「先输关键词」。
+      -->
+      <el-button
+        v-if="userStore.isAdmin"
+        :loading="backfilling"
+        :disabled="!filters.keyword.trim() || status.running"
+        @click="handleBackfill"
+      >
+        {{ status.running ? '补全中…' : '从官网补全' }}
+      </el-button>
       <el-button @click="resetFilters">重置</el-button>
     </div>
 
@@ -75,7 +88,7 @@
         </el-table-column>
         <el-table-column label="参数量" width="130">
           <template #default="{ row }">
-            <span v-if="row.sizes">{{ row.sizes.split(',').join(' / ') }}</span>
+            <span v-if="row._sizesText">{{ row._sizesText }}</span>
             <span v-else class="muted">-</span>
           </template>
         </el-table-column>
@@ -88,18 +101,18 @@
         <el-table-column label="能力" width="200">
           <template #default="{ row }">
             <el-tag
-              v-for="c in splitCapabilities(row.capabilities)"
-              :key="c"
+              v-for="c in row._capabilities"
+              :key="c.key"
               size="small"
               effect="plain"
               class="cap-tag"
             >
-              {{ capabilityLabel(c) }}
+              {{ c.label }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="官网更新" width="120" align="center">
-          <template #default="{ row }">{{ formatDate(row.sourceUpdatedAt) }}</template>
+          <template #default="{ row }">{{ formatDate(row.sourceUpdatedAt, '-') }}</template>
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
@@ -108,7 +121,14 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!loading && models.length === 0" description="暂无模型数据" />
+      <el-empty v-if="!loading && models.length === 0">
+        <template #description>
+          <span v-if="filters.keyword.trim()">
+            本地没有匹配「{{ filters.keyword.trim() }}」的模型，可点上方「从官网补全」
+          </span>
+          <span v-else>暂无模型数据</span>
+        </template>
+      </el-empty>
     </div>
 
     <div class="table-footer">
@@ -126,8 +146,8 @@
     <el-drawer v-model="drawerVisible" :title="detail?.name || '模型详情'" size="62%">
       <div v-if="detail" v-loading="detailLoading" class="detail">
         <div class="detail-tags">
-          <el-tag v-for="c in splitCapabilities(detail.capabilities)" :key="c" size="small" effect="plain">
-            {{ capabilityLabel(c) }}
+          <el-tag v-for="c in detailCapabilities" :key="c.key" size="small" effect="plain">
+            {{ c.label }}
           </el-tag>
           <el-tag v-if="detail.vendorLabel" size="small" type="info" effect="plain">{{ detail.vendorLabel }}</el-tag>
           <el-tag v-if="detail.isAbliterated === 1" size="small" type="warning" effect="plain">abliterated</el-tag>
@@ -137,8 +157,8 @@
 
         <div class="detail-meta">
           <span>下载量：{{ detail.pullsText || detail.pulls }}</span>
-          <span>参数量：{{ detail.sizes ? detail.sizes.split(',').join(' / ') : '-' }}</span>
-          <span>官方更新：{{ formatDate(detail.sourceUpdatedAt) }}</span>
+          <span>参数量：{{ detailSizesText }}</span>
+          <span>官方更新：{{ formatDate(detail.sourceUpdatedAt, '-') }}</span>
           <a :href="detail.url" target="_blank" rel="noopener noreferrer">官网页面</a>
         </div>
 
@@ -183,10 +203,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onDeactivated, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useClipboard } from '@/composables/useClipboard'
+import { formatDate } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 import {
+  backfillOllamaModels,
   getOllamaFilters,
   getOllamaModelDetail,
   getOllamaModels,
@@ -196,6 +219,9 @@ import {
   type OllamaModel,
   type OllamaSyncStatus,
 } from '@/api/ollamaModel'
+
+// 显式声明组件名：MainLayout 的 <keep-alive :include="..."> 按组件名匹配缓存。
+defineOptions({ name: 'AiOllamaModels' })
 
 const userStore = useUserStore()
 
@@ -207,8 +233,22 @@ const CAPABILITY_LABELS: Record<string, string> = {
   cloud: '云端',
 }
 
-const models = ref<OllamaModel[]>([])
+/**
+ * 展示行：把每行的显示文本/标签在**数据加载时算一次**。
+ * 原来模板里直接 `row.sizes.split(',')`、`splitCapabilities(row.capabilities)`、
+ * `capabilityLabel(c)` —— 每行每次重渲染都要重新 split + filter + 查表。
+ * 表格页大小可到 100，这笔开销不划算。
+ */
+interface OllamaRow extends OllamaModel {
+  /** 参数量显示文本，如 "7b / 27b"；无参数量时为空串 */
+  _sizesText: string
+  /** 能力标签（已翻译），直接 v-for */
+  _capabilities: { key: string; label: string }[]
+}
+
+const models = ref<OllamaRow[]>([])
 const loading = ref(false)
+const backfilling = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -245,16 +285,30 @@ const detail = ref<OllamaModel | null>(null)
 let pollTimer: number | null = null
 
 const capabilityLabel = (c: string) => CAPABILITY_LABELS[c] ?? c
-const splitCapabilities = (caps: string | null) => (caps ? caps.split(',').filter(Boolean) : [])
 
-const syncText = computed(() => (status.value.lastRunAt ? formatDate(status.value.lastRunAt) : '未同步'))
+/** 把能力字符串拆成 {key,label} 列表（供预计算与抽屉 computed 复用） */
+const toCapabilities = (caps: string | null | undefined) =>
+  caps
+    ? caps
+        .split(',')
+        .filter(Boolean)
+        .map((k) => ({ key: k, label: capabilityLabel(k) }))
+    : []
 
-const formatDate = (s: string | null) => {
-  if (!s) return '-'
-  const d = new Date(s.replace(' ', 'T'))
-  if (Number.isNaN(d.getTime())) return s
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** 接口行 → 展示行（显示文本只算一次） */
+const toRow = (m: OllamaModel): OllamaRow => ({
+  ...m,
+  _sizesText: m.sizes ? m.sizes.split(',').join(' / ') : '',
+  _capabilities: toCapabilities(m.capabilities),
+})
+
+/** 抽屉内容来自单独的详情请求；用 computed 缓存，模板里就不必每次重渲染都拆一遍 */
+const detailCapabilities = computed(() => toCapabilities(detail.value?.capabilities))
+const detailSizesText = computed(() =>
+  detail.value?.sizes ? detail.value.sizes.split(',').join(' / ') : '-'
+)
+
+const syncText = computed(() => (status.value.lastRunAt ? formatDate(status.value.lastRunAt, '-') : '未同步'))
 
 const load = async () => {
   loading.value = true
@@ -264,12 +318,13 @@ const load = async () => {
       vendor: filters.vendor || undefined,
       size: filters.size || undefined,
       capability: filters.capability || undefined,
-      abliterated: filters.version === 'abliterated' ? true : undefined,
+      abliterated:
+        filters.version === 'abliterated' ? true : filters.version === 'standard' ? false : undefined,
       sort: filters.sort,
       page: page.value,
       pageSize: pageSize.value,
     })
-    models.value = res.data?.records ?? []
+    models.value = (res.data?.records ?? []).map(toRow)
     total.value = res.data?.total ?? 0
   } finally {
     loading.value = false
@@ -322,23 +377,11 @@ const onRowClick = async (row: unknown) => {
   }
 }
 
+const { copy } = useClipboard()
+
 const copyCommand = async (text: string | null | undefined) => {
   if (!text) return
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
-    ElMessage.success(`已复制：${text}`)
-  } catch {
-    ElMessage.error('复制失败，请手动复制')
-  }
+  await copy(text, `已复制：${text}`)
 }
 
 const stopPolling = () => {
@@ -382,6 +425,23 @@ const handleSync = async () => {
   }
 }
 
+/** 搜不到时从官网按需补全：复用既有的 startPolling 流程，不另写轮询 */
+const handleBackfill = async () => {
+  const kw = filters.keyword.trim()
+  if (!kw) return
+  backfilling.value = true
+  try {
+    await backfillOllamaModels(kw)
+    ElMessage.success(`已开始从官网补全「${kw}」，完成后会自动刷新`)
+    await loadStatus()
+    startPolling()
+  } catch {
+    /* 提示已在请求层 */
+  } finally {
+    backfilling.value = false
+  }
+}
+
 onMounted(async () => {
   await Promise.all([loadOptions(), load()])
   await loadStatus()
@@ -390,6 +450,9 @@ onMounted(async () => {
   }
 })
 
+// 本页被 keep-alive 缓存后，切走只会触发 onDeactivated（不会 onUnmounted），
+// 轮询必须在这里一起停掉，否则会在后台空转到结束。
+onDeactivated(stopPolling)
 onUnmounted(stopPolling)
 </script>
 

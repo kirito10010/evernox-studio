@@ -38,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -58,6 +59,9 @@ public class AiOllamaServiceImpl implements AiOllamaService {
 
     /** 疑似官网改版/抓取失败的安全闸阈值：抓到的模型数不足库中一半时不做删除 */
     private static final double DELETE_SAFETY_RATIO = 0.5;
+
+    /** 按关键词补全时允许的关键词最大长度 */
+    private static final int MAX_KEYWORD_LENGTH = 100;
 
     private static final Pattern LEADING_NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
 
@@ -86,8 +90,9 @@ public class AiOllamaServiceImpl implements AiOllamaService {
         if (StringUtils.hasText(vendor)) {
             w.eq(AiOllamaModel::getVendor, vendor.trim());
         }
-        if (Boolean.TRUE.equals(abliterated)) {
-            w.eq(AiOllamaModel::getIsAbliterated, 1);
+        if (abliterated != null) {
+            // true = 只看 abliterated；false = 只看标准版本（排除 abliterated）
+            w.eq(AiOllamaModel::getIsAbliterated, abliterated ? 1 : 0);
         }
         if (StringUtils.hasText(capability)) {
             w.like(AiOllamaModel::getCapabilities, capability.trim().toLowerCase(Locale.ROOT));
@@ -217,6 +222,56 @@ public class AiOllamaServiceImpl implements AiOllamaService {
 
     @Override
     public OllamaSyncStatus syncAll() {
+        return runSync("全量同步",
+                "未抓取到任何模型（官网不可达或页面结构变化），已跳过全部删除",
+                crawler::fetchAllModels,
+                true);
+    }
+
+    @Override
+    public void triggerBackfillAsync(String keyword) {
+        String kw = keyword == null ? "" : keyword.trim();
+        if (kw.isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "关键词不能为空");
+        }
+        if (kw.length() > MAX_KEYWORD_LENGTH) {
+            throw new BusinessException(ResultCode.PARAM_ERROR,
+                    "关键词过长（最多 " + MAX_KEYWORD_LENGTH + " 个字符）");
+        }
+        if (syncing.get()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "已有同步任务在执行，请稍后再试");
+        }
+        CompletableFuture.runAsync(() -> backfillByKeyword(kw));
+    }
+
+    /**
+     * 按关键词从官网补全（只增不删）。
+     * 与全量同步共用 {@link #runSync}，差异只有两处：数据源是单个查询、且不做任何删除。
+     */
+    private OllamaSyncStatus backfillByKeyword(String keyword) {
+        return runSync("按关键词「" + keyword + "」补全",
+                "官网也没有匹配「" + keyword + "」的结果",
+                () -> crawler.fetchByKeyword(keyword, AiOllamaCrawler.ADHOC_PAGE_LIMIT),
+                false);
+    }
+
+    /**
+     * 同步主流程：取数 → 逐模型 upsert → （可选）删除不在本次结果里的模型 → 同步变体。
+     *
+     * 逐语句提交、不用 @Transactional：整个流程可能跨越数十次网络请求，
+     * 长事务会长时间占用连接与锁；各步骤幂等，中途中断下次同步会自动校正。
+     *
+     * @param scopeLabel   状态摘要前缀
+     * @param emptyMessage 抓取结果为空时的提示
+     * @param loader       数据来源（全量抓取 / 按关键词抓取）
+     * @param deleteMissing true = 删除不在本次结果里的模型（仅全量同步）；
+     *                      false = 只增不删。按关键词补全**必须**传 false——
+     *                      一个窄关键词只回几条结果，若走进删除阶段，会把库中其它模型整批删掉。
+     */
+    private OllamaSyncStatus runSync(String scopeLabel,
+                                     String emptyMessage,
+                                     Supplier<AiOllamaCrawler.ScrapeOutcome> loader,
+                                     boolean deleteMissing) {
         if (!syncing.compareAndSet(false, true)) {
             // 已有同步在跑，直接返回当前状态
             return getSyncStatus();
@@ -229,11 +284,11 @@ public class AiOllamaServiceImpl implements AiOllamaService {
                 .build();
         status = st;
         try {
-            AiOllamaCrawler.ScrapeOutcome outcome = crawler.fetchAllModels();
+            AiOllamaCrawler.ScrapeOutcome outcome = loader.get();
             List<OllamaModelDto> scraped = outcome.models();
             if (scraped.isEmpty()) {
-                st.setMessage("未抓取到任何模型（官网不可达或页面结构变化），已跳过全部删除");
-                log.warn("Ollama 模型同步：抓取结果为空，跳过本次同步");
+                st.setMessage(emptyMessage);
+                log.warn("Ollama 模型同步：抓取结果为空（{}），跳过本次写入", scopeLabel);
                 return st;
             }
 
@@ -268,24 +323,29 @@ public class AiOllamaServiceImpl implements AiOllamaService {
                 }
             }
 
-            // 删除阶段（安全闸：抓取不完整或结果骤减时不允许删除）
-            boolean scrapedFull = outcome.complete();
-            boolean ratioOk = scraped.size() >= existing.size() * DELETE_SAFETY_RATIO;
+            // 删除阶段：仅全量同步执行（deleteMissing=false 时整体跳过，连比例安全闸都不计算）
             int modelRemoved = 0;
             List<String> notes = new ArrayList<>();
-            if (scrapedFull && ratioOk) {
-                Set<String> scrapedNames = scraped.stream().map(OllamaModelDto::getName).collect(Collectors.toSet());
-                for (AiOllamaModel old : existing.values()) {
-                    if (!scrapedNames.contains(old.getName())) {
-                        tagRepository.delete(new LambdaQueryWrapper<AiOllamaTag>().eq(AiOllamaTag::getModelId, old.getId()));
-                        modelRepository.deleteById(old.getId());
-                        modelRemoved++;
+            if (deleteMissing) {
+                boolean scrapedFull = outcome.complete();
+                boolean ratioOk = scraped.size() >= existing.size() * DELETE_SAFETY_RATIO;
+                if (scrapedFull && ratioOk) {
+                    Set<String> scrapedNames = scraped.stream().map(OllamaModelDto::getName).collect(Collectors.toSet());
+                    for (AiOllamaModel old : existing.values()) {
+                        if (!scrapedNames.contains(old.getName())) {
+                            tagRepository.delete(new LambdaQueryWrapper<AiOllamaTag>().eq(AiOllamaTag::getModelId, old.getId()));
+                            modelRepository.deleteById(old.getId());
+                            modelRemoved++;
+                        }
                     }
+                } else {
+                    notes.add("本次抓取不完整（complete=" + scrapedFull + "，抓取 " + scraped.size()
+                            + " / 库中 " + existing.size() + "），已跳过删除阶段");
+                    log.warn("Ollama 模型同步：{}", notes.get(notes.size() - 1));
                 }
-            } else {
-                notes.add("本次抓取不完整（complete=" + scrapedFull + "，抓取 " + scraped.size()
-                        + " / 库中 " + existing.size() + "），已跳过删除阶段");
-                log.warn("Ollama 模型同步：{}", notes.get(notes.size() - 1));
+            } else if (!outcome.complete()) {
+                // 只增不删的路径（按需补全）：如实告知可能没抓全，避免用户误以为已收录完整
+                notes.add("本次未抓完（已达页数上限或抓取中断），官网可能还有更多匹配未收录");
             }
 
             // 变体同步：只处理有变化的模型
@@ -313,8 +373,10 @@ public class AiOllamaServiceImpl implements AiOllamaService {
             st.setModelRemoved(modelRemoved);
             st.setTagAdded(tagAdded);
             st.setTagRemoved(tagRemoved);
-            String summary = "同步完成：模型 +" + modelAdded + " ~" + modelUpdated + " -" + modelRemoved
-                    + "，变体 +" + tagAdded + " -" + tagRemoved;
+            String summary = scopeLabel + "完成：模型 +" + modelAdded + " ~" + modelUpdated
+                    + (deleteMissing ? " -" + modelRemoved : "")
+                    + "，变体 +" + tagAdded + " -" + tagRemoved
+                    + "，库中共 " + modelRepository.selectCount(null) + " 行";
             if (!notes.isEmpty()) {
                 summary = summary + "；" + String.join("；", notes);
             }

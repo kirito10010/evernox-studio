@@ -1,17 +1,7 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import type { Result } from '@/types/user'
 import type { SalaryConfig, SalaryConfigPayload, SalaryRecord, SalaryRecordPayload } from '@/types/salary'
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 // ==================== 工资配置 ====================
 

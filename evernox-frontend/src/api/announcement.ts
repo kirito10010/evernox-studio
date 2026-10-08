@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/utils/request'
+import { buildQuery } from '@/utils/query'
 import request from '@/utils/request'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
@@ -35,17 +36,6 @@ export const deleteAnnouncementTag = (id: number): Promise<Result<void>> => {
 }
 
 // ========== 管理员 - 公告 ==========
-
-/** 拼接查询串，跳过空值 */
-const buildQuery = (params: Record<string, unknown>): string => {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined || value === null || value === '') continue
-    search.append(key, String(value))
-  }
-  const qs = search.toString()
-  return qs ? `?${qs}` : ''
-}
 
 export const getAdminAnnouncementList = (
   params: AnnouncementAdminListParams

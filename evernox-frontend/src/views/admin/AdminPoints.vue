@@ -12,12 +12,7 @@
       <el-button type="primary" :loading="loading" @click="search">搜索</el-button>
     </div>
 
-    <div
-      class="user-cards"
-      v-infinite-scroll="loadMore"
-      :infinite-scroll-disabled="loading || !hasMore"
-      infinite-scroll-distance="80"
-    >
+    <div class="user-cards">
       <div class="user-card" v-for="u in users" :key="u.id">
         <div class="card-head">
           <el-avatar :size="40" icon="UserFilled" />
@@ -42,6 +37,13 @@
           <el-button size="small" type="warning" @click="openSetMember(u)">设会员</el-button>
         </div>
       </div>
+
+      <!-- 触底加载哨兵：交给 useInfiniteScroll 的 IntersectionObserver 观察 -->
+      <div
+        v-if="hasMore"
+        :ref="(el) => (sentinelRef = el as HTMLElement | null)"
+        class="load-sentinel"
+      ></div>
 
       <p v-if="loading" class="load-hint">加载中...</p>
       <p v-else-if="!hasMore && users.length > 0" class="load-hint">没有更多了</p>
@@ -109,6 +111,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import { getAdminUsers, rechargePoints, setSuperMember } from '@/api/admin'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { UserRoleColor, UserRoleMap, type UserInfoResponse, type UserRole } from '@/types/user'
 
 const keyword = ref('')
@@ -139,6 +142,9 @@ const loadUsers = async (reset: boolean) => {
     total.value = res.data?.total ?? 0
     users.value = reset ? records : [...users.value, ...records]
     page.value += 1
+    // 追加后必须 recheck：哨兵若仍落在可见区域内，交叉状态没有翻转，
+    // IntersectionObserver 不会再回调，列表就停在第二批不动了。
+    await recheck()
   } finally {
     loading.value = false
   }
@@ -146,6 +152,17 @@ const loadUsers = async (reset: boolean) => {
 
 const search = () => loadUsers(true)
 const loadMore = () => loadUsers(false)
+
+/**
+ * 触底加载下一批。
+ *
+ * 这里用项目自研的 useInfiniteScroll（IntersectionObserver），而不是 Element Plus 的
+ * v-infinite-scroll —— 后者会往控制台抛 [ElInfiniteScroll] 弃用警告，且项目其余
+ * 7 个列表页（图床、相册、记事本、话题）都统一用这个 composable。
+ */
+const { sentinelRef, recheck } = useInfiniteScroll(() => {
+  if (hasMore.value && !loading.value) void loadMore()
+})
 
 onMounted(() => loadUsers(true))
 
@@ -307,6 +324,12 @@ const submitSetMember = async () => {
       text-align: center;
       font-size: 13px;
       color: var(--ev-text-muted);
+    }
+
+    .load-sentinel {
+      grid-column: 1 / -1;
+      width: 100%;
+      height: 1px;
     }
   }
 }

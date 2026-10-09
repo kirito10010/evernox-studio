@@ -36,4 +36,23 @@ app.use(router)
 // 应用持久化主题（index.html 已预置，此处再同步 store，保证后续切换一致）
 useThemeStore(pinia).apply()
 
+/**
+ * 旧 chunk 自愈。
+ *
+ * 重新部署后，浏览器可能仍持有旧的 index.html，于是去请求已被删除的旧 chunk：
+ * 控制台报 `Unable to preload CSS for /assets/xxx.css` 或 404，表现为「点菜单没反应」，
+ * 手动刷新一次才好。Vite 遇到这种情况会派发 vite:preloadError，这里自动刷新一次。
+ *
+ * sessionStorage 标记用于防止「chunk 真的不存在」时无限刷新；
+ * 挂载成功即说明本次加载的 chunk 完整，清掉标记让后续仍能自愈。
+ */
+const CHUNK_RELOAD_FLAG = 'evernox:chunk-reload-once'
+window.addEventListener('vite:preloadError', () => {
+  if (sessionStorage.getItem(CHUNK_RELOAD_FLAG)) return
+  sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1')
+  window.location.reload()
+})
+
 app.mount('#app')
+
+sessionStorage.removeItem(CHUNK_RELOAD_FLAG)

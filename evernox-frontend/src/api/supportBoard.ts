@@ -38,7 +38,12 @@ export const getActiveSupportBoard = (): Promise<Result<SupportBoardView>> => {
 
 /** 拉取画板紧凑二进制（8 字节头 + 每像素 [R,G,B,flags]），用于快速加载渲染 */
 export const getActiveSupportBoardBinary = async (): Promise<ArrayBuffer> => {
-  const res = await request.get('/support-board/active-binary', { responseType: 'arraybuffer' })
+  const res = await request.get('/support-board/active-binary', {
+    responseType: 'arraybuffer',
+    // 走 fetch 而非 XHR：部分浏览器扩展会 hook XMLHttpRequest 并无条件读
+    // responseText，遇到二进制响应必抛 InvalidStateError，刷满控制台
+    adapter: 'fetch',
+  })
   return res.data as ArrayBuffer
 }
 

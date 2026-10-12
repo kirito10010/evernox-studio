@@ -614,6 +614,17 @@ onBeforeUnmount(() => {
       padding-left: 0 !important;
       padding-right: 0 !important;
     }
+
+    /* 自定义标题必须退出布局，否则图标无法居中。
+       EP 的收起样式只把 `.el-menu-item > span` / `.el-sub-menu__title > span` 置为
+       visibility:hidden + 宽高 0，并没有重置 flex；而 .admin-menu-title 自带 flex:1
+       （flex-basis:0 且可增长），于是这个「看不见」的标题仍然吃掉整行剩余宽度，
+       把图标挤到最左边（超级会员 / 管理员 / 网站审批 / 笔记审批 / 忍者测验管理 都受影响）。
+       改成不伸缩、不占位即可；刻意不用 display:none，避免连带影响收起态弹出层里的标题。 */
+    .admin-menu-title {
+      flex: 0 0 auto !important;
+      min-width: 0 !important;
+    }
   }
 
   :deep(.el-menu-item),

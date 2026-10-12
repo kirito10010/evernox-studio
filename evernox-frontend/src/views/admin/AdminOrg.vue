@@ -172,8 +172,11 @@
           </el-table-column>
           <el-table-column label="奖励礼包" width="170" fixed="right">
             <template #default="{ row }">
+              <!-- 忍战次数为 0（或未录入）时禁止分配礼包：没参战就没有奖励。
+                   用 !row.ninjaBattleCount 一并覆盖 null，字段本身是可空的。 -->
               <el-select
                 :model-value="row.rewardPackageId"
+                :disabled="!row.ninjaBattleCount"
                 placeholder="选择礼包"
                 clearable
                 size="small"

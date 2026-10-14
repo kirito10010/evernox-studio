@@ -239,8 +239,9 @@ onBeforeUnmount(() => {
 .aurora-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
-  will-change: transform;
+  /* 去掉 filter: blur(100px) 与 will-change：blob 本身是 radial-gradient，边缘已足够
+     柔和；100px 模糊只会新增一个整块滤镜合成层，并随 aurora-drift（动 background-position）
+     在每帧重新光栅化，是高 DPR 屏幕上的主要开销。 */
 }
 
 .blob-1 {

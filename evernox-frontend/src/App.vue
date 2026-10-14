@@ -26,21 +26,20 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
   background-color: var(--ev-bg-deep);
 }
 
-/* 薄雾光斑层：缓慢漂移，仅作氛围，不遮挡内容 */
+/* 薄雾光斑层：静止的氛围渐变，不遮挡内容。
+   这里刻意不再叠加 filter: blur(40px) 与无限漂移动画：
+   - 网格本身由 radial-gradient 构成，边缘天然平滑，40px 高斯模糊几乎不改变观感，
+     却要为整个视口额外维护一个带滤镜的合成层（2.5K@DPR2 下纹理可达数千万物理像素）。
+   - 背景一旦运动，压在其上的 sidebar / header / 卡片的 backdrop-filter 会被迫
+     每帧重新采样并重新模糊；背景静止后它们只在真正重绘时才计算。
+   这两点正是「1K 流畅、2.5K 整站发钝」的根源。 */
 #app::before {
   content: '';
   position: absolute;
-  inset: -12%;                                       /* 比视口大 12%，留白：漂移时不会露边 */
+  inset: -12%;                                       /* 比视口大 12%，避免渐变边缘露白 */
   z-index: -1;
   background: var(--ev-grad-mesh);
   background-size: 180% 180%;
-  filter: blur(40px);
-  /* 用 transform 版漂移：模糊只栅格化一次，之后每帧只做 GPU 矩阵变换。
-     原先动 background-position 会每帧重新光栅化这一层并重算 40px 模糊，
-     在 2.5K 这类高分屏上会拖垮整个外壳——包括压在上面的 sidebar / header 的
-     backdrop-filter（它们会因为背后画面每帧变化而每帧重新采样）。 */
-  animation: aurora-drift-transform 28s ease-in-out infinite;
-  will-change: transform;
   pointer-events: none;
 }
 

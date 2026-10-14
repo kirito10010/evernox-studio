@@ -3,20 +3,16 @@
    纯 mixin 文件，无任何 CSS 输出，可被多处 @use 而不重复注入
    ============================================================ */
 
-/* 主玻璃配方：半透明白底 + 高斯模糊 + 上沿高光边 + 细腻浅蓝阴影 */
+/* 主玻璃配方：半透明白底 + 上沿高光边 + 细腻浅蓝阴影
+   注意：不再使用 backdrop-filter。卡片铺在平滑的渐变背景之上，高斯模糊几乎没有
+   视觉收益，却会让每张卡片在滚动时逐帧重新采样背景，在 2.5K 等高 DPR 屏幕上
+   造成滚动卡顿。需要真正「透出下方内容」的浮层（弹窗等）请用 ev-glass-strong。 */
 @mixin ev-glass($alpha: 0.66, $radius: var(--ev-radius-xl)) {
   background: rgba(255, 255, 255, $alpha);
-  backdrop-filter: var(--ev-blur-md);
-  -webkit-backdrop-filter: var(--ev-blur-md);
   border: 1px solid var(--ev-border-subtle);
   border-top-color: var(--ev-border-gloss);
   border-radius: $radius;
   box-shadow: var(--ev-shadow-card), var(--ev-inset-gloss);
-
-  /* 不支持 backdrop-filter 时降级为近实底，避免透出杂色 */
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: rgba(255, 255, 255, 0.92);
-  }
 }
 
 /* 强玻璃：用于弹窗 / 下拉 / 浮层等需要更高可读性的场景 */

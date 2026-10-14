@@ -509,24 +509,20 @@ onBeforeUnmount(() => {
    ============================================================ */
 .sidebar {
   position: relative;
+  /* 不再使用 backdrop-filter：背景是平滑静止的渐变，模糊肉眼无差，
+     却会让整条侧栏在每次合成时重新采样背景（高 DPR 屏上逐帧开销显著）。 */
   background: linear-gradient(180deg,
     var(--ev-bg-glass-strong) 0%,
     var(--ev-bg-glass) 60%,
     var(--ev-bg-glass-light) 100%
   );
   border-right: 1px solid var(--ev-border-subtle);
-  backdrop-filter: var(--ev-blur-lg);
-  -webkit-backdrop-filter: var(--ev-blur-lg);
   box-shadow: inset -1px 0 0 var(--ev-border-gloss), var(--ev-shadow-sm);
   transition: width 0.35s var(--ev-ease-out);
   display: flex;
   flex-direction: column;
   z-index: 20;
   overflow: hidden;
-
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: var(--ev-bg-glass-strong);
-  }
 }
 
 /* Logo */
@@ -694,20 +690,15 @@ onBeforeUnmount(() => {
 
 .header {
   height: 60px;
+  /* 同 .sidebar：去掉 backdrop-filter，避免大块表面每次合成重新采样背景 */
   background: var(--ev-bg-glass);
   border-bottom: 1px solid var(--ev-border-subtle);
   box-shadow: var(--ev-inset-gloss), var(--ev-shadow-xs);
-  backdrop-filter: var(--ev-blur-md);
-  -webkit-backdrop-filter: var(--ev-blur-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
   flex-shrink: 0;
-
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    background: var(--ev-bg-glass-strong);
-  }
 }
 
 .header-left {

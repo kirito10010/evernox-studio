@@ -56,8 +56,8 @@
         </el-table>
       </el-tab-pane>
 
-      <!-- ==================== 积分换算比 ==================== -->
-      <el-tab-pane label="积分换算比" name="config" lazy>
+      <!-- ==================== 发包设置 ==================== -->
+      <el-tab-pane label="发包设置" name="config" lazy>
         <div class="toolbar">
           <span class="toolbar-label">选择组织：</span>
           <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 200px">
@@ -82,6 +82,14 @@
           <el-button type="primary" :loading="savingConfig" @click="saveConfig">保存换算比</el-button>
         </div>
         <el-empty v-else description="请先选择组织" />
+
+        <OrgDistributionPanel
+          ref="distributionPanelRef"
+          :organization-id="selectedOrgId"
+          :packages="packages"
+          :members="members"
+          @updated="onDistributionPlansUpdated"
+        />
       </el-tab-pane>
 
       <!-- ==================== 奖励礼包 ==================== -->
@@ -143,7 +151,35 @@
           <el-button type="success" :disabled="!uploadFile || !selectedOrgId" :loading="importing" @click="doImport">
             导入数据
           </el-button>
+          <el-upload
+            ref="renegadeUploadRef"
+            :auto-upload="false"
+            accept=".txt"
+            :show-file-list="false"
+            :on-change="onRenegadeFileChange"
+          >
+            <el-button
+              :disabled="!selectedOrgId || !selectedWeek"
+              :loading="importingRenegade"
+            >
+              导入车头
+            </el-button>
+          </el-upload>
           <el-button type="warning" :disabled="!selectedOrgId || !selectedWeek" @click="calculate">计算积分</el-button>
+          <el-dropdown trigger="click" :disabled="!canDistribute || !distributionPlans.length" @command="runDistribution">
+            <el-button type="primary" :disabled="!canDistribute || !distributionPlans.length" :loading="distributing">
+              一键发包
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="p in distributionPlans" :key="p.id" :command="p.id">
+                  {{ p.name }}
+                </el-dropdown-item>
+                <el-dropdown-item v-if="!distributionPlans.length" disabled>暂无发包方案</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-button type="danger" :disabled="!selectedOrgId || !selectedWeek" @click="deleteWeek">删除本周</el-button>
           <el-input v-model="recordKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
           <el-button link type="primary" @click="importHelpVisible = true">导入说明</el-button>
@@ -412,6 +448,26 @@
       </template>
     </el-dialog>
 
+    <!-- 叛忍车头导入结果 -->
+    <el-dialog v-model="renegadeResultVisible" title="叛忍车头导入失败" width="520px" append-to-body>
+      <div v-if="renegadeResult" class="renegade-result">
+        <div class="result-stats">
+          <span class="ok">符合 {{ renegadeResult.matchedCount }} 行</span>
+          <span class="bad">不符合 {{ renegadeResult.unmatchedCount }} 行</span>
+        </div>
+        <p class="result-tip">
+          名单必须与本周玩家名完全一致（含符号、空格）；本次未做任何修改，请修正后重新导入。
+        </p>
+        <el-table :data="renegadeResult.unmatchedItems" size="small" border max-height="280">
+          <el-table-column prop="line" label="行号" width="70" />
+          <el-table-column prop="name" label="名单中的名字" min-width="180" />
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="renegadeResultVisible = false">知道了</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 导入说明弹窗 -->
     <el-dialog v-model="importHelpVisible" title="Excel 导入说明" width="620px" append-to-body>
       <div class="import-help">
@@ -452,6 +508,19 @@
             使用前提：先在<b>目标周</b>点「一键生成」生成记录，再「导入数据」。这一步<b>直接写入、没有预览</b>；
             Excel 里的名字若在该周记录中找不到，会被跳过并列入「未匹配」。
           </p>
+        </div>
+        <div class="help-section">
+          <h4>周记录 · 导入车头（.txt）</h4>
+          <p>
+            选择当前组织、当前周后点「导入车头」，文件为 <b>.txt</b>，<b>一行一个玩家名</b>，空行会被忽略。
+          </p>
+          <ul>
+            <li>名字必须与本周玩家名<b>完全一致</b>（错别字、少符号、多空格都会失败）；</li>
+            <li><b>全部匹配才会导入</b>，名单内玩家标记为车头，名单外的车头标记会被清除；</li>
+            <li>有任何一个不匹配，整批不写入，并弹窗列出「行号 + 名字」；</li>
+            <li>支持 UTF-8（含 BOM）与 Windows 记事本 ANSI/GBK 编码；</li>
+            <li>导入的是标记，导入后仍需点「计算积分」才会按车头加成重算积分。</li>
+          </ul>
         </div>
       </div>
       <template #footer>
@@ -498,7 +567,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { UploadFile } from 'element-plus'
+import type { UploadFile, UploadInstance } from 'element-plus'
 import dayjs from 'dayjs'
 import {
   getOrgOrganizations,
@@ -520,6 +589,7 @@ import {
   generateOrgRecords,
   calculateOrgRecords,
   importOrgExcel,
+  importOrgRenegadeLeaders,
   previewOrgMembers,
   applyOrgMembers,
   setOrgRecordPackage,
@@ -529,8 +599,11 @@ import {
   getOrgApplications,
   approveOrgApplication,
   rejectOrgApplication,
+  runOrgDistribution,
 } from '@/api/org'
+import OrgDistributionPanel from '@/components/org/OrgDistributionPanel.vue'
 import type {
+  OrgDistributionPlan,
   OrgImportResult,
   OrgMember,
   OrgMemberImportApplyRequest,
@@ -543,6 +616,7 @@ import type {
   OrgOrganization,
   OrgOrganizationRequest,
   OrgPointsConfig,
+  OrgRenegadeImportResult,
   OrgRewardPackage,
   OrgRewardPackageRequest,
   OrgWeekRecord,
@@ -860,6 +934,7 @@ const savePackage = async () => {
     ElMessage.success('保存成功')
     packageDialogVisible.value = false
     await loadPackages()
+    void distributionPanelRef.value?.reload()
   } finally {
     savingPackage.value = false
   }
@@ -869,6 +944,55 @@ const deletePackage = async (row: OrgRewardPackage) => {
   await deleteOrgPackage(row.id)
   ElMessage.success('删除成功')
   await loadPackages()
+  void distributionPanelRef.value?.reload()
+}
+
+// ==================== 一键发包 ====================
+const distributionPlans = ref<OrgDistributionPlan[]>([])
+const distributing = ref(false)
+const distributionPanelRef = ref<{ reload: () => Promise<void> } | null>(null)
+
+const canDistribute = computed(() => !!selectedOrgId.value && !!selectedWeek.value && !distributing.value)
+
+const onDistributionPlansUpdated = (plans: OrgDistributionPlan[]) => {
+  distributionPlans.value = plans
+}
+
+const runDistribution = async (planId: unknown) => {
+  if (!selectedOrgId.value || !selectedWeek.value) return
+  const plan = distributionPlans.value.find((p) => p.id === Number(planId))
+  if (!plan) return
+
+  try {
+    await ElMessageBox.confirm(
+      `将按方案「${plan.name}」对 ${selectedWeek.value} 的周记录发包；未分配到礼包的记录会被清空原有礼包。是否继续？`,
+      '一键发包',
+      { type: 'warning', confirmButtonText: '开始发包', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  distributing.value = true
+  try {
+    const res = await runOrgDistribution(plan.id, selectedWeek.value)
+    const r = res.data
+    if (r) {
+      const summary = r.packageSummary.map((s) => `${s.packageName}×${s.count}`).join('，') || '无'
+      ElMessage.success(
+        `发包完成：共 ${r.assignedCount} 人（必发 ${r.forcedCount}，排名 ${r.rankedCount}）；${summary}`
+      )
+      if (r.skippedZeroBattleCount > 0) {
+        ElMessage.info(`有 ${r.skippedZeroBattleCount} 人忍战次数为 0，未参与发包`)
+      }
+      if (r.skippedForcedNames.length > 0) {
+        ElMessage.warning(`以下必发玩家被跳过：${r.skippedForcedNames.join('、')}`)
+      }
+    }
+    await Promise.all([loadRecords(), loadWeeks()])
+  } finally {
+    distributing.value = false
+  }
 }
 
 // ==================== 周记录 ====================
@@ -876,6 +1000,33 @@ const weeks = ref<string[]>([])
 const selectedWeek = ref('')
 const records = ref<OrgWeekRecord[]>([])
 const recordKeyword = ref('')
+
+// 叛忍车头 txt 导入
+const renegadeUploadRef = ref<UploadInstance | null>(null)
+const importingRenegade = ref(false)
+const renegadeResultVisible = ref(false)
+const renegadeResult = ref<OrgRenegadeImportResult | null>(null)
+
+const onRenegadeFileChange = async (file: UploadFile) => {
+  const raw = file.raw
+  if (!raw || !selectedOrgId.value || !selectedWeek.value) return
+  importingRenegade.value = true
+  try {
+    const res = await importOrgRenegadeLeaders(raw, selectedOrgId.value, selectedWeek.value)
+    const result = res.data
+    if (!result) return
+    if (result.allMatched) {
+      ElMessage.success(`导入成功：共导入 ${result.importedCount} 名叛忍车头`)
+      await loadRecords()
+    } else {
+      renegadeResult.value = result
+      renegadeResultVisible.value = true
+    }
+  } finally {
+    importingRenegade.value = false
+    renegadeUploadRef.value?.clearFiles()
+  }
+}
 const recordPage = ref(1)
 const recordPageSize = ref(20)
 const filteredRecords = computed(() => {
@@ -1249,6 +1400,40 @@ onMounted(async () => {
         color: var(--ev-text-secondary);
       }
     }
+  }
+}
+
+.renegade-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .result-stats {
+    display: flex;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 600;
+
+    .ok {
+      padding: 3px 10px;
+      border-radius: 6px;
+      color: var(--ev-success);
+      background: rgba(52, 201, 163, 0.12);
+    }
+
+    .bad {
+      padding: 3px 10px;
+      border-radius: 6px;
+      color: var(--ev-danger);
+      background: rgba(242, 99, 127, 0.12);
+    }
+  }
+
+  .result-tip {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ev-text-muted);
   }
 }
 </style>

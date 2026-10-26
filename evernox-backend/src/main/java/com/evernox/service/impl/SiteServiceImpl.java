@@ -32,6 +32,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -200,9 +201,37 @@ public class SiteServiceImpl implements SiteService {
     public List<SiteTagResponse> listTags() {
         LambdaQueryWrapper<SiteTag> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(SiteTag::getSort).orderByAsc(SiteTag::getId);
-        return siteTagRepository.selectList(wrapper).stream()
-                .map(SiteTagResponse::from)
-                .collect(Collectors.toList());
+        List<SiteTag> tags = siteTagRepository.selectList(wrapper);
+        if (tags.isEmpty()) {
+            return List.of();
+        }
+
+        // 公开页标签按「关联的已公开站点数」排序，需要带上计数；
+        // 标签管理页的计数包含所有状态，这里只统计 PUBLIC，避免私有/待审站点把标签顶上去。
+        Set<Long> publicSiteIds = siteLinkRepository.selectList(new LambdaQueryWrapper<SiteLink>()
+                        .select(SiteLink::getId)
+                        .eq(SiteLink::getStatus, SiteStatus.PUBLIC))
+                .stream()
+                .map(SiteLink::getId)
+                .collect(Collectors.toSet());
+
+        Map<Long, Long> counts = countPublicSitesByTag(publicSiteIds);
+
+        return tags.stream().map(tag -> {
+            SiteTagResponse resp = SiteTagResponse.from(tag);
+            resp.setSiteCount(counts.getOrDefault(tag.getId(), 0L));
+            return resp;
+        }).collect(Collectors.toList());
+    }
+
+    /** 统计每个标签关联的已公开站点数；没有公开站点时直接返回空表 */
+    private Map<Long, Long> countPublicSitesByTag(Set<Long> publicSiteIds) {
+        if (publicSiteIds.isEmpty()) {
+            return Map.of();
+        }
+        return siteLinkTagRepository.selectList(new LambdaQueryWrapper<>()).stream()
+                .filter(rel -> publicSiteIds.contains(rel.getSiteId()))
+                .collect(Collectors.groupingBy(SiteLinkTag::getTagId, Collectors.counting()));
     }
 
     @Override

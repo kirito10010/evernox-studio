@@ -36,10 +36,6 @@ public class SchemaMigration implements ApplicationRunner {
         addColumnIfMissing("site_link", "weight",
                 "INT NOT NULL DEFAULT 0 COMMENT '排序权重，越大越靠前'");
 
-        // 沙盘：last_grant_date → last_grant_at（资源产出改为按小时发放）
-        renameColumnIfNeeded("game_player", "last_grant_date", "last_grant_at",
-                "DATETIME NULL COMMENT '上次小时发放时间'");
-
         // 应援板：像素锁定
         addColumnIfMissing("support_pixel", "locked",
                 "TINYINT NOT NULL DEFAULT 0 COMMENT '是否锁定 0/1'");
@@ -53,20 +49,18 @@ public class SchemaMigration implements ApplicationRunner {
         // 组织周记录：5+ 处查询都是 organization_id + week_date 组合过滤，
         // 原表只有 idx_week_date(week_date)，缺 organization_id 打头的索引
         addIndexIfMissing("org_week_record", "idx_org_week", "`organization_id`, `week_date`");
-        // ===== 上面是登记区 =====
-    }
 
-    private void renameColumnIfNeeded(String table, String oldColumn, String newColumn, String definition) {
-        try {
-            Integer oldCount = columnCount(table, oldColumn);
-            Integer newCount = columnCount(table, newColumn);
-            if (oldCount != null && oldCount > 0 && (newCount == null || newCount == 0)) {
-                jdbcTemplate.execute("ALTER TABLE `" + table + "` CHANGE COLUMN `" + oldColumn + "` `" + newColumn + "` " + definition);
-                log.info("自动迁移完成：表 {} 列 {} 重命名为 {}", table, oldColumn, newColumn);
-            }
-        } catch (Exception e) {
-            log.error("自动迁移失败：表 {} 列 {} 重命名失败：{}", table, oldColumn, e.getMessage());
-        }
+        // Ollama 模型库：官方/第三方/社区分类 + 变体校验时间
+        addColumnIfMissing("ai_ollama_model", "category",
+                "VARCHAR(20) NOT NULL DEFAULT 'official' COMMENT '分类: official/third_party/community'");
+        addColumnIfMissing("ai_ollama_model", "tags_synced_at",
+                "DATETIME NULL COMMENT '变体最近一次成功抓取时间'");
+        addIndexIfMissing("ai_ollama_model", "idx_category", "`category`");
+
+        // 绩效记录：实际工作量放开到 3 位小数（0.125 = 1 小时，定额 8）
+        ensureDecimalScale("performance_record", "actual_workload", 3,
+                "DECIMAL(12,3) NOT NULL COMMENT '实际工作量'");
+        // ===== 上面是登记区 =====
     }
 
     private Integer columnCount(String table, String column) {
@@ -114,6 +108,27 @@ public class SchemaMigration implements ApplicationRunner {
             log.info("自动迁移完成：表 {} 新增列 {}", table, column);
         } catch (Exception e) {
             log.error("自动迁移失败：表 {} 新增列 {} 失败，请手动执行 ALTER：{}",
+                    table, column, e.getMessage());
+        }
+    }
+
+    /**
+     * 数值列精度不足时放宽小数位（幂等）。
+     * 只在现有 scale 小于目标值时执行 MODIFY，不会重复改表。
+     */
+    private void ensureDecimalScale(String table, String column, int scale, String definition) {
+        try {
+            Integer current = jdbcTemplate.queryForObject(
+                    "SELECT NUMERIC_SCALE FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                    Integer.class, table, column);
+            if (current != null && current >= scale) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE `" + table + "` MODIFY COLUMN `" + column + "` " + definition);
+            log.info("自动迁移完成：表 {} 列 {} 小数位放宽到 {}", table, column, scale);
+        } catch (Exception e) {
+            log.error("自动迁移失败：表 {} 列 {} 调整精度失败，请手动执行 ALTER：{}",
                     table, column, e.getMessage());
         }
     }

@@ -37,6 +37,11 @@ public class PointsController {
         return ResponseEntity.ok(pointsSseRegistry.register(userId));
     }
 
+    @GetMapping("/online-count")
+    public Result<Integer> onlineCount() {
+        return Result.success(pointsSseRegistry.onlineCount());
+    }
+
     @PostMapping("/sign-in")
     public Result<Void> signIn(HttpServletRequest request) {
         pointsService.signIn(getUserId(request));

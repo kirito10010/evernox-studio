@@ -38,6 +38,9 @@ public class OllamaModelDto {
     /** 厂商中文名 */
     private String vendorLabel;
 
+    /** 分类: official / third_party / community */
+    private String category;
+
     /** 下载量(解析后数值) */
     private Long pulls;
 

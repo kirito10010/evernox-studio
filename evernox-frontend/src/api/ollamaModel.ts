@@ -33,6 +33,8 @@ export interface OllamaModel {
   description: string | null
   vendor: string | null
   vendorLabel: string | null
+  /** 分类：official / third_party / community */
+  category: string | null
   pulls: number
   pullsText: string | null
   tagCount: number
@@ -58,6 +60,7 @@ export interface OllamaVendorOption {
 }
 
 export interface OllamaFilterOptions {
+  categories: OllamaVendorOption[]
   vendors: OllamaVendorOption[]
   sizes: string[]
   capabilities: string[]
@@ -80,6 +83,8 @@ export interface OllamaSyncStatus {
 
 export interface OllamaModelQuery {
   keyword?: string
+  /** 分类：official / third_party / community */
+  category?: string
   vendor?: string
   /** 参数量筛选，如 7b / 27b */
   size?: string

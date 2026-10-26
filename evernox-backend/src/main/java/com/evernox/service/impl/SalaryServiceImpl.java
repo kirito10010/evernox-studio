@@ -124,6 +124,30 @@ public class SalaryServiceImpl implements SalaryService {
     }
 
     @Override
+    @Transactional
+    public SalaryRecordResponse updateRecord(Long id, SalaryRecordRequest request, Long userId) {
+        SalaryRecord existing = recordRepository.selectById(id);
+        if (existing == null || !existing.getUserId().equals(userId)) {
+            throw new BusinessException("工资记录不存在");
+        }
+        String month = request.getMonth().trim();
+        // 改月份时要排除自己，避免误判与自身冲突
+        long conflict = recordRepository.selectCount(new LambdaQueryWrapper<SalaryRecord>()
+                .eq(SalaryRecord::getUserId, userId)
+                .eq(SalaryRecord::getMonth, month)
+                .ne(SalaryRecord::getId, id));
+        if (conflict > 0) {
+            throw new BusinessException("该月工资记录已存在");
+        }
+
+        SalaryRecord record = computeRecord(userId, month, request.getAttendanceDays());
+        record.setId(existing.getId());
+        record.setCreatedAt(existing.getCreatedAt());
+        recordRepository.updateById(record);
+        return SalaryRecordResponse.from(record);
+    }
+
+    @Override
     public List<SalaryRecordResponse> listRecords(Long userId) {
         LambdaQueryWrapper<SalaryRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SalaryRecord::getUserId, userId)

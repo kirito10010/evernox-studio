@@ -73,6 +73,7 @@ import { formatTime } from '@/utils/format'
 import RichTextViewer from '@/components/RichTextViewer.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   createComment,
   deleteComment,
@@ -97,6 +98,7 @@ const emit = defineEmits<{
 
 const { decryptImage, clearCache } = useImageDecrypt(getTopicImageBlob)
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 
 const post = ref<TopicPost | null>(null)
 const loading = ref(false)
@@ -133,7 +135,7 @@ const loadComments = async () => {
   commentPage.value += 1
 }
 
-const onLike = async () => {
+const doLike = async () => {
   if (!post.value) return
   const res = await likePost(post.value.id)
   if (res.data) {
@@ -143,7 +145,9 @@ const onLike = async () => {
   emit('changed')
 }
 
-const onFavorite = async () => {
+const onLike = () => authDialog.requireAuth(() => void doLike())
+
+const doFavorite = async () => {
   if (!post.value) return
   const res = await favoritePost(post.value.id)
   if (res.data) {
@@ -153,7 +157,9 @@ const onFavorite = async () => {
   emit('changed')
 }
 
-const onComment = async () => {
+const onFavorite = () => authDialog.requireAuth(() => void doFavorite())
+
+const doComment = async () => {
   if (!commentInput.value.trim() || !post.value) return
   submitting.value = true
   try {
@@ -168,6 +174,8 @@ const onComment = async () => {
     submitting.value = false
   }
 }
+
+const onComment = () => authDialog.requireAuth(() => void doComment())
 
 const canDeleteComment = (c: TopicComment) => c.userId === userStore.userInfo?.id || userStore.isAdmin
 

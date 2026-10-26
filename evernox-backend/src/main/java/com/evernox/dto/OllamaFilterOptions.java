@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Ollama 模型库筛选项（厂商 / 参数量尺寸 / 能力）
+ * Ollama 模型库筛选项（分类 / 厂商 / 参数量尺寸 / 能力）
  */
 @Data
 @Builder
@@ -16,6 +16,7 @@ import java.util.List;
 @AllArgsConstructor
 public class OllamaFilterOptions {
 
+    private List<VendorOption> categories;
     private List<VendorOption> vendors;
     private List<String> sizes;
     private List<String> capabilities;

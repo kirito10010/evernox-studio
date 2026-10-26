@@ -26,6 +26,7 @@ public class OllamaModelResponse {
     private String description;
     private String vendor;
     private String vendorLabel;
+    private String category;
     private Long pulls;
     private String pullsText;
     private Integer tagCount;
@@ -55,6 +56,7 @@ public class OllamaModelResponse {
                 .description(m.getDescription())
                 .vendor(m.getVendor())
                 .vendorLabel(m.getVendorLabel())
+                .category(m.getCategory())
                 .pulls(m.getPulls())
                 .pullsText(m.getPullsText())
                 .tagCount(m.getTagCount())

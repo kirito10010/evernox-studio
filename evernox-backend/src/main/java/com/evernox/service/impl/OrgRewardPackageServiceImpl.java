@@ -2,8 +2,12 @@ package com.evernox.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.evernox.dto.OrgRewardPackageRequest;
+import com.evernox.entity.OrgDistributionForcedPlayer;
+import com.evernox.entity.OrgDistributionPlanItem;
 import com.evernox.entity.OrgRewardPackage;
 import com.evernox.exception.BusinessException;
+import com.evernox.repository.OrgDistributionForcedPlayerRepository;
+import com.evernox.repository.OrgDistributionPlanItemRepository;
 import com.evernox.repository.OrgRewardPackageRepository;
 import com.evernox.service.OrgRewardPackageService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +26,8 @@ import java.util.List;
 public class OrgRewardPackageServiceImpl implements OrgRewardPackageService {
 
     private final OrgRewardPackageRepository packageRepository;
+    private final OrgDistributionPlanItemRepository planItemRepository;
+    private final OrgDistributionForcedPlayerRepository forcedPlayerRepository;
 
     @Override
     @SuppressWarnings("null")
@@ -65,7 +71,13 @@ public class OrgRewardPackageServiceImpl implements OrgRewardPackageService {
 
     @Override
     @Transactional
+    @SuppressWarnings("null")
     public void delete(Long id) {
+        // 礼包可能被一键发包方案引用：先清理队列与必发条目，避免方案指向不存在的礼包
+        planItemRepository.delete(new LambdaQueryWrapper<OrgDistributionPlanItem>()
+                .eq(OrgDistributionPlanItem::getPackageId, id));
+        forcedPlayerRepository.delete(new LambdaQueryWrapper<OrgDistributionForcedPlayer>()
+                .eq(OrgDistributionForcedPlayer::getPackageId, id));
         packageRepository.deleteById(id);
         log.info("删除奖励礼包: id={}", id);
     }

@@ -1,5 +1,5 @@
 <template>
-  <div class="todos-page">
+  <div v-if="userStore.isLoggedIn" class="todos-page">
     <div class="page-header">
       <div class="header-text">
         <h2>待办</h2>
@@ -145,9 +145,14 @@
       </template>
     </el-dialog>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后使用待办"
+    description="登录后可创建、完成并管理你的待办事项。"
+  />
 </template>
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createTodo,
@@ -159,7 +164,10 @@ import {
 } from '@/api/todo'
 import { TodoPriorityMap } from '@/types/todo'
 import type { Todo, TodoDueScope, TodoStats } from '@/types/todo'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const PAGE_SIZE = 50
 
 const todos = ref<Todo[]>([])
@@ -337,10 +345,21 @@ const handleDelete = async (todo: Todo) => {
   }
 }
 
-onMounted(() => {
+const initPage = () => {
   void reload()
   void loadStats()
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) initPage()
+  }
+)
 </script>
 <style scoped lang="scss">
 .todos-page {

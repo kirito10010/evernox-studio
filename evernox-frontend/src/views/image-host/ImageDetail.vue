@@ -11,7 +11,7 @@
       <el-icon :size="48"><WarningFilled /></el-icon>
       <h2>{{ error }}</h2>
       <p>该图片不存在或您没有权限查看</p>
-      <el-button type="primary" @click="$router.push('/image-host')">
+      <el-button type="primary" @click="goHome">
         返回首页
       </el-button>
     </div>
@@ -45,7 +45,7 @@
         <div class="image-container image-encrypted" v-else>
           <el-icon :size="48"><Lock /></el-icon>
           <span>该图片已加密，需要登录后查看</span>
-          <el-button type="primary" @click="$router.push('/login')">登录查看</el-button>
+          <el-button type="primary" @click="handleLoginToView">登录查看</el-button>
         </div>
       </div>
 
@@ -84,12 +84,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getImageById, deleteImage, updateImageVisibility } from '@/api/image'
 import type { ImageResponse } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useClipboard } from '@/composables/useClipboard'
 import { formatDateTime } from '@/utils/format'
@@ -102,6 +103,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 const { decryptImage, clearCache } = useImageDecrypt()
 
 const image = ref<ImageResponse | null>(null)
@@ -114,7 +116,7 @@ const isOwner = computed(() => {
   return image.value && userStore.userInfo?.id === image.value.userId
 })
 
-onMounted(async () => {
+const load = async () => {
   const imageId = Number(route.params.id)
   if (!imageId) {
     error.value = '无效的图片链接'
@@ -150,7 +152,30 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
+
+// 登录后重新加载：私有图此时才有权限解密
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      decryptedUrl.value = null
+      loading.value = true
+      void load()
+    }
+  }
+)
+
+const goHome = () => {
+  router.push(userStore.isLoggedIn ? '/image-host' : '/image-host/public')
+}
+
+const handleLoginToView = () => {
+  // 登录成功后由上面的 watch 自动重新加载并解密
+  authDialog.open('login')
+}
 
 onUnmounted(() => {
   clearCache()

@@ -1,5 +1,5 @@
 <template>
-  <div class="topic-mine">
+  <div v-if="userStore.isLoggedIn" class="topic-mine">
     <div class="page-header">
       <div class="hero-text">
         <h2>我的</h2>
@@ -36,16 +36,24 @@
 
     <PostDetailDialog v-model="detailVisible" :post-id="detailPostId" @changed="load" />
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看我的话题"
+    description="登录后可查看自己发布的帖子和收藏的内容。"
+  />
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import PostCard from '@/components/PostCard.vue'
 import PostDetailDialog from '@/components/PostDetailDialog.vue'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { getMyFavorites, getMyPosts, getTopicImageBlob } from '@/api/topic'
+import { useUserStore } from '@/stores/user'
 import type { TopicPost } from '@/types/topic'
 
+const userStore = useUserStore()
 const { decryptImage, clearCache } = useImageDecrypt(getTopicImageBlob)
 
 const activeTab = ref<'posts' | 'favorites'>('posts')
@@ -59,6 +67,7 @@ const detailVisible = ref(false)
 const detailPostId = ref<number | null>(null)
 
 const load = async () => {
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     const res =
@@ -85,6 +94,13 @@ const openDetail = (post: TopicPost) => {
   detailPostId.value = post.id
   detailVisible.value = true
 }
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void load()
+  }
+)
 
 load()
 onBeforeUnmount(clearCache)

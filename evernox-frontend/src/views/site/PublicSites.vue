@@ -17,16 +17,30 @@
       </el-input>
     </div>
 
-    <div v-if="tags.length" class="tag-bar">
-      <el-check-tag :checked="selectedTagIds.length === 0" @change="clearTags">全部</el-check-tag>
-      <el-check-tag
-        v-for="tag in tags"
-        :key="tag.id"
-        :checked="selectedTagIds.includes(tag.id)"
-        @change="toggleTag(tag.id)"
+    <div v-if="tags.length" class="tag-bar" :class="{ 'is-expanded': tagsExpanded }">
+      <div ref="tagListRef" class="tag-list">
+        <el-check-tag :checked="selectedTagIds.length === 0" @change="clearTags">全部</el-check-tag>
+        <el-check-tag
+          v-for="tag in sortedTags"
+          :key="tag.id"
+          :checked="selectedTagIds.includes(tag.id)"
+          @change="toggleTag(tag.id)"
+        >
+          {{ tag.name }}
+        </el-check-tag>
+      </div>
+      <button
+        v-if="showTagToggle"
+        class="tag-toggle"
+        type="button"
+        @click="toggleTagBar"
       >
-        {{ tag.name }}
-      </el-check-tag>
+        <span>{{ tagsExpanded ? '收起' : '展开' }}</span>
+        <el-icon :size="12">
+          <ArrowUp v-if="tagsExpanded" />
+          <ArrowDown v-else />
+        </el-icon>
+      </button>
     </div>
 
     <div v-loading="loading" class="card-grid">
@@ -52,8 +66,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { ArrowDown, ArrowUp, Search } from '@element-plus/icons-vue'
 import SiteCard from '@/components/SiteCard.vue'
 import { getPublicSites, getSiteTags } from '@/api/site'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
@@ -69,6 +83,43 @@ const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = 12
 const total = ref(0)
+
+// ---------- 标签栏：按站点数排序 + 默认只占一行 ----------
+const tagsExpanded = ref(false)
+const tagOverflow = ref(false)
+const tagListRef = ref<HTMLElement | null>(null)
+let tagResizeObserver: ResizeObserver | null = null
+
+/** 关联站点数从多到少；数量相同则保持后台 sort 顺序 */
+const sortedTags = computed(() =>
+  [...tags.value].sort((a, b) => (b.siteCount ?? 0) - (a.siteCount ?? 0))
+)
+
+/** 一行放不下时才出现「展开」；展开后始终保留「收起」 */
+const showTagToggle = computed(() => tagOverflow.value || tagsExpanded.value)
+
+const measureTagOverflow = () => {
+  const el = tagListRef.value
+  if (!el) return
+  tagOverflow.value = el.scrollWidth > el.clientWidth + 1
+}
+
+const setupTagObserver = () => {
+  tagResizeObserver?.disconnect()
+  const el = tagListRef.value
+  if (!el) return
+  tagResizeObserver = new ResizeObserver(() => {
+    if (!tagsExpanded.value) measureTagOverflow()
+  })
+  tagResizeObserver.observe(el)
+  measureTagOverflow()
+}
+
+const toggleTagBar = async () => {
+  tagsExpanded.value = !tagsExpanded.value
+  await nextTick()
+  measureTagOverflow()
+}
 
 const loadSites = async () => {
   loading.value = true
@@ -122,12 +173,18 @@ const clearTags = () => {
 }
 
 onMounted(() => {
-  void loadTags()
+  void loadTags().then(async () => {
+    await nextTick()
+    setupTagObserver()
+  })
   void loadSites()
 })
 
 // ObjectURL 不回收会一直占内存
-onUnmounted(clearCache)
+onUnmounted(() => {
+  tagResizeObserver?.disconnect()
+  clearCache()
+})
 </script>
 
 <style scoped lang="scss">
@@ -162,8 +219,52 @@ onUnmounted(clearCache)
 
 .tag-bar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.tag-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow: hidden;
+  /* 折叠时最后一个标签可能被切断，右侧做一点渐隐提示「还有更多」 */
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+
+  /* 不压缩标签，超出的直接裁掉，保证始终只有一行 */
+  > * {
+    flex: 0 0 auto;
+  }
+}
+
+.tag-bar.is-expanded .tag-list {
+  flex-wrap: wrap;
+  overflow: visible;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.tag-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ev-primary, #2f7cf6);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--ev-bg-tint, rgba(47, 124, 246, 0.08));
+  }
 }
 
 .card-grid {

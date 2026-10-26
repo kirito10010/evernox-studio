@@ -48,6 +48,7 @@ export {
   Grid,
   Hide,
   HomeFilled,
+  InfoFilled,
   Link,
   List,
   Loading,

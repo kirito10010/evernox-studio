@@ -36,6 +36,14 @@
         @keyup.enter="reload"
         @clear="reload"
       />
+      <el-select v-model="filters.category" placeholder="全部类型" clearable style="width: 130px" @change="reload">
+        <el-option
+          v-for="c in options.categories"
+          :key="c.key"
+          :label="`${c.label} (${c.count})`"
+          :value="c.key"
+        />
+      </el-select>
       <el-select v-model="filters.vendor" placeholder="全部厂商" clearable style="width: 180px" @change="reload">
         <el-option v-for="v in options.vendors" :key="v.key" :label="`${v.label} (${v.count})`" :value="v.key" />
       </el-select>
@@ -77,8 +85,15 @@
           <template #default="{ row }">
             <div class="model-cell">
               <span class="model-name">{{ row.name }}</span>
+              <el-tag
+                v-if="row.category"
+                size="small"
+                :type="categoryMeta(row.category).type"
+                effect="plain"
+              >
+                {{ categoryMeta(row.category).label }}
+              </el-tag>
               <el-tag v-if="row.isAbliterated === 1" size="small" type="warning" effect="plain">abliterated</el-tag>
-              <el-tag v-if="row.vendor === 'community'" size="small" type="info" effect="plain">社区</el-tag>
             </div>
             <div v-if="row.description" class="model-desc">{{ row.description }}</div>
           </template>
@@ -146,6 +161,14 @@
     <el-drawer v-model="drawerVisible" :title="detail?.name || '模型详情'" size="62%">
       <div v-if="detail" v-loading="detailLoading" class="detail">
         <div class="detail-tags">
+          <el-tag
+            v-if="detail.category"
+            size="small"
+            :type="categoryMeta(detail.category).type"
+            effect="plain"
+          >
+            {{ categoryMeta(detail.category).label }}
+          </el-tag>
           <el-tag v-for="c in detailCapabilities" :key="c.key" size="small" effect="plain">
             {{ c.label }}
           </el-tag>
@@ -233,6 +256,15 @@ const CAPABILITY_LABELS: Record<string, string> = {
   cloud: '云端',
 }
 
+const CATEGORY_META: Record<string, { label: string; type: 'success' | 'warning' | 'info' }> = {
+  official: { label: '官方', type: 'success' },
+  third_party: { label: '第三方', type: 'warning' },
+  community: { label: '社区', type: 'info' },
+}
+
+const categoryMeta = (category: string) =>
+  CATEGORY_META[category] ?? { label: category, type: 'info' as const }
+
 /**
  * 展示行：把每行的显示文本/标签在**数据加载时算一次**。
  * 原来模板里直接 `row.sizes.split(',')`、`splitCapabilities(row.capabilities)`、
@@ -255,6 +287,7 @@ const total = ref(0)
 
 const filters = reactive({
   keyword: '',
+  category: '',
   vendor: '',
   size: '',
   capability: '',
@@ -262,7 +295,7 @@ const filters = reactive({
   sort: 'popular' as 'popular' | 'new' | 'size',
 })
 
-const options = ref<OllamaFilterOptions>({ vendors: [], sizes: [], capabilities: [] })
+const options = ref<OllamaFilterOptions>({ categories: [], vendors: [], sizes: [], capabilities: [] })
 const status = ref<OllamaSyncStatus>({
   running: false,
   lastRunAt: null,
@@ -315,6 +348,7 @@ const load = async () => {
   try {
     const res = await getOllamaModels({
       keyword: filters.keyword || undefined,
+      category: filters.category || undefined,
       vendor: filters.vendor || undefined,
       size: filters.size || undefined,
       capability: filters.capability || undefined,
@@ -338,6 +372,7 @@ const reload = () => {
 
 const resetFilters = () => {
   filters.keyword = ''
+  filters.category = ''
   filters.vendor = ''
   filters.size = ''
   filters.capability = ''
@@ -348,7 +383,7 @@ const resetFilters = () => {
 
 const loadOptions = async () => {
   const res = await getOllamaFilters()
-  options.value = res.data ?? { vendors: [], sizes: [], capabilities: [] }
+  options.value = res.data ?? { categories: [], vendors: [], sizes: [], capabilities: [] }
 }
 
 const loadStatus = async () => {

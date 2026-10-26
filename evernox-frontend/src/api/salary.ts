@@ -27,6 +27,11 @@ export const createRecord = (data: SalaryRecordPayload): Promise<Result<SalaryRe
   return post('/salary/record', data)
 }
 
+/** 编辑工资记录 */
+export const updateRecord = (id: number, data: SalaryRecordPayload): Promise<Result<SalaryRecord>> => {
+  return put(`/salary/record/${id}`, data)
+}
+
 /** 工资记录列表 */
 export const listRecords = (): Promise<Result<SalaryRecord[]>> => {
   return get('/salary/record/list')

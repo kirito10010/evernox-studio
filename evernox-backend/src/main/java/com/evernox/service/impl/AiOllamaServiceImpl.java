@@ -8,6 +8,7 @@ import com.evernox.dto.OllamaFilterOptions;
 import com.evernox.dto.OllamaModelDto;
 import com.evernox.dto.OllamaModelResponse;
 import com.evernox.dto.OllamaSyncStatus;
+import com.evernox.dto.OllamaTagCount;
 import com.evernox.dto.OllamaTagDto;
 import com.evernox.dto.OllamaTagResponse;
 import com.evernox.entity.AiOllamaModel;
@@ -60,6 +61,12 @@ public class AiOllamaServiceImpl implements AiOllamaService {
     /** 疑似官网改版/抓取失败的安全闸阈值：抓到的模型数不足库中一半时不做删除 */
     private static final double DELETE_SAFETY_RATIO = 0.5;
 
+    /** 全量同步时每轮最多重新校验多少个模型的变体 */
+    private static final int TAG_REVALIDATE_BATCH = 100;
+
+    /** 变体校验周期：超过这个天数未校验的模型进入轮询 */
+    private static final int TAG_REVALIDATE_DAYS = 7;
+
     /** 按关键词补全时允许的关键词最大长度 */
     private static final int MAX_KEYWORD_LENGTH = 100;
 
@@ -79,13 +86,17 @@ public class AiOllamaServiceImpl implements AiOllamaService {
     // ===== 查询 =====
 
     @Override
-    public IPage<OllamaModelResponse> listModels(String keyword, String vendor, String size, Boolean abliterated,
-                                                 String capability, String sort, int page, int pageSize) {
+    public IPage<OllamaModelResponse> listModels(String keyword, String category, String vendor, String size,
+                                                 Boolean abliterated, String capability, String sort,
+                                                 int page, int pageSize) {
         Page<AiOllamaModel> p = new Page<>(Math.max(page, 1), Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE));
         LambdaQueryWrapper<AiOllamaModel> w = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
             w.and(q -> q.like(AiOllamaModel::getName, kw).or().like(AiOllamaModel::getDescription, kw));
+        }
+        if (StringUtils.hasText(category)) {
+            w.eq(AiOllamaModel::getCategory, category.trim());
         }
         if (StringUtils.hasText(vendor)) {
             w.eq(AiOllamaModel::getVendor, vendor.trim());
@@ -140,14 +151,18 @@ public class AiOllamaServiceImpl implements AiOllamaService {
     @Override
     public OllamaFilterOptions getFilterOptions() {
         List<AiOllamaModel> all = modelRepository.selectList(new LambdaQueryWrapper<AiOllamaModel>()
-                .select(AiOllamaModel::getVendor, AiOllamaModel::getVendorLabel,
-                        AiOllamaModel::getSizes, AiOllamaModel::getCapabilities));
+                .select(AiOllamaModel::getCategory, AiOllamaModel::getVendor,
+                        AiOllamaModel::getVendorLabel, AiOllamaModel::getSizes,
+                        AiOllamaModel::getCapabilities));
 
         Map<String, String> labels = new HashMap<>();
         Map<String, Long> counts = new HashMap<>();
+        Map<String, Long> categoryCounts = new HashMap<>();
         Set<String> sizes = new TreeSet<>(sizeComparator());
         Set<String> capabilities = new LinkedHashSet<>();
         for (AiOllamaModel m : all) {
+            String category = StringUtils.hasText(m.getCategory()) ? m.getCategory() : "official";
+            categoryCounts.merge(category, 1L, Long::sum);
             if (StringUtils.hasText(m.getVendor())) {
                 labels.putIfAbsent(m.getVendor(), StringUtils.hasText(m.getVendorLabel()) ? m.getVendorLabel() : m.getVendor());
                 counts.merge(m.getVendor(), 1L, Long::sum);
@@ -178,19 +193,39 @@ public class AiOllamaServiceImpl implements AiOllamaService {
                         .thenComparing(OllamaFilterOptions.VendorOption::getKey))
                 .toList();
 
+        List<OllamaFilterOptions.VendorOption> categories = List.of(
+                categoryOption("official", "官方", categoryCounts),
+                categoryOption("third_party", "第三方", categoryCounts),
+                categoryOption("community", "社区", categoryCounts));
+
         return OllamaFilterOptions.builder()
+                .categories(categories)
                 .vendors(vendors)
                 .sizes(new ArrayList<>(sizes))
                 .capabilities(new ArrayList<>(capabilities))
                 .build();
     }
 
+    private OllamaFilterOptions.VendorOption categoryOption(String key, String label,
+                                                            Map<String, Long> counts) {
+        return OllamaFilterOptions.VendorOption.builder()
+                .key(key)
+                .label(label)
+                .count(counts.getOrDefault(key, 0L))
+                .build();
+    }
+
     @Override
     public OllamaSyncStatus getSyncStatus() {
         OllamaSyncStatus s = status;
+        // memory 里的 lastRunAt 只反映当前进程；服务重启后为 null。
+        // 此时回退到库里的 MAX(synced_at)，保证「最近同步」仍显示最后一次落库时间。
+        LocalDateTime lastRunAt = s.getLastRunAt() != null
+                ? s.getLastRunAt()
+                : modelRepository.selectLastSyncedAt();
         return OllamaSyncStatus.builder()
                 .running(s.isRunning())
-                .lastRunAt(s.getLastRunAt())
+                .lastRunAt(lastRunAt)
                 .lastSuccess(s.isLastSuccess())
                 .durationMs(s.getDurationMs())
                 .modelTotal(modelRepository.selectCount(null))
@@ -293,7 +328,17 @@ public class AiOllamaServiceImpl implements AiOllamaService {
             }
 
             Map<String, AiOllamaModel> existing = modelRepository.selectList(null).stream()
-                    .collect(Collectors.toMap(AiOllamaModel::getName, Function.identity(), (a, b) -> a));
+                    .collect(Collectors.toMap(m -> modelKey(m.getName()), Function.identity(), (a, b) -> a));
+            // 兼容旧库：schema 回填可能未执行，按名称重新推导一次分类
+            for (AiOllamaModel m : existing.values()) {
+                String expected = crawler.classifyCategory(m.getName(), null);
+                if (!expected.equals(m.getCategory())) {
+                    m.setCategory(expected);
+                    modelRepository.updateById(m);
+                }
+            }
+            Map<Long, AiOllamaModel> modelById = existing.values().stream()
+                    .collect(Collectors.toMap(AiOllamaModel::getId, Function.identity(), (a, b) -> a));
             Map<Long, Long> tagCounts = countTagsByModel();
 
             LocalDateTime now = LocalDateTime.now();
@@ -301,46 +346,65 @@ public class AiOllamaServiceImpl implements AiOllamaService {
             int modelAdded = 0;
             int modelUpdated = 0;
             for (OllamaModelDto dto : scraped) {
-                AiOllamaModel old = existing.get(dto.getName());
+                String key = modelKey(dto.getName());
+                if (key.isEmpty()) {
+                    continue;
+                }
+                AiOllamaModel old = existing.get(key);
                 if (old == null) {
                     AiOllamaModel entity = toModelEntity(dto, now);
                     modelRepository.insert(entity);
+                    existing.put(key, entity);
+                    modelById.put(entity.getId(), entity);
                     modelAdded++;
                     needsTags.add(entity.getId());
                 } else {
-                    // 注意：tagStale 必须在 applyModelChanges 之前判断（后者会覆盖 tagCount）
-                    boolean tagStale = !Objects.equals(old.getTagCount(), dto.getTagCount())
-                            || !Objects.equals(old.getSourceUpdatedAt(), dto.getSourceUpdatedAt())
-                            || tagCounts.getOrDefault(old.getId(), 0L) == 0L;
+                    // 列表页已不再提供变体数与更新时间：这里只兜底「库中完全没有变体」的模型，
+                    // 其余模型由全量同步的分批轮询（每轮 100 个 / 7 天）负责校验。
+                    long actualTags = tagCounts.getOrDefault(old.getId(), 0L);
                     boolean changed = applyModelChanges(old, dto, now);
                     if (changed) {
+                        modelRepository.updateById(old);
                         modelUpdated++;
                     }
-                    modelRepository.updateById(old);
-                    if (tagStale) {
+                    if (actualTags == 0L) {
                         needsTags.add(old.getId());
                     }
                 }
             }
 
-            // 删除阶段：仅全量同步执行（deleteMissing=false 时整体跳过，连比例安全闸都不计算）
+            // 删除阶段：仅全量同步执行；只处理官方模型，社区/第三方模型永远不删
             int modelRemoved = 0;
             List<String> notes = new ArrayList<>();
+            long officialExisting = existing.values().stream()
+                    .filter(m -> isOfficialModel(m.getName()))
+                    .count();
             if (deleteMissing) {
-                boolean scrapedFull = outcome.complete();
-                boolean ratioOk = scraped.size() >= existing.size() * DELETE_SAFETY_RATIO;
-                if (scrapedFull && ratioOk) {
-                    Set<String> scrapedNames = scraped.stream().map(OllamaModelDto::getName).collect(Collectors.toSet());
+                boolean officialComplete = outcome.officialComplete();
+                long officialScraped = scraped.stream()
+                        .filter(d -> "official".equals(d.getCategory()))
+                        .count();
+                boolean ratioOk = officialScraped >= officialExisting * DELETE_SAFETY_RATIO;
+                if (officialComplete && ratioOk) {
+                    Set<String> scrapedOfficialKeys = scraped.stream()
+                            .filter(d -> "official".equals(d.getCategory()))
+                            .map(d -> modelKey(d.getName()))
+                            .collect(Collectors.toSet());
                     for (AiOllamaModel old : existing.values()) {
-                        if (!scrapedNames.contains(old.getName())) {
+                        // 社区/第三方模型无法通过官网完整枚举，绝不能按本次结果删除
+                        if (!isOfficialModel(old.getName())) {
+                            continue;
+                        }
+                        if (!scrapedOfficialKeys.contains(modelKey(old.getName()))) {
                             tagRepository.delete(new LambdaQueryWrapper<AiOllamaTag>().eq(AiOllamaTag::getModelId, old.getId()));
                             modelRepository.deleteById(old.getId());
+                            modelById.remove(old.getId());
                             modelRemoved++;
                         }
                     }
                 } else {
-                    notes.add("本次抓取不完整（complete=" + scrapedFull + "，抓取 " + scraped.size()
-                            + " / 库中 " + existing.size() + "），已跳过删除阶段");
+                    notes.add("官方库抓取不完整（complete=" + officialComplete + "，抓取 " + officialScraped
+                            + " / 库中 " + officialExisting + "），已跳过删除阶段");
                     log.warn("Ollama 模型同步：{}", notes.get(notes.size() - 1));
                 }
             } else if (!outcome.complete()) {
@@ -348,23 +412,48 @@ public class AiOllamaServiceImpl implements AiOllamaService {
                 notes.add("本次未抓完（已达页数上限或抓取中断），官网可能还有更多匹配未收录");
             }
 
-            // 变体同步：只处理有变化的模型
+            // 新版列表页不再提供「变体数 / 更新时间」，改为分批轮询校验：
+            // 优先校验从未抓过变体、或超过 7 天未校验的模型，每轮最多 100 个。
+            // 放在删除之后，避免为刚被删除的模型浪费一次请求。
+            if (deleteMissing) {
+                LocalDateTime revalidateBefore = now.minusDays(TAG_REVALIDATE_DAYS);
+                existing.values().stream()
+                        .filter(m -> m.getId() != null)
+                        .filter(m -> modelById.containsKey(m.getId()))
+                        .filter(m -> m.getTagsSyncedAt() == null
+                                || m.getTagsSyncedAt().isBefore(revalidateBefore))
+                        .sorted(Comparator.comparing(AiOllamaModel::getTagsSyncedAt,
+                                Comparator.nullsFirst(Comparator.naturalOrder())))
+                        .limit(TAG_REVALIDATE_BATCH)
+                        .forEach(m -> needsTags.add(m.getId()));
+            }
+
+            // 变体同步：只处理官网更新时间变化、或库中完全没有变体的模型
             int tagAdded = 0;
             int tagRemoved = 0;
+            int tagFetchFailed = 0;
             for (Long modelId : needsTags) {
-                AiOllamaModel model = modelRepository.selectById(modelId);
+                AiOllamaModel model = modelById.get(modelId);
                 if (model == null) {
                     continue;
                 }
                 List<OllamaTagDto> tagDtos = crawler.fetchTags(model.getUrl());
                 if (tagDtos.isEmpty()) {
                     // 抓取失败或无变体：保留旧数据，下轮再试
+                    tagFetchFailed++;
                     continue;
                 }
                 int[] diff = replaceTags(model, tagDtos, now);
                 tagAdded += diff[0];
                 tagRemoved += diff[1];
                 sleepQuietly();
+            }
+
+            // 单条 SQL 刷新全部模型的最近同步时间，避免为「无变化」的模型执行 2000+ 次单行 UPDATE
+            modelRepository.touchAll(now);
+
+            if (tagFetchFailed > 0) {
+                notes.add(tagFetchFailed + " 个模型的变体抓取失败，已保留旧数据，下轮重试");
             }
 
             st.setLastSuccess(true);
@@ -376,6 +465,7 @@ public class AiOllamaServiceImpl implements AiOllamaService {
             String summary = scopeLabel + "完成：模型 +" + modelAdded + " ~" + modelUpdated
                     + (deleteMissing ? " -" + modelRemoved : "")
                     + "，变体 +" + tagAdded + " -" + tagRemoved
+                    + "，本轮校验变体 " + needsTags.size() + " 个"
                     + "，库中共 " + modelRepository.selectCount(null) + " 行";
             if (!notes.isEmpty()) {
                 summary = summary + "；" + String.join("；", notes);
@@ -430,13 +520,18 @@ public class AiOllamaServiceImpl implements AiOllamaService {
             }
         }
 
-        // 参数量集合以变体解析结果为准（比列表页徽标更完整）
-        List<String> sizeList = new ArrayList<>(paramSizes);
-        model.setSizes(sizeList.isEmpty() ? null : String.join(",", sizeList));
-        List<Double> numeric = numericSizes(sizeList);
-        model.setMinSizeB(numeric.isEmpty() ? null : numeric.get(0));
-        model.setMaxSizeB(numeric.isEmpty() ? null : numeric.get(numeric.size() - 1));
+        // 参数量集合以变体解析结果为准；新版变体名通常不再带参数量（如 q4_K_M），
+        // 解析为空时保留列表页徽标得到的 sizes，避免把已有参数量清空。
+        if (!paramSizes.isEmpty()) {
+            List<String> sizeList = new ArrayList<>(paramSizes);
+            model.setSizes(String.join(",", sizeList));
+            List<Double> numeric = numericSizes(sizeList);
+            model.setMinSizeB(numeric.isEmpty() ? null : numeric.get(0));
+            model.setMaxSizeB(numeric.isEmpty() ? null : numeric.get(numeric.size() - 1));
+        }
+        // 新版列表页不再提供变体数：以本次实际抓取结果为准
         model.setTagCount(dtos.size());
+        model.setTagsSyncedAt(now);
         model.setSyncedAt(now);
         modelRepository.updateById(model);
         return new int[]{added, removed};
@@ -511,6 +606,7 @@ public class AiOllamaServiceImpl implements AiOllamaService {
                 .description(dto.getDescription())
                 .vendor(dto.getVendor())
                 .vendorLabel(dto.getVendorLabel())
+                .category(dto.getCategory())
                 .pulls(dto.getPulls() == null ? 0L : dto.getPulls())
                 .pullsText(dto.getPullsText())
                 .tagCount(dto.getTagCount() == null ? 0 : dto.getTagCount())
@@ -547,24 +643,38 @@ public class AiOllamaServiceImpl implements AiOllamaService {
         changed |= differ(old.getDescription(), dto.getDescription(), old::setDescription);
         changed |= differ(old.getVendor(), dto.getVendor(), old::setVendor);
         changed |= differ(old.getVendorLabel(), dto.getVendorLabel(), old::setVendorLabel);
+        if (dto.getCategory() != null) {
+            changed |= differ(old.getCategory(), dto.getCategory(), old::setCategory);
+        }
         changed |= differ(old.getPulls(), dto.getPulls(), old::setPulls);
         changed |= differ(old.getPullsText(), dto.getPullsText(), old::setPullsText);
-        changed |= differ(old.getTagCount(), dto.getTagCount(), old::setTagCount);
-        changed |= differ(old.getCapabilities(), joinOrNull(capabilities), old::setCapabilities);
+        // 列表页已不再提供变体数与更新时间：null 表示「未解析到」，不能覆盖库中旧值
+        if (dto.getTagCount() != null) {
+            changed |= differ(old.getTagCount(), dto.getTagCount(), old::setTagCount);
+        }
+        if (dto.getSourceUpdatedAt() != null) {
+            changed |= differ(old.getSourceUpdatedAt(), dto.getSourceUpdatedAt(), old::setSourceUpdatedAt);
+        }
         changed |= differ(old.getIsAbliterated(), dto.getIsAbliterated(), old::setIsAbliterated);
-        changed |= differ(old.getSourceUpdatedAt(), dto.getSourceUpdatedAt(), old::setSourceUpdatedAt);
-        changed |= differ(old.getIsVision(), capabilities.contains("vision") ? 1 : 0, old::setIsVision);
-        changed |= differ(old.getIsTools(), capabilities.contains("tools") ? 1 : 0, old::setIsTools);
-        changed |= differ(old.getIsThinking(), capabilities.contains("thinking") ? 1 : 0, old::setIsThinking);
-        changed |= differ(old.getIsEmbedding(), capabilities.contains("embedding") ? 1 : 0, old::setIsEmbedding);
+
+        // 能力/尺寸解析为空时保留旧值，避免官网再次改版把已有数据清空
+        if (!capabilities.isEmpty()) {
+            changed |= differ(old.getCapabilities(), joinOrNull(capabilities), old::setCapabilities);
+            changed |= differ(old.getIsVision(), capabilities.contains("vision") ? 1 : 0, old::setIsVision);
+            changed |= differ(old.getIsTools(), capabilities.contains("tools") ? 1 : 0, old::setIsTools);
+            changed |= differ(old.getIsThinking(), capabilities.contains("thinking") ? 1 : 0, old::setIsThinking);
+            changed |= differ(old.getIsEmbedding(), capabilities.contains("embedding") ? 1 : 0, old::setIsEmbedding);
+        }
 
         // 参数量先用列表页徽标兜底，随后若抓到变体会以变体解析结果覆盖
-        String sizesText = sortedSizes.isEmpty() ? null : String.join(",", sortedSizes);
-        changed |= differ(old.getSizes(), sizesText, old::setSizes);
-        Double minSize = numeric.isEmpty() ? null : numeric.get(0);
-        Double maxSize = numeric.isEmpty() ? null : numeric.get(numeric.size() - 1);
-        changed |= differ(old.getMinSizeB(), minSize, old::setMinSizeB);
-        changed |= differ(old.getMaxSizeB(), maxSize, old::setMaxSizeB);
+        if (!sortedSizes.isEmpty()) {
+            String sizesText = String.join(",", sortedSizes);
+            changed |= differ(old.getSizes(), sizesText, old::setSizes);
+            Double minSize = numeric.isEmpty() ? null : numeric.get(0);
+            Double maxSize = numeric.isEmpty() ? null : numeric.get(numeric.size() - 1);
+            changed |= differ(old.getMinSizeB(), minSize, old::setMinSizeB);
+            changed |= differ(old.getMaxSizeB(), maxSize, old::setMaxSizeB);
+        }
 
         old.setSyncedAt(now);
         return changed;
@@ -580,8 +690,27 @@ public class AiOllamaServiceImpl implements AiOllamaService {
 
     /** 各模型已入库的变体数量 */
     private Map<Long, Long> countTagsByModel() {
-        return tagRepository.selectList(null).stream()
-                .collect(Collectors.groupingBy(AiOllamaTag::getModelId, Collectors.counting()));
+        Map<Long, Long> counts = new HashMap<>();
+        for (OllamaTagCount row : tagRepository.countByModel()) {
+            if (row.getModelId() != null) {
+                counts.put(row.getModelId(), row.getTotal() == null ? 0L : row.getTotal());
+            }
+        }
+        return counts;
+    }
+
+    /**
+     * 模型名比对 key。
+     * MySQL 唯一索引是 utf8mb4_unicode_ci（不区分大小写、忽略尾部空格），
+     * Java 侧必须用同样的规则，否则官网大小写变化会被误判为新模型并触发唯一键冲突。
+     */
+    private static String modelKey(String name) {
+        return name == null ? "" : name.strip().toLowerCase(Locale.ROOT);
+    }
+
+    /** 官方库模型没有命名空间（名称不含 /） */
+    private static boolean isOfficialModel(String name) {
+        return name != null && name.indexOf('/') < 0;
     }
 
     private String joinOrNull(List<String> values) {

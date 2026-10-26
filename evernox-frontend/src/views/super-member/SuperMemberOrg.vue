@@ -24,21 +24,39 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import AdminOrg from '@/views/admin/AdminOrg.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 const canUse = computed(() => userStore.isAdmin || userStore.isSuperMember)
 
-onMounted(() => {
+const refreshIdentity = () => {
+  if (!userStore.isLoggedIn) return
   // 点开时重新拉取身份，保证已到期的超级会员立即失效
-  userStore.fetchUserInfo()
+  void userStore.fetchUserInfo()
+}
+
+onMounted(refreshIdentity)
+watch(() => userStore.isLoggedIn, (loggedIn) => {
+  if (loggedIn) refreshIdentity()
 })
 
 const onUpgrade = () => {
+  // 匿名用户可以浏览会员介绍，真正使用会员功能时才要求登录
+  if (!userStore.isLoggedIn) {
+    authDialog.open('login', {
+      afterLogin: () => {
+        // 登录后仍是普通用户：引导去个人中心用积分开通
+        if (!canUse.value) router.push('/profile')
+      },
+    })
+    return
+  }
   router.push('/profile')
 }
 </script>
@@ -52,9 +70,10 @@ const onUpgrade = () => {
   .intro-card {
     max-width: 560px;
     width: 100%;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--ev-bg-glass-strong);
     border: 1px solid var(--ev-border-subtle);
     border-radius: 16px;
+    box-shadow: var(--ev-shadow-card);
     padding: 32px;
     text-align: center;
 

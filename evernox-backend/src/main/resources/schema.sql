@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS `performance_record` (
     `work_date`        DATE NOT NULL COMMENT '工作日期',
     `process_type`     TINYINT NOT NULL COMMENT '工序类型: 0作业/1质检',
     `quota`            DECIMAL(12,2) NOT NULL COMMENT '定额效率(记录时快照)',
-    `actual_workload`  DECIMAL(12,2) NOT NULL COMMENT '实际工作量',
+    `actual_workload`  DECIMAL(12,3) NOT NULL COMMENT '实际工作量',
     `performance_days` DECIMAL(12,5) NOT NULL COMMENT '绩效人天=实际工作量/定额效率',
     `deleted`          TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
     `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -262,6 +262,7 @@ CREATE TABLE IF NOT EXISTS `performance_record` (
     KEY `idx_user_date` (`user_id`, `work_date`),
     KEY `idx_user_project` (`user_id`, `project_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='绩效记录表';
+
 
 -- 加班记录表（纯私有）
 CREATE TABLE IF NOT EXISTS `performance_overtime` (
@@ -688,90 +689,40 @@ CREATE TABLE IF NOT EXISTS `org_week_record` (
     KEY `idx_org_week` (`organization_id`, `week_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织每周成员记录';
 
--- 沙盘争霸城市（静态表，启动时种子填充）
-CREATE TABLE IF NOT EXISTS `game_city` (
-    `id`           BIGINT NOT NULL AUTO_INCREMENT COMMENT '城市ID',
-    `adcode`       VARCHAR(20) NOT NULL COMMENT '行政区划代码(唯一)',
-    `name`         VARCHAR(50) NOT NULL COMMENT '城市名',
-    `province`     VARCHAR(50) NOT NULL COMMENT '所属省份',
-    `center_lng`   DECIMAL(10,6) NOT NULL COMMENT '中心经度',
-    `center_lat`   DECIMAL(10,6) NOT NULL COMMENT '中心纬度',
-    `weight`       INT NOT NULL DEFAULT 1 COMMENT '基础权重，越大越值钱',
-    `base_defense` INT NOT NULL DEFAULT 100 COMMENT '基础守备力',
-    `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+-- 一键发包方案
+CREATE TABLE IF NOT EXISTS `org_distribution_plan` (
+    `id`              BIGINT NOT NULL AUTO_INCREMENT COMMENT '方案ID',
+    `organization_id` BIGINT NOT NULL COMMENT '所属组织ID',
+    `name`            VARCHAR(100) NOT NULL COMMENT '方案名称',
+    `rank_field`      VARCHAR(40) NOT NULL DEFAULT 'totalPoints' COMMENT '排名依据字段',
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_adcode` (`adcode`),
-    KEY `idx_province` (`province`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市';
+    KEY `idx_organization` (`organization_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='一键发包方案';
 
--- 沙盘争霸城市邻接关系（静态，种子时按中心距离计算）
-CREATE TABLE IF NOT EXISTS `game_city_adjacency` (
-    `id`                BIGINT NOT NULL AUTO_INCREMENT COMMENT '邻接ID',
-    `city_id`           BIGINT NOT NULL COMMENT '城市ID',
-    `adjacent_city_id`  BIGINT NOT NULL COMMENT '相邻城市ID',
+-- 一键发包方案礼包队列
+CREATE TABLE IF NOT EXISTS `org_distribution_plan_item` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '条目ID',
+    `plan_id`    BIGINT NOT NULL COMMENT '方案ID',
+    `package_id` BIGINT NOT NULL COMMENT '礼包ID',
+    `quantity`   INT NOT NULL DEFAULT 1 COMMENT '发放数量',
+    `sort_order` INT NOT NULL DEFAULT 0 COMMENT '队列顺序',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pair` (`city_id`, `adjacent_city_id`),
-    KEY `idx_city` (`city_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市邻接';
+    KEY `idx_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='一键发包方案礼包队列';
 
--- 沙盘争霸轮次（每周一轮）
-CREATE TABLE IF NOT EXISTS `game_round` (
-    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '轮次ID',
-    `round_no`   INT NOT NULL COMMENT '轮次号',
-    `status`     TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 0未开始/1进行中/2已结算',
-    `start_at`   DATETIME NOT NULL COMMENT '开局时间(周一10点)',
-    `settle_at`  DATETIME NOT NULL COMMENT '结算时间(周日18点)',
-    `end_at`     DATETIME NOT NULL COMMENT '结束时间(下周一10点)',
+-- 一键发包方案的必发玩家
+CREATE TABLE IF NOT EXISTS `org_distribution_forced_player` (
+    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `plan_id`    BIGINT NOT NULL COMMENT '方案ID',
+    `member_id`  BIGINT NOT NULL COMMENT '组织成员ID(org_member.id)',
+    `package_id` BIGINT NOT NULL COMMENT '必发礼包ID(必须在方案队列中)',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
-    KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸轮次';
-
--- 沙盘争霸玩家每周参赛状态
-CREATE TABLE IF NOT EXISTS `game_player` (
-    `id`                BIGINT NOT NULL AUTO_INCREMENT COMMENT '参赛ID',
-    `round_id`          BIGINT NOT NULL COMMENT '轮次ID',
-    `user_id`           BIGINT NOT NULL COMMENT '用户ID',
-    `base_city_id`      BIGINT NOT NULL COMMENT '本营城市ID',
-    `force`             INT NOT NULL DEFAULT 0 COMMENT '当前兵力',
-    `action_points`     INT NOT NULL DEFAULT 0 COMMENT '当前体力',
-    `is_new`            TINYINT NOT NULL DEFAULT 0 COMMENT '本周新加入: 0否/1是',
-    `joined_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
-    `last_grant_at`     DATETIME NULL COMMENT '上次小时发放时间',
-    `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_round_user` (`round_id`, `user_id`),
-    KEY `idx_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸玩家状态';
-
--- 沙盘争霸城市归属（共享地图；无主城市不落行）
-CREATE TABLE IF NOT EXISTS `game_city_owner` (
-    `id`             BIGINT NOT NULL AUTO_INCREMENT COMMENT '归属ID',
-    `round_id`       BIGINT NOT NULL COMMENT '轮次ID',
-    `city_id`        BIGINT NOT NULL COMMENT '城市ID',
-    `owner_user_id`  BIGINT NOT NULL COMMENT '归属用户ID',
-    `level`          INT NOT NULL DEFAULT 0 COMMENT '城市等级(繁荣度)',
-    `garrison`       INT NOT NULL DEFAULT 0 COMMENT '驻防兵力',
-    `captured_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '占领时间',
-    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_round_city` (`round_id`, `city_id`),
-    KEY `idx_round_owner` (`round_id`, `owner_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸城市归属';
-
--- 沙盘争霸结算发奖记录
-CREATE TABLE IF NOT EXISTS `game_reward` (
-    `id`         BIGINT NOT NULL AUTO_INCREMENT COMMENT '奖励ID',
-    `round_id`   BIGINT NOT NULL COMMENT '轮次ID',
-    `user_id`    BIGINT NOT NULL COMMENT '用户ID',
-    `rank`       INT NOT NULL DEFAULT 0 COMMENT '排名(参与奖为0)',
-    `points`     INT NOT NULL COMMENT '发放积分',
-    `board_type` VARCHAR(20) NOT NULL COMMENT '榜单类型: total/rookie/participation',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (`id`),
-    KEY `idx_round` (`round_id`),
-    KEY `idx_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='沙盘争霸发奖记录';
+    UNIQUE KEY `uk_plan_member` (`plan_id`, `member_id`),
+    KEY `idx_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='一键发包必发玩家';
 
 -- 平台访问日志（活跃度统计；admin 不记录；保留 90 天）
 CREATE TABLE IF NOT EXISTS `user_visit_log` (
@@ -853,6 +804,7 @@ CREATE TABLE IF NOT EXISTS `ai_ollama_model` (
     `description`       VARCHAR(2000) NULL COMMENT '模型介绍(英文原文)',
     `vendor`            VARCHAR(50) NULL COMMENT '厂商key: qwen/deepseek/.../community/other',
     `vendor_label`      VARCHAR(100) NULL COMMENT '厂商中文名',
+    `category`          VARCHAR(20) NOT NULL DEFAULT 'official' COMMENT '分类: official/third_party/community',
     `pulls`             BIGINT NOT NULL DEFAULT 0 COMMENT '下载量(解析后数值)',
     `pulls_text`        VARCHAR(20) NULL COMMENT '下载量原文(如 6.7M)',
     `tag_count`         INT NOT NULL DEFAULT 0 COMMENT '变体数量',
@@ -868,15 +820,19 @@ CREATE TABLE IF NOT EXISTS `ai_ollama_model` (
     `default_command`   VARCHAR(300) NULL COMMENT '默认下载命令 ollama run xxx',
     `source_updated_at` DATETIME NULL COMMENT '官网更新时间(UTC)',
     `synced_at`         DATETIME NULL COMMENT '最近一次同步时间',
+    `tags_synced_at`    DATETIME NULL COMMENT '变体最近一次成功抓取时间',
     `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_name` (`name`),
     KEY `idx_vendor` (`vendor`),
+    KEY `idx_category` (`category`),
     KEY `idx_abliterated` (`is_abliterated`),
     KEY `idx_pulls` (`pulls`),
     KEY `idx_source_updated` (`source_updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Ollama模型库(模型族)';
+
+
 
 -- Ollama 模型库（变体标签，关联 ai_ollama_model.id）
 CREATE TABLE IF NOT EXISTS `ai_ollama_tag` (

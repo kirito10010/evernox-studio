@@ -1,4 +1,4 @@
-import { post } from '@/utils/request'
+import { get, post } from '@/utils/request'
 import type { Result } from '@/types/user'
 
 /**
@@ -6,6 +6,13 @@ import type { Result } from '@/types/user'
  */
 export const signIn = (): Promise<Result<void>> => {
   return post('/points/sign-in')
+}
+
+/**
+ * 当前在线登录用户数（复用积分 SSE 连接统计）
+ */
+export const getOnlineCount = (): Promise<Result<number>> => {
+  return get('/points/online-count')
 }
 
 /**

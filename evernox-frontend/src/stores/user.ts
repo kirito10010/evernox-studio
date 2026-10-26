@@ -61,8 +61,7 @@ export const useUserStore = defineStore('user', () => {
     } finally {
       clearToken()
       ElMessage.success('已退出登录')
-      // 强制刷新页面跳转到登录页
-      window.location.href = '/login'
+      // 不再强制跳转登录页：留在当前页，个人页面会自动显示「登录后查看」
     }
   }
 

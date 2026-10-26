@@ -59,6 +59,10 @@
             </div>
           </div>
         </div>
+        <div v-else-if="!userStore.isLoggedIn" class="aside-login-hint">
+          <span>登录后可查看我的提交</span>
+          <el-button size="small" type="primary" plain @click="authDialog.open('login')">去登录</el-button>
+        </div>
         <el-empty v-else description="还没有提交过题目" :image-size="50" />
       </aside>
     </div>
@@ -100,9 +104,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatTime } from '@/utils/format'
+import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   deleteMySubmission,
   getMySubmissions,
@@ -113,6 +119,9 @@ import {
 } from '@/api/quiz'
 import { QuizStatusMap, QuizStatusType } from '@/types/quiz'
 import type { QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+
+const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 
 const keyword = ref('')
 const results = ref<QuizQuestion[]>([])
@@ -158,6 +167,7 @@ const clearSearch = () => {
 }
 
 const loadSubmissions = async () => {
+  if (!userStore.isLoggedIn) return
   const res = await getMySubmissions()
   mySubmissions.value = res.data || []
 }
@@ -172,9 +182,11 @@ const resetForm = () => {
 }
 
 const openSubmit = () => {
-  editingId.value = null
-  resetForm()
-  submitVisible.value = true
+  authDialog.requireAuth(() => {
+    editingId.value = null
+    resetForm()
+    submitVisible.value = true
+  })
 }
 
 const openEdit = (s: QuizQuestion) => {
@@ -240,6 +252,13 @@ const onDelete = async (s: QuizQuestion) => {
 }
 
 onMounted(loadSubmissions)
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void loadSubmissions()
+  }
+)
 </script>
 
 <style scoped lang="scss">
@@ -345,6 +364,19 @@ onMounted(loadSubmissions)
       font-weight: 600;
       color: var(--ev-text-primary);
       margin-bottom: 12px;
+    }
+
+    .aside-login-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 16px;
+      font-size: 13px;
+      color: var(--ev-text-muted);
+      background: var(--ev-bg-tint);
+      border: 1px solid var(--ev-border-subtle);
+      border-radius: 12px;
     }
 
     .submission-list {

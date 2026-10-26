@@ -14,6 +14,8 @@
   --ev-bg-glass:        rgba(255, 255, 255, 0.66);
   --ev-bg-glass-strong: rgba(255, 255, 255, 0.82);
   --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
+  /* 弹窗底色：接近不透明，避免透过背景文字影响阅读 */
+  --ev-bg-dialog:       rgba(255, 255, 255, 0.97);
   --ev-bg-tint:         rgba(47, 124, 246, 0.05);
   --ev-bg-tint-strong:  rgba(47, 124, 246, 0.10);
 
@@ -107,6 +109,8 @@
   --ev-bg-glass:        rgba(26, 36, 52, 0.66);
   --ev-bg-glass-strong: rgba(30, 42, 60, 0.85);
   --ev-bg-glass-light:  rgba(26, 36, 52, 0.45);
+  /* 深色下弹窗同样压重，避免背景内容透出干扰阅读 */
+  --ev-bg-dialog:       rgba(24, 34, 49, 0.98);
   --ev-bg-tint:         rgba(47, 124, 246, 0.10);
   --ev-bg-tint-strong:  rgba(47, 124, 246, 0.16);
 
@@ -165,6 +169,31 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+
+/* ============================================================
+   高分辨率性能策略：全局停用 backdrop-filter
+   ------------------------------------------------------------
+   项目里有 100+ 处玻璃面（卡片、工具条、弹窗、遮罩、下拉）使用
+   backdrop-filter。它每次绘制都要把背景重新采样并做高斯模糊，成本
+   随物理像素数（≈ devicePixelRatio²）增长：
+     · 1K / DPR1 时总像素约 2M，勉强在帧预算内，所以感觉不卡；
+     · 2.5K / DPR1.5~2 时物理像素 8M~15M，滚动、hover、开弹窗时
+       每个玻璃面每帧都要重新模糊，合成器掉帧 → 交互发钝。
+   这些面的背景本身已是半透明色块，且绝大多数铺在平滑渐变之上，
+   模糊几乎没有视觉收益。这里统一降级为「半透明实底」，观感基本一致。
+   ============================================================ */
+*,
+*::before,
+*::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 登录/注册/找回密码页的装饰光斑：原来用 aurora-drift 动 background-position，
+   属于「只能重绘、不能合成」的属性，会逐帧重绘大面积渐变。纯装饰，直接停止。 */
+.aurora-blob {
+  animation: none !important;
 }
 
 /* Prevent el-row negative gutter overflow */
@@ -589,7 +618,10 @@ textarea:focus-visible,
 /* --- Dialog --- */
 .el-dialog {
   @include ev-glass-strong(var(--ev-radius-2xl));
-  background: var(--ev-bg-glass-strong) !important;
+  /* 近不透明底色；不再对弹窗做 backdrop blur（底色已足够实，模糊无收益） */
+  background: var(--ev-bg-dialog) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--ev-border-subtle) !important;
   box-shadow: var(--ev-shadow-float), var(--ev-inset-gloss) !important;
 
@@ -700,7 +732,9 @@ textarea:focus-visible,
 
 .el-message-box {
   @include ev-glass-strong(var(--ev-radius-xl));
-  background: var(--ev-bg-glass-strong) !important;
+  background: var(--ev-bg-dialog) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid var(--ev-border-subtle) !important;
   box-shadow: var(--ev-shadow-float) !important;
 

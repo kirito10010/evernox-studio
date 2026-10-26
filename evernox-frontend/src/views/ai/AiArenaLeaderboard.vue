@@ -32,8 +32,8 @@
         <el-tooltip v-if="userStore.isAdmin" placement="bottom-end">
           <template #content>
             <div class="import-tip">
-              服务器 IP 被官网风控拦截（HTTP 403），抓取要在能打开 arena.ai 的电脑上做：<br />
-              <b>①</b> 点左边「下载抓取脚本」拿到 <b>fetch-arena-leaderboard.bat</b>；<br />
+              官网对榜单页启用了 Cloudflare 挑战（HTTP 403），抓取要在能打开 arena.ai 的电脑上做：<br />
+              <b>①</b> 点左边「下载抓取脚本」拿到 <b>fetch-arena-leaderboard.bat</b>（脚本用 Windows 自带的 curl 抓 RSC 数据）；<br />
               <b>②</b> 双击运行它（首次运行若被 SmartScreen 拦，点「更多信息 → 仍要运行」），<br />
               　 它会在同目录生成 <b>arena-lb-日期-时间.zip</b>；<br />
               <b>③</b> 回到这里点「导入数据包」，选那个 zip。
@@ -645,6 +645,12 @@ onUnmounted(stopPolling)
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+
+    /* Element Plus 默认给相邻按钮加 12px 左外边距，和 flex gap 叠加后间距翻倍；
+       这里统一交给 gap 控制，四个快捷价格按钮才会紧凑 */
+    :deep(.el-button + .el-button) {
+      margin-left: 0;
+    }
 
     .price-range {
       display: flex;

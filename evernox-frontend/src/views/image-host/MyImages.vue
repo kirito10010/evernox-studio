@@ -1,5 +1,5 @@
 <template>
-  <div class="my-images">
+  <div v-if="userStore.isLoggedIn" class="my-images">
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-aurora"></div>
@@ -203,7 +203,13 @@
 
     <ImageLightbox v-model="lightboxVisible" :image="lightboxImage" :src="lightboxSrc" />
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看我的图床"
+    description="登录后可上传、分类并管理你自己上传的图片。"
+  />
 </template>
+
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -224,7 +230,10 @@ import UploadModal from '@/components/UploadModal.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
 import { aspectRatioOf, formatBytes, skeletonRatio } from '@/utils/image'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const { decryptImage, clearCache } = useImageDecrypt()
 const { decryptImage: loadThumb, clearCache: clearThumbCache } = useImageDecrypt(getImageThumbnail)
 
@@ -288,10 +297,21 @@ const openLightbox = async (img: ImageResponse) => {
 const ratioOf = (img: ImageResponse) => (img.width && img.height ? img.width / img.height : 1)
 const { gridRef, columns } = useMasonry(images, ratioOf, { minColumnWidth: 260 })
 
+const initPage = () => {
+  void loadAlbumOptions()
+  void resetAndLoad()
+}
+
 onMounted(() => {
-  loadAlbumOptions()
-  resetAndLoad()
+  if (userStore.isLoggedIn) initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) initPage()
+  }
+)
 onUnmounted(() => {
   clearCache()
   clearThumbCache()

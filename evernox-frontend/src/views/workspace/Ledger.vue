@@ -1,5 +1,5 @@
 <template>
-  <div class="ledger-page">
+  <div v-if="userStore.isLoggedIn" class="ledger-page">
     <!-- 头部统计 -->
     <div class="page-header">
       <div class="header-text">
@@ -190,10 +190,15 @@
       </div>
     </el-dialog>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后使用记账"
+    description="登录后可记录收支、查看分类统计与历史账目。"
+  />
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ExpenseChart from '@/components/ExpenseChart.vue'
 import ExpensePieChart from '@/components/ExpensePieChart.vue'
@@ -214,7 +219,10 @@ import type {
   ExpenseChartPoint,
   ExpenseRecord,
 } from '@/types/expense'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const RECENT_SIZE = 5
 const PAGE_SIZE = 10
 
@@ -544,11 +552,22 @@ const refreshAfterMutation = async () => {
 }
 
 // ---------- 初始化 ----------
-onMounted(async () => {
+const initPage = async () => {
   await Promise.all([loadCategories(), loadMonths()])
   applyMonth('current')
   await loadRecent()
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) void initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void initPage()
+  }
+)
 </script>
 
 <style scoped lang="scss">

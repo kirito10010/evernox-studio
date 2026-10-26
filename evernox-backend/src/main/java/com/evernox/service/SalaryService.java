@@ -28,6 +28,9 @@ public interface SalaryService {
     /** 保存工资记录（每用户每月唯一） */
     SalaryRecordResponse createRecord(SalaryRecordRequest request, Long userId);
 
+    /** 编辑工资记录（重新按月份/出勤天数计算） */
+    SalaryRecordResponse updateRecord(Long id, SalaryRecordRequest request, Long userId);
+
     /** 工资记录列表（按月份倒序） */
     List<SalaryRecordResponse> listRecords(Long userId);
 

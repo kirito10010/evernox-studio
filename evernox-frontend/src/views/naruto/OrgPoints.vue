@@ -130,6 +130,7 @@ import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   getPublicOrgOrganizations,
   getPublicOrgWeeks,
@@ -203,6 +204,7 @@ const loading = ref(false)
 const pointsConfig = ref<OrgPointsConfig | null>(null)
 
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 const isAdmin = computed(() => userStore.isAdmin)
 
 const memberships = ref<OrgMembership[]>([])
@@ -246,6 +248,10 @@ const loadOrganizations = async () => {
 }
 
 const loadMemberships = async () => {
+  if (!userStore.isLoggedIn) {
+    memberships.value = []
+    return
+  }
   const res = await getMyOrgMemberships()
   memberships.value = res.data
 }
@@ -299,8 +305,10 @@ const loadConfig = async () => {
 }
 
 const openApply = () => {
-  applyOrgId.value = null
-  applyDialogVisible.value = true
+  authDialog.requireAuth(() => {
+    applyOrgId.value = null
+    applyDialogVisible.value = true
+  })
 }
 
 const submitApply = async () => {
@@ -540,6 +548,21 @@ onMounted(async () => {
   await loadWeeks()
   await loadRecords()
 })
+
+// 登录后重新拉取组织成员身份，切换可见组织与周数据
+watch(
+  () => userStore.isLoggedIn,
+  async (loggedIn) => {
+    if (!loggedIn) {
+      memberships.value = []
+      return
+    }
+    await loadMemberships()
+    selectDefaultOrg()
+    await loadWeeks()
+    await loadRecords()
+  }
+)
 
 onBeforeUnmount(() => {
   disposeChart()

@@ -108,7 +108,7 @@
             <el-icon class="tool-emoji"><Hide /></el-icon>
             <span>隐藏锁区样式</span>
           </div>
-          <div class="tool-btn" title="导入图片成像素画" @click="importDialogVisible = true">
+          <div class="tool-btn" title="导入图片成像素画" @click="openImportDialog">
             <el-icon class="tool-emoji"><UploadFilled /></el-icon>
             <span>导入图片</span>
           </div>
@@ -205,6 +205,7 @@ import {
 } from '@/api/supportBoard'
 import type { SupportBoardView, SupportPixelChangeEvent } from '@/api/supportBoard'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 
 const DEFAULT_COLORS = [
   '#000000', '#ffffff', '#ff0000', '#ffa500', '#ffff00', '#00ff00', '#008000',
@@ -222,6 +223,7 @@ const tool = ref<Tool>('brush')
 type LockMode = 'brush' | 'region'
 const lockMode = ref<LockMode>('brush')
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 const isAdmin = computed(() => userStore.isAdmin)
 const currentColor = ref('#f44336')
 const defaultColors = DEFAULT_COLORS
@@ -488,6 +490,12 @@ const onWheel = (e: WheelEvent) => {
   scale.value = newScale
 }
 
+const openImportDialog = () => {
+  authDialog.requireAuth(() => {
+    importDialogVisible.value = true
+  })
+}
+
 const onMouseDown = (e: MouseEvent) => {
   if (e.button === 2) {
     dragging.value = true
@@ -498,6 +506,11 @@ const onMouseDown = (e: MouseEvent) => {
     return
   }
   if (e.button === 0) {
+    // 匿名可以浏览应援板，但绘制像素需要登录
+    if (!userStore.isLoggedIn) {
+      authDialog.open('login')
+      return
+    }
     e.preventDefault()
     refreshWrapRect()
     const pos = screenToPixel(e.clientX, e.clientY)
@@ -1088,6 +1101,14 @@ onMounted(() => {
   window.addEventListener('resize', onResize)
   document.addEventListener('fullscreenchange', onFullscreenChange)
 })
+
+// 登录后建立实时像素流（匿名不连接，避免持续 401）
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) connectStream()
+  }
+)
 
 onBeforeUnmount(() => {
   if (eventSource) eventSource.close()

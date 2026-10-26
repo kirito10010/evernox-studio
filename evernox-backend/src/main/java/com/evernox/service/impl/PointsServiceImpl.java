@@ -91,21 +91,6 @@ public class PointsServiceImpl implements PointsService {
                 userId, days, cost, user.getSuperMemberExpiresAt());
     }
 
-    @Override
-    @Transactional
-    public void award(Long userId, Integer points, String description) {
-        if (points == null || points <= 0) {
-            throw new BusinessException("奖励积分必须大于0");
-        }
-        User user = requireUser(userId);
-        int balance = (user.getPoints() == null ? 0 : user.getPoints()) + points;
-        user.setPoints(balance);
-        userRepository.updateById(user);
-        insertLog(userId, points, balance, "game_reward", description, null);
-        pointsSseRegistry.notifyPointsChanged(userId, balance);
-        log.info("系统发奖: userId={}, +{}, desc={}", userId, points, description);
-    }
-
     /** 续费累加：有未到期时长则叠加，否则从当前时间开始 */
     private void extendMembership(User user, int days) {
         LocalDateTime now = LocalDateTime.now();

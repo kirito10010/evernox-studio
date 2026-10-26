@@ -44,6 +44,9 @@ public class AiOllamaModel {
     /** 厂商中文名 */
     private String vendorLabel;
 
+    /** 分类: official / third_party / community */
+    private String category;
+
     /** 下载量(解析后数值) */
     private Long pulls;
 
@@ -88,6 +91,9 @@ public class AiOllamaModel {
 
     /** 最近一次同步时间 */
     private LocalDateTime syncedAt;
+
+    /** 变体最近一次成功抓取时间 */
+    private LocalDateTime tagsSyncedAt;
 
     /** 创建时间 */
     private LocalDateTime createdAt;

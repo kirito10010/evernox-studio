@@ -25,7 +25,7 @@
           </template>
         </el-input>
       </div>
-      <el-switch v-model="onlyFav" inline-prompt active-text="我的收藏" @change="reload" />
+      <el-switch v-model="onlyFav" inline-prompt active-text="我的收藏" @change="onOnlyFavChange" />
     </div>
 
     <div v-loading="loading" class="news-list">
@@ -72,6 +72,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   getAiNewsList,
   getAiNewsFavorites,
@@ -81,6 +82,7 @@ import {
 } from '@/api/aiNews'
 
 const loading = ref(false)
+const authDialog = useAuthDialogStore()
 const items = ref<AiNewsItem[]>([])
 const page = ref(1)
 const size = ref(20)
@@ -159,7 +161,9 @@ const reload = () => {
   void load()
 }
 
-const toggleFav = async (it: AiNewsItem) => {
+const toggleFav = (it: AiNewsItem) => authDialog.requireAuth(() => void doToggleFav(it))
+
+const doToggleFav = async (it: AiNewsItem) => {
   try {
     if (it.favorited) {
       await unfavoriteAiNews(it.id)
@@ -175,6 +179,18 @@ const toggleFav = async (it: AiNewsItem) => {
   } catch {
     /* 提示已在请求层 */
   }
+}
+
+const onOnlyFavChange = (value: string | number | boolean) => {
+  if (!value) {
+    reload()
+    return
+  }
+  const ok = authDialog.requireAuth(() => {
+    onlyFav.value = true
+    reload()
+  })
+  if (!ok) onlyFav.value = false
 }
 
 onMounted(() => {
@@ -204,6 +220,40 @@ onMounted(() => {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+
+    /* 输入框 + 搜索按钮的组合：全局 .el-input__wrapper 的圆角带 !important，
+       会把分组右内角也做成圆的，和 append 的直角拼在一起就错位；
+       这里显式拆成「左圆右平 + 左平右圆」，并让按钮融进 append 底色 */
+    :deep(.el-input-group) {
+      .el-input__wrapper {
+        border-radius: var(--ev-radius-md) 0 0 var(--ev-radius-md) !important;
+      }
+
+      .el-input-group__append {
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 var(--ev-radius-md) var(--ev-radius-md) 0 !important;
+        background: var(--ev-bg-tint) !important;
+        box-shadow: 0 0 0 1px var(--ev-border-default) inset !important;
+        overflow: hidden;
+      }
+
+      .el-input-group__append .el-button {
+        height: 100%;
+        margin: 0 !important;
+        padding: 0 16px !important;
+        border: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: var(--ev-primary) !important;
+        font-weight: 600 !important;
+
+        &:hover {
+          background: var(--ev-bg-tint-strong) !important;
+        }
+      }
+    }
   }
 
   .news-list {

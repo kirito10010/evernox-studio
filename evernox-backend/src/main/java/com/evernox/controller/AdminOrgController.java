@@ -1,7 +1,11 @@
 package com.evernox.controller;
 
 import com.evernox.common.Result;
+import com.evernox.dto.OrgDistributionPlanRequest;
+import com.evernox.dto.OrgDistributionPlanResponse;
+import com.evernox.dto.OrgDistributionRunResponse;
 import com.evernox.dto.OrgImportResponse;
+import com.evernox.dto.OrgRenegadeLeaderImportResponse;
 import com.evernox.dto.OrgMemberImportApplyRequest;
 import com.evernox.dto.OrgMemberImportApplyResponse;
 import com.evernox.dto.OrgMemberImportPreviewResponse;
@@ -17,6 +21,7 @@ import com.evernox.entity.OrgPointsConfig;
 import com.evernox.entity.OrgRewardPackage;
 import com.evernox.security.JwtTokenProvider;
 import com.evernox.service.OrgExcelImportService;
+import com.evernox.service.OrgDistributionService;
 import com.evernox.service.OrgMemberService;
 import com.evernox.service.OrgMembershipService;
 import com.evernox.service.OrgOrganizationService;
@@ -48,6 +53,7 @@ public class AdminOrgController {
     private final OrgRewardPackageService packageService;
     private final OrgPointsConfigService pointsConfigService;
     private final OrgWeekRecordService weekRecordService;
+    private final OrgDistributionService distributionService;
     private final OrgExcelImportService excelImportService;
     private final OrgMembershipService membershipService;
     private final JwtTokenProvider jwtTokenProvider;
@@ -175,6 +181,40 @@ public class AdminOrgController {
         return Result.success("删除成功", null);
     }
 
+    // ==================== 一键发包方案 ====================
+
+    @GetMapping("/distribution/plans")
+    public Result<List<OrgDistributionPlanResponse>> distributionPlans(@RequestParam Long organizationId) {
+        return Result.success(distributionService.list(organizationId));
+    }
+
+    @PostMapping("/distribution/plans")
+    public Result<OrgDistributionPlanResponse> createDistributionPlan(
+            @RequestParam Long organizationId,
+            @Valid @RequestBody OrgDistributionPlanRequest request) {
+        return Result.success("保存成功", distributionService.create(organizationId, request));
+    }
+
+    @PutMapping("/distribution/plans/{id}")
+    public Result<OrgDistributionPlanResponse> updateDistributionPlan(
+            @PathVariable Long id,
+            @Valid @RequestBody OrgDistributionPlanRequest request) {
+        return Result.success("保存成功", distributionService.update(id, request));
+    }
+
+    @DeleteMapping("/distribution/plans/{id}")
+    public Result<Void> deleteDistributionPlan(@PathVariable Long id) {
+        distributionService.delete(id);
+        return Result.success("删除成功", null);
+    }
+
+    @PostMapping("/distribution/plans/{id}/run")
+    public Result<OrgDistributionRunResponse> runDistribution(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekDate) {
+        return Result.success("发包完成", distributionService.run(id, weekDate));
+    }
+
     // ==================== 周记录 ====================
 
     @GetMapping("/weeks")
@@ -209,6 +249,15 @@ public class AdminOrgController {
             @RequestParam Long organizationId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekDate) {
         return Result.success("导入完成", excelImportService.importExcel(file, organizationId, weekDate));
+    }
+
+    @PostMapping("/records/renegade-leaders/import")
+    public Result<OrgRenegadeLeaderImportResponse> importRenegadeLeaders(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam Long organizationId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekDate) {
+        return Result.success("导入完成",
+                weekRecordService.importRenegadeLeaders(organizationId, weekDate, file));
     }
 
     @PutMapping("/records/{id}/package")

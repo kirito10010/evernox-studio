@@ -28,6 +28,7 @@ public class AiOllamaController {
     @GetMapping("/models")
     public Result<IPage<OllamaModelResponse>> models(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String category,
             @RequestParam(required = false) String vendor,
             @RequestParam(required = false) String size,
             @RequestParam(required = false) Boolean abliterated,
@@ -35,7 +36,8 @@ public class AiOllamaController {
             @RequestParam(defaultValue = "popular") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        return Result.success(aiOllamaService.listModels(keyword, vendor, size, abliterated, capability, sort, page, pageSize));
+        return Result.success(aiOllamaService.listModels(
+                keyword, category, vendor, size, abliterated, capability, sort, page, pageSize));
     }
 
     @GetMapping("/models/{id}")

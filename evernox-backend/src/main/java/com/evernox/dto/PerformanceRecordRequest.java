@@ -30,9 +30,9 @@ public class PerformanceRecordRequest {
     @Max(value = 1, message = "工序类型不正确")
     private Integer processType;
 
-    /** 实际工作量，必须为正整数 */
+    /** 实际工作量，最多 3 位小数（定额为 8 时，0.125 表示 1 小时） */
     @NotNull(message = "请填写实际工作量")
-    @DecimalMin(value = "1", message = "实际工作量必须为正整数")
-    @Digits(integer = 10, fraction = 0, message = "实际工作量必须为整数")
+    @DecimalMin(value = "0.001", message = "实际工作量必须大于 0")
+    @Digits(integer = 10, fraction = 3, message = "实际工作量最多保留 3 位小数")
     private BigDecimal actualWorkload;
 }

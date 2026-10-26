@@ -3,6 +3,7 @@ package com.evernox.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.evernox.dto.OrgRenegadeLeaderImportResponse;
 import com.evernox.dto.OrgWeekRecordResponse;
 import com.evernox.dto.OrgWeekRecordUpdateRequest;
 import com.evernox.entity.OrgMember;
@@ -21,13 +22,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +50,8 @@ import java.util.stream.Collectors;
 public class OrgWeekRecordServiceImpl implements OrgWeekRecordService {
 
     private static final int SCALE = 5;
+    /** 车头名单 txt 大小上限 */
+    private static final long MAX_RENEGADE_FILE_SIZE = 1024 * 1024;
 
     private final OrgMemberRepository memberRepository;
     private final OrgOrganizationRepository organizationRepository;
@@ -226,11 +239,138 @@ public class OrgWeekRecordServiceImpl implements OrgWeekRecordService {
         log.info("删除整周批次: organizationId={}, weekDate={}, deleted={}", organizationId, weekDate, deleted);
     }
 
+    @Override
+    @Transactional
+    @SuppressWarnings("null")
+    public OrgRenegadeLeaderImportResponse importRenegadeLeaders(Long organizationId, LocalDate weekDate,
+                                                                 MultipartFile file) {
+        if (organizationId == null || weekDate == null) {
+            throw new BusinessException("请先选择组织和周");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("请选择要导入的 txt 文件");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename != null && !filename.toLowerCase().endsWith(".txt")) {
+            throw new BusinessException("仅支持 .txt 文件");
+        }
+        if (file.getSize() > MAX_RENEGADE_FILE_SIZE) {
+            throw new BusinessException("文件过大，请控制在 1MB 以内");
+        }
+
+        List<OrgWeekRecord> records = recordRepository.selectList(new LambdaQueryWrapper<OrgWeekRecord>()
+                .eq(OrgWeekRecord::getOrganizationId, organizationId)
+                .eq(OrgWeekRecord::getWeekDate, weekDate));
+        if (records.isEmpty()) {
+            throw new BusinessException("该周暂无记录，请先生成或导入数据");
+        }
+
+        List<NamedLine> lines = readRenegadeLines(file);
+        if (lines.isEmpty()) {
+            throw new BusinessException("文件内容为空");
+        }
+
+        Map<String, List<OrgWeekRecord>> byName = records.stream()
+                .filter(r -> r.getMemberName() != null)
+                .collect(Collectors.groupingBy(OrgWeekRecord::getMemberName));
+
+        Set<Long> matchedIds = new HashSet<>();
+        List<OrgRenegadeLeaderImportResponse.UnmatchedItem> unmatched = new ArrayList<>();
+        for (NamedLine line : lines) {
+            List<OrgWeekRecord> hits = byName.get(line.name());
+            if (hits == null) {
+                unmatched.add(OrgRenegadeLeaderImportResponse.UnmatchedItem.builder()
+                        .line(line.lineNo())
+                        .name(line.name())
+                        .build());
+            } else {
+                hits.forEach(r -> matchedIds.add(r.getId()));
+            }
+        }
+
+        boolean allMatched = unmatched.isEmpty();
+        int imported = 0;
+        if (allMatched) {
+            // 全量覆盖本周车头标记：名单内为车头，名单外恢复为否
+            recordRepository.update(null, new LambdaUpdateWrapper<OrgWeekRecord>()
+                    .eq(OrgWeekRecord::getOrganizationId, organizationId)
+                    .eq(OrgWeekRecord::getWeekDate, weekDate)
+                    .in(OrgWeekRecord::getId, matchedIds)
+                    .set(OrgWeekRecord::getIsRenegadeLeader, 1));
+            recordRepository.update(null, new LambdaUpdateWrapper<OrgWeekRecord>()
+                    .eq(OrgWeekRecord::getOrganizationId, organizationId)
+                    .eq(OrgWeekRecord::getWeekDate, weekDate)
+                    .notIn(OrgWeekRecord::getId, matchedIds)
+                    .set(OrgWeekRecord::getIsRenegadeLeader, 0));
+            imported = matchedIds.size();
+            log.info("导入叛忍车头成功: organizationId={}, weekDate={}, count={}",
+                    organizationId, weekDate, imported);
+        } else {
+            log.info("导入叛忍车头失败: organizationId={}, weekDate={}, matched={}, unmatched={}",
+                    organizationId, weekDate, lines.size() - unmatched.size(), unmatched.size());
+        }
+
+        return OrgRenegadeLeaderImportResponse.builder()
+                .allMatched(allMatched)
+                .totalLines(lines.size())
+                .matchedCount(lines.size() - unmatched.size())
+                .unmatchedCount(unmatched.size())
+                .importedCount(imported)
+                .unmatchedItems(unmatched)
+                .build();
+    }
+
     // ==================== 私有方法 ====================
+
+    /**
+     * 读取 txt：优先按 BOM 判断编码，无 BOM 时先严格按 UTF-8 解码，失败再按 GBK（Windows 记事本 ANSI）。
+     * 忽略空行，保留文件中的真实行号。
+     */
+    private List<NamedLine> readRenegadeLines(MultipartFile file) {
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new BusinessException("读取文件失败");
+        }
+        String[] raw = decodeText(bytes).split("\\r\\n|\\n|\\r", -1);
+        List<NamedLine> lines = new ArrayList<>();
+        for (int i = 0; i < raw.length; i++) {
+            String name = raw[i].strip();
+            if (!name.isEmpty()) {
+                lines.add(new NamedLine(i + 1, name));
+            }
+        }
+        return lines;
+    }
+
+    private String decodeText(byte[] bytes) {
+        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF
+                && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
+            return new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
+        }
+        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xFE) {
+            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16LE);
+        }
+        if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFE && (bytes[1] & 0xFF) == 0xFF) {
+            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
+        }
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException e) {
+            return new String(bytes, Charset.forName("GBK"));
+        }
+    }
+
+    private record NamedLine(int lineNo, String name) {
+    }
 
     @SuppressWarnings("null")
     private BigDecimal carryOver(Long memberId, LocalDate weekDate, OrgPointsConfig config) {
-        // 向后回溯最近一个有数据的周：上周无数据则找上上周，依次往前，完全无数据才为 0
         OrgWeekRecord prev = recordRepository.selectOne(new LambdaQueryWrapper<OrgWeekRecord>()
                 .eq(OrgWeekRecord::getMemberId, memberId)
                 .lt(OrgWeekRecord::getWeekDate, weekDate)

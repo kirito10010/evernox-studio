@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -159,6 +160,11 @@ public class AiArenaServiceImpl implements AiArenaService {
     @Override
     public ArenaSyncStatus getSyncStatus() {
         ArenaSyncStatus s = status;
+        // memory 里的 lastRunAt 只反映当前进程；服务重启后为 null。
+        // 此时回退到库里的 MAX(synced_at)，保证「最近同步」仍显示最后一次落库时间。
+        LocalDateTime lastRunAt = s.getLastRunAt() != null
+                ? s.getLastRunAt()
+                : repository.selectLastSyncedAt();
         return ArenaSyncStatus.builder()
                 .running(s.isRunning())
                 .phase(s.getPhase())
@@ -169,7 +175,7 @@ public class AiArenaServiceImpl implements AiArenaService {
                 .added(s.getAdded())
                 .updated(s.getUpdated())
                 .removed(s.getRemoved())
-                .lastRunAt(s.getLastRunAt())
+                .lastRunAt(lastRunAt)
                 .lastSuccess(s.isLastSuccess())
                 .durationMs(s.getDurationMs())
                 .message(s.getMessage())
@@ -204,20 +210,20 @@ public class AiArenaServiceImpl implements AiArenaService {
     }
 
     @Override
-    public ArenaSyncStatus importHtml(Map<String, String> htmlByCategory) {
-        if (htmlByCategory == null || htmlByCategory.isEmpty()) {
-            throw new BusinessException(ResultCode.PARAM_ERROR, "数据包里没有任何可识别的分类页面");
+    public ArenaSyncStatus importPackage(Map<String, String> payloadByCategory) {
+        if (payloadByCategory == null || payloadByCategory.isEmpty()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "数据包里没有任何可识别的分类数据");
         }
         return doSync("解析数据包", category -> {
-            String html = htmlByCategory.get(category.slug());
-            if (html == null || html.isBlank()) {
-                throw new AiArenaCrawler.ArenaFetchException("数据包里没有该分类的页面文件");
+            String payload = payloadByCategory.get(category.slug());
+            if (payload == null || payload.isBlank()) {
+                throw new AiArenaCrawler.ArenaFetchException("数据包里没有该分类的数据文件");
             }
-            return crawler.parseCategoryHtml(html, category);
+            return crawler.parseCategoryPayload(payload, category);
         });
     }
 
-    /** 每个分类的数据来源：在线抓取，或本地抓取后上传的页面 HTML */
+    /** 每个分类的数据来源：在线抓取的 RSC 数据，或本地抓取后上传的数据 */
     @FunctionalInterface
     private interface CategorySource {
         List<ArenaRankDto> load(AiArenaCrawler.Category category);
@@ -312,36 +318,67 @@ public class AiArenaServiceImpl implements AiArenaService {
     /**
      * 用一个分类的采集结果刷新库中该分类的数据。
      * 返回 [新增数, 更新数, 删除数]。
+     *
+     * 【为什么不能直接用 modelName 做 Map key】数据库唯一键 uk_category_model 使用
+     * utf8mb4_unicode_ci，比较时忽略大小写和尾随空格；而 Java 的 Map/Set 按字符串
+     * 精确比较。旧数据里若模型名带尾随空格或大小写不同，就会出现「Map 查不到旧行 →
+     * 走 insert → 撞唯一键」的 Duplicate entry 错误。因此这里统一用 modelKey()
+     * 生成与数据库比较规则对齐的键。
      */
     private int[] syncCategory(AiArenaCrawler.Category category, List<ArenaRankDto> scraped, LocalDateTime now) {
         Map<String, AiArenaRank> existing = repository.selectList(new LambdaQueryWrapper<AiArenaRank>()
                         .eq(AiArenaRank::getCategory, category.slug()))
                 .stream()
-                .collect(Collectors.toMap(AiArenaRank::getModelName, Function.identity(), (a, b) -> a));
+                .collect(Collectors.toMap(
+                        row -> modelKey(row.getModelName()),
+                        Function.identity(),
+                        (a, b) -> a));
 
         int added = 0;
         int updated = 0;
         Set<String> seen = new HashSet<>();
         for (ArenaRankDto dto : scraped) {
-            seen.add(dto.getModelName());
-            AiArenaRank old = existing.get(dto.getModelName());
+            String key = modelKey(dto.getModelName());
+            // 空名，或同一批数据里出现同名变体（仅大小写/首尾空白不同）：
+            // 只保留第一条，避免同一分类下二次 insert 撞唯一键。
+            if (key.isEmpty() || !seen.add(key)) {
+                continue;
+            }
+            AiArenaRank old = existing.get(key);
             if (old == null) {
-                repository.insert(toEntity(dto, now));
+                AiArenaRank entity = toEntity(dto, now);
+                repository.insert(entity);
+                // 关键：把刚插入的行回填索引。否则同一批数据里若还有同名行，
+                // 第二次仍会判定 old == null 而再次 insert。
+                existing.put(key, entity);
                 added++;
-            } else if (applyChanges(old, dto, now)) {
-                repository.updateById(old);
-                updated++;
+            } else {
+                boolean changed = applyChanges(old, dto, now);
+                // 旧库里的模型名可能带首尾空格/大小写不同，顺手改成官网当前写法。
+                changed |= differ(old.getModelName(), dto.getModelName(), old::setModelName);
+                if (changed) {
+                    repository.updateById(old);
+                    updated++;
+                }
             }
         }
 
         int removed = 0;
-        for (AiArenaRank old : existing.values()) {
-            if (!seen.contains(old.getModelName())) {
-                repository.deleteById(old.getId());
+        for (Map.Entry<String, AiArenaRank> entry : existing.entrySet()) {
+            if (!seen.contains(entry.getKey())) {
+                repository.deleteById(entry.getValue().getId());
                 removed++;
             }
         }
         return new int[]{added, updated, removed};
+    }
+
+    /**
+     * 与 MySQL uk_category_model（utf8mb4_unicode_ci，忽略大小写/尾随空格）对齐的去重键。
+     * 用于在 Java 侧判断「是不是同一个模型」，避免唯一键冲突。
+     */
+    private static String modelKey(String modelName) {
+        return modelName == null ? "" : modelName.strip().toLowerCase(Locale.ROOT);
     }
 
     private AiArenaRank toEntity(ArenaRankDto dto, LocalDateTime now) {

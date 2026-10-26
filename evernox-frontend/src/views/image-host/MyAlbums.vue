@@ -1,5 +1,5 @@
 <template>
-  <div class="my-albums">
+  <div v-if="userStore.isLoggedIn" class="my-albums">
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-aurora"></div>
@@ -215,10 +215,16 @@
       @cropped="handleCoverCropped"
     />
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看我的相册"
+    description="登录后可创建相册、整理图片并管理封面。"
+  />
 </template>
 
+
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   getMyAlbums, createAlbum, updateAlbum, deleteAlbum,
   getAlbumImages,
@@ -239,7 +245,10 @@ import { aspectRatioOf } from '@/utils/image'
 import AlbumCoverCropper from '@/components/AlbumCoverCropper.vue'
 import { PictureRounded } from '@element-plus/icons-vue'
 import { uploadImage, updateImageVisibility } from '@/api/image'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const { decryptImage, clearCache } = useImageDecrypt()
 const { decryptImage: loadThumb, clearCache: clearThumbCache } = useImageDecrypt(getImageThumbnail)
 
@@ -360,7 +369,16 @@ const handleCoverCropped = async (file: File) => {
 }
 
 
-onMounted(() => loadAlbums())
+onMounted(() => {
+  if (userStore.isLoggedIn) void loadAlbums()
+})
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void loadAlbums()
+  }
+)
 onUnmounted(() => {
   clearCache()
   clearThumbCache()

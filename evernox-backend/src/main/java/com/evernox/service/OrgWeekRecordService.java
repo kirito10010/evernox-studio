@@ -2,6 +2,8 @@ package com.evernox.service;
 
 import com.evernox.dto.OrgWeekRecordResponse;
 import com.evernox.dto.OrgWeekRecordUpdateRequest;
+import com.evernox.dto.OrgRenegadeLeaderImportResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -34,4 +36,11 @@ public interface OrgWeekRecordService {
 
     /** 删除整周批次 */
     void deleteWeek(Long organizationId, LocalDate weekDate);
+
+    /**
+     * 从 txt 导入叛忍车头（一行一个玩家名）。
+     * 只有所有名字都能精确匹配该周记录时才写入；否则整批不导入并返回不匹配的行。
+     */
+    OrgRenegadeLeaderImportResponse importRenegadeLeaders(Long organizationId, LocalDate weekDate,
+                                                          MultipartFile file);
 }

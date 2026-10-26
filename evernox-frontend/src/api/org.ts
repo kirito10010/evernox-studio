@@ -1,6 +1,9 @@
 import { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
 import type {
+  OrgDistributionPlan,
+  OrgDistributionPlanRequest,
+  OrgDistributionRunResult,
   OrgImportResult,
   OrgMember,
   OrgMemberImportApplyRequest,
@@ -11,6 +14,7 @@ import type {
   OrgOrganization,
   OrgOrganizationRequest,
   OrgPointsConfig,
+  OrgRenegadeImportResult,
   OrgRewardPackage,
   OrgRewardPackageRequest,
   OrgWeekRecord,
@@ -144,6 +148,20 @@ export const importOrgExcel = (
   })
 }
 
+export const importOrgRenegadeLeaders = (
+  file: File,
+  organizationId: number,
+  weekDate: string
+): Promise<Result<OrgRenegadeImportResult>> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return post(
+    `/admin/org/records/renegade-leaders/import?organizationId=${organizationId}&weekDate=${weekDate}`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }
+  )
+}
+
 export const setOrgRecordPackage = (id: number, packageId: number): Promise<Result<OrgWeekRecord>> => {
   return put(`/admin/org/records/${id}/package?packageId=${packageId}`)
 }
@@ -161,6 +179,39 @@ export const updateOrgRecord = (
 
 export const deleteOrgWeek = (organizationId: number, weekDate: string): Promise<Result<void>> => {
   return del(`/admin/org/records/${organizationId}/${weekDate}`)
+}
+
+// ==================== 一键发包方案 ====================
+
+export const getOrgDistributionPlans = (
+  organizationId: number
+): Promise<Result<OrgDistributionPlan[]>> => {
+  return get(`/admin/org/distribution/plans?organizationId=${organizationId}`)
+}
+
+export const createOrgDistributionPlan = (
+  organizationId: number,
+  data: OrgDistributionPlanRequest
+): Promise<Result<OrgDistributionPlan>> => {
+  return post(`/admin/org/distribution/plans?organizationId=${organizationId}`, data)
+}
+
+export const updateOrgDistributionPlan = (
+  id: number,
+  data: OrgDistributionPlanRequest
+): Promise<Result<OrgDistributionPlan>> => {
+  return put(`/admin/org/distribution/plans/${id}`, data)
+}
+
+export const deleteOrgDistributionPlan = (id: number): Promise<Result<void>> => {
+  return del(`/admin/org/distribution/plans/${id}`)
+}
+
+export const runOrgDistribution = (
+  id: number,
+  weekDate: string
+): Promise<Result<OrgDistributionRunResult>> => {
+  return post(`/admin/org/distribution/plans/${id}/run?weekDate=${weekDate}`)
 }
 
 // ==================== 加入审批 ====================

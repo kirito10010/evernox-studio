@@ -12,8 +12,6 @@ import org.springframework.stereotype.Component;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -61,9 +59,6 @@ public class AiOllamaCrawler {
     private static final Pattern SIZE_TAG = Pattern.compile("(?i)^\\d+(\\.\\d+)?b(-a\\d+b)?$");
     /** 从变体名提取参数量，如 27b-coding-mtp-q4_K_M → 27b */
     private static final Pattern PARAM_SIZE = Pattern.compile("(\\d+(?:\\.\\d+)?b)", Pattern.CASE_INSENSITIVE);
-    /** 官网绝对时间形如 Sep 1, 2026 5:04 PM UTC */
-    private static final DateTimeFormatter US_DATE = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", Locale.US);
-
     private static final String CLOUD = "cloud";
     private static final String ABLITERATED = "abliterated";
 
@@ -79,8 +74,15 @@ public class AiOllamaCrawler {
     /** 厂商关键词表（有序，先命中先生效） */
     private static final List<VendorRule> VENDOR_RULES = buildVendorRules();
 
-    /** 一次全量抓取的结果：models + 是否完整翻完（中途请求失败则 complete=false，用于禁止删除） */
-    public record ScrapeOutcome(List<OllamaModelDto> models, boolean complete) {
+    /** 第三方命名空间：已知厂商/组织；其余带命名空间的都算社区 */
+    private static final Set<String> THIRD_PARTY_NAMESPACES = buildThirdPartyNamespaces();
+
+    /** 列表卡片上会出现的已知能力徽标 */
+    private static final Set<String> KNOWN_CAPABILITIES =
+            Set.of("tools", "thinking", "vision", "embedding", "audio", "cloud");
+
+    /** 一次全量抓取的结果：models + 是否完整翻完 + 官方入口是否完整 */
+    public record ScrapeOutcome(List<OllamaModelDto> models, boolean complete, boolean officialComplete) {
     }
 
     /**
@@ -114,7 +116,7 @@ public class AiOllamaCrawler {
 
         log.info("Ollama 模型列表抓取完成：{} 个模型（official complete={}，abliterated complete={}），complete={}",
                 all.size(), officialComplete, abliteratedComplete, complete);
-        return new ScrapeOutcome(all, complete);
+        return new ScrapeOutcome(all, complete, officialComplete);
     }
 
     /**
@@ -133,7 +135,7 @@ public class AiOllamaCrawler {
         // forceAbliterated=false：通用关键词不该把结果一律标成 abliterated，只按名字判定
         boolean complete = crawlInto(path, false, merged, maxPages);
         log.info("Ollama 关键词抓取：q={}，{} 个模型，complete={}", keyword, merged.size(), complete);
-        return new ScrapeOutcome(new ArrayList<>(merged.values()), complete);
+        return new ScrapeOutcome(new ArrayList<>(merged.values()), complete, false);
     }
 
     /**
@@ -285,7 +287,9 @@ public class AiOllamaCrawler {
 
             List<String> capabilities = new ArrayList<>();
             List<String> sizes = new ArrayList<>();
-            for (Element badge : li.select("div.flex.flex-wrap.space-x-2 span")) {
+            // 不用固定的 space-x-2 父容器：官网已改成 gap-2，直接扫描所有 flex-wrap 徽标，
+            // 按文本识别尺寸/能力，忽略 context、价格等非能力徽标。
+            for (Element badge : li.select("div.flex.flex-wrap span")) {
                 String t = badge.text().trim();
                 if (t.isEmpty()) {
                     continue;
@@ -297,36 +301,28 @@ public class AiOllamaCrawler {
                     }
                 } else {
                     String cap = t.toLowerCase(Locale.ROOT);
-                    if (!capabilities.contains(cap)) {
+                    if (KNOWN_CAPABILITIES.contains(cap) && !capabilities.contains(cap)) {
                         capabilities.add(cap);
                     }
                 }
             }
 
-            // 云端模型排除：带 cloud 能力且没有任何本地参数量
+            // 云端模型排除：纯云端（有 cloud 能力、没有任何本地参数量）不采集；本地+云端双栖保留
             if (capabilities.contains(CLOUD) && sizes.isEmpty()) {
                 continue;
             }
 
+            // 新版列表页只保留下载量；Tag 数与更新时间已移除
             String pullsText = null;
             Long pulls = 0L;
-            Integer tagCount = 0;
-            LocalDateTime sourceUpdatedAt = null;
-            for (Element stat : li.select("p.my-1 > span.flex.items-center")) {
-                String title = stat.attr("title");
-                if (!title.isBlank()) {
-                    sourceUpdatedAt = parseUsDate(title);
-                    continue;
-                }
-                String whole = stat.text();
-                String value = statValue(stat);
-                if (whole.contains("Pull") || whole.contains("Download")) {
-                    pullsText = value;
-                    pulls = parsePulls(value);
-                } else if (whole.contains("Tag")) {
-                    tagCount = parseInt(value);
-                }
+            Element downloads = li.selectFirst("span[title$=downloads]");
+            if (downloads != null) {
+                pulls = parseExactPulls(downloads.attr("title"));
+                Element valueEl = downloads.selectFirst("span");
+                pullsText = valueEl == null ? null : blankToNull(valueEl.text());
             }
+            Integer tagCount = null;
+            LocalDateTime sourceUpdatedAt = null;
 
             String namespace = null;
             String baseName = name;
@@ -336,6 +332,7 @@ public class AiOllamaCrawler {
                 baseName = name.substring(slash + 1);
             }
             String[] vendor = classifyVendor(baseName, namespace);
+            String category = classifyCategory(name, href);
 
             models.add(OllamaModelDto.builder()
                     .name(name)
@@ -345,6 +342,7 @@ public class AiOllamaCrawler {
                     .description(description)
                     .vendor(vendor[0])
                     .vendorLabel(vendor[1])
+                    .category(category)
                     .pulls(pulls)
                     .pullsText(pullsText)
                     .tagCount(tagCount)
@@ -355,20 +353,6 @@ public class AiOllamaCrawler {
                     .build());
         }
         return models;
-    }
-
-    /** 统计项数值：跳过 svg 与 .hidden 标签，取第一个有文本的直接子元素 */
-    private String statValue(Element stat) {
-        for (Element child : stat.children()) {
-            if (child.hasClass("hidden") || "svg".equals(child.tagName())) {
-                continue;
-            }
-            String t = child.text().trim();
-            if (!t.isEmpty()) {
-                return t;
-            }
-        }
-        return stat.text().trim();
     }
 
     /**
@@ -463,6 +447,42 @@ public class AiOllamaCrawler {
                 rule("upstage", "Upstage", "solar"));
     }
 
+    /**
+     * 第三方命名空间：已知厂商/组织。
+     * 由厂商规则 key + 常见组织别名组成；不在清单里的命名空间一律视为社区。
+     */
+    private static Set<String> buildThirdPartyNamespaces() {
+        Set<String> namespaces = new HashSet<>();
+        VENDOR_RULES.forEach(rule -> namespaces.add(rule.key()));
+        namespaces.addAll(Set.of(
+                "meta-llama", "deepseek-ai", "mistralai", "zhipuai", "thudm", "01-ai", "01ai",
+                "ibm-granite", "alibaba", "amazon", "aws", "openai", "anthropic", "xai",
+                "snowflake", "salesforce", "databricks", "redhat", "ollama"));
+        return Set.copyOf(namespaces);
+    }
+
+    /**
+     * 模型分类：官方库 / 第三方 / 社区。
+     * 官网没有显式分类标签，只能根据链接形态：
+     * - /library/* → official
+     * - 带命名空间且命名空间是已知厂商/组织 → third_party
+     * - 其余带命名空间 → community
+     */
+    public String classifyCategory(String name, String href) {
+        if (href != null && href.startsWith("/library/")) {
+            return "official";
+        }
+        if (name == null) {
+            return "official";
+        }
+        int slash = name.indexOf('/');
+        if (slash <= 0) {
+            return "official";
+        }
+        String namespace = name.substring(0, slash).toLowerCase(Locale.ROOT);
+        return THIRD_PARTY_NAMESPACES.contains(namespace) ? "third_party" : "community";
+    }
+
     /** 词边界 + 数字前瞻：保证 qwen 命中 qwen3.6，且不误匹配 incident 之类 */
     private static VendorRule rule(String key, String label, String... keywords) {
         String alternatives = Arrays.stream(keywords).map(Pattern::quote).collect(Collectors.joining("|"));
@@ -474,6 +494,27 @@ public class AiOllamaCrawler {
     }
 
     // ===== 数值 / 日期解析 =====
+
+    /** "2,101,194 downloads" → 2101194；无法解析时返回 0 */
+    private Long parseExactPulls(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0L;
+        }
+        StringBuilder digits = new StringBuilder();
+        for (char c : raw.toCharArray()) {
+            if (Character.isDigit(c)) {
+                digits.append(c);
+            }
+        }
+        if (digits.isEmpty()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(digits.toString());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
 
     /** 6.7M → 6700000 */
     public Long parsePulls(String raw) {
@@ -550,22 +591,6 @@ public class AiOllamaCrawler {
         return m.find() ? m.group(1).toLowerCase(Locale.ROOT) : null;
     }
 
-    /** Sep 1, 2026 5:04 PM UTC → 服务器本地时间 */
-    public LocalDateTime parseUsDate(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String s = raw.trim();
-        if (s.endsWith("UTC")) {
-            s = s.substring(0, s.length() - 3).trim();
-        }
-        try {
-            LocalDateTime utc = LocalDateTime.parse(s, US_DATE);
-            return utc.atZone(ZoneId.of("UTC")).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     // ===== 通用工具 =====
 
@@ -645,13 +670,5 @@ public class AiOllamaCrawler {
 
     private String blankToNull(String s) {
         return (s == null || s.isBlank()) ? null : s;
-    }
-
-    private Integer parseInt(String s) {
-        try {
-            return Integer.parseInt(s.trim());
-        } catch (Exception e) {
-            return 0;
-        }
     }
 }

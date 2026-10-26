@@ -1,5 +1,5 @@
 <template>
-  <div class="my-sites">
+  <div v-if="userStore.isLoggedIn" class="my-sites">
     <div class="page-header">
       <div class="header-text">
         <h2>我的分享</h2>
@@ -125,10 +125,15 @@
       @cropped="handleCoverCropped"
     />
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看我的分享"
+    description="登录后可管理自己分享的网站，并申请公开。"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -138,9 +143,12 @@ import AlbumCoverCropper from '@/components/AlbumCoverCropper.vue'
 import { createSite, deleteSite, getMySites, submitSite, updateSite, withdrawSite } from '@/api/site'
 import { uploadImage } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 import { SiteStatus } from '@/types/site'
 import type { SiteLink, SiteLinkPayload } from '@/types/site'
 
+const userStore = useUserStore()
 const { decryptImage, clearCache } = useImageDecrypt()
 
 const sites = ref<SiteLink[]>([])
@@ -191,6 +199,7 @@ const rules: FormRules = {
 }
 
 const loadSites = async () => {
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     const res = await getMySites({
@@ -365,6 +374,13 @@ const handleDelete = async (site: SiteLink) => {
 onMounted(() => {
   void loadSites()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void loadSites()
+  }
+)
 
 onUnmounted(() => {
   revokePreview()

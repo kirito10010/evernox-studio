@@ -28,6 +28,7 @@
           router
           unique-opened
         >
+          <!-- 1. 内容与资源 -->
           <el-sub-menu index="image-host">
             <template #title>
               <el-icon><Picture /></el-icon>
@@ -70,6 +71,26 @@
             </el-menu-item>
           </el-sub-menu>
 
+          <el-sub-menu index="topic">
+            <template #title>
+              <el-icon><ChatDotRound /></el-icon>
+              <span>话题集中营</span>
+            </template>
+            <el-menu-item index="/topic/square">
+              <el-icon><Compass /></el-icon>
+              <template #title>广场</template>
+            </el-menu-item>
+            <el-menu-item index="/topic/circles">
+              <el-icon><CirclePlusFilled /></el-icon>
+              <template #title>圈子</template>
+            </el-menu-item>
+            <el-menu-item index="/topic/mine">
+              <el-icon><User /></el-icon>
+              <template #title>我的</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <!-- 2. 娱乐与查询 -->
           <el-sub-menu index="naruto">
             <template #title>
               <el-icon><Promotion /></el-icon>
@@ -93,6 +114,52 @@
             </el-menu-item>
           </el-sub-menu>
 
+          <el-sub-menu index="ai">
+            <template #title>
+              <el-icon><Cpu /></el-icon>
+              <span>AI 资讯</span>
+            </template>
+            <el-menu-item index="/ai/news">
+              <el-icon><Document /></el-icon>
+              <template #title>资讯动态</template>
+            </el-menu-item>
+            <el-menu-item index="/ai/leaderboard">
+              <el-icon><Trophy /></el-icon>
+              <template #title>模型排行</template>
+            </el-menu-item>
+            <el-menu-item index="/ai/ollama">
+              <el-icon><Box /></el-icon>
+              <template #title>Ollama 模型</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu index="games">
+            <template #title>
+              <el-icon><VideoPlay /></el-icon>
+              <span>小游戏</span>
+            </template>
+            <el-menu-item index="/games/support-board">
+              <el-icon><Brush /></el-icon>
+              <template #title>应援板</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu index="utility">
+            <template #title>
+              <el-icon><Compass /></el-icon>
+              <span>生活服务</span>
+            </template>
+            <el-menu-item index="/utility/earthquake">
+              <el-icon><Location /></el-icon>
+              <template #title>地震信息</template>
+            </el-menu-item>
+            <el-menu-item index="/utility/weather">
+              <el-icon><PartlyCloudy /></el-icon>
+              <template #title>天气查询</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <!-- 3. 个人效率 -->
           <el-sub-menu index="workspace">
             <template #title>
               <el-icon><Notebook /></el-icon>
@@ -120,25 +187,7 @@
             </el-menu-item>
           </el-sub-menu>
 
-          <el-sub-menu index="topic">
-            <template #title>
-              <el-icon><ChatDotRound /></el-icon>
-              <span>话题集中营</span>
-            </template>
-            <el-menu-item index="/topic/square">
-              <el-icon><Compass /></el-icon>
-              <template #title>广场</template>
-            </el-menu-item>
-            <el-menu-item index="/topic/circles">
-              <el-icon><CirclePlusFilled /></el-icon>
-              <template #title>圈子</template>
-            </el-menu-item>
-            <el-menu-item index="/topic/mine">
-              <el-icon><User /></el-icon>
-              <template #title>我的</template>
-            </el-menu-item>
-          </el-sub-menu>
-
+          <!-- 4. 会员与管理：管理员固定最后，超级会员紧挨其上方 -->
           <el-sub-menu index="super-member">
             <template #title>
               <el-icon><StarFilled /></el-icon>
@@ -149,56 +198,7 @@
             </template>
             <el-menu-item index="/super-member/org">
               <el-icon><DataAnalysis /></el-icon>
-              <template #title>火影组织管理</template>
-            </el-menu-item>
-          </el-sub-menu>
-
-          <el-sub-menu index="games">
-            <template #title>
-              <el-icon><VideoPlay /></el-icon>
-              <span>小游戏</span>
-            </template>
-            <el-menu-item index="/games/sandbox">
-              <el-icon><Trophy /></el-icon>
-              <template #title>沙盘争霸</template>
-            </el-menu-item>
-            <el-menu-item index="/games/support-board">
-              <el-icon><Brush /></el-icon>
-              <template #title>应援板</template>
-            </el-menu-item>
-          </el-sub-menu>
-
-          <el-sub-menu index="utility">
-            <template #title>
-              <el-icon><Compass /></el-icon>
-              <span>生活服务</span>
-            </template>
-            <el-menu-item index="/utility/earthquake">
-              <el-icon><Location /></el-icon>
-              <template #title>地震信息</template>
-            </el-menu-item>
-            <el-menu-item index="/utility/weather">
-              <el-icon><PartlyCloudy /></el-icon>
-              <template #title>天气查询</template>
-            </el-menu-item>
-          </el-sub-menu>
-
-          <el-sub-menu index="ai">
-            <template #title>
-              <el-icon><Cpu /></el-icon>
-              <span>AI 资讯</span>
-            </template>
-            <el-menu-item index="/ai/news">
-              <el-icon><Document /></el-icon>
-              <template #title>资讯动态</template>
-            </el-menu-item>
-            <el-menu-item index="/ai/leaderboard">
-              <el-icon><Trophy /></el-icon>
-              <template #title>模型排行榜</template>
-            </el-menu-item>
-            <el-menu-item index="/ai/ollama">
-              <el-icon><Box /></el-icon>
-              <template #title>Ollama 模型库</template>
+              <template #title>组织管理</template>
             </el-menu-item>
           </el-sub-menu>
 
@@ -246,24 +246,24 @@
             </el-menu-item>
             <el-menu-item index="/admin/support-board">
               <el-icon><Brush /></el-icon>
-              <template #title>应援板管理</template>
+              <template #title>应援板</template>
             </el-menu-item>
             <el-menu-item index="/admin/quiz">
               <el-icon><QuestionFilled /></el-icon>
               <template #title>
                 <span class="admin-menu-title">
-                  <span>忍者测验管理</span>
+                  <span>测验审核</span>
                   <span v-if="approval.quizPending > 0" class="menu-count">{{ approval.quizPending }}</span>
                 </span>
               </template>
             </el-menu-item>
             <el-menu-item index="/admin/topic">
               <el-icon><ChatDotRound /></el-icon>
-              <template #title>话题集中营管理</template>
+              <template #title>话题管理</template>
             </el-menu-item>
             <el-menu-item index="/admin/points">
               <el-icon><Money /></el-icon>
-              <template #title>积分与会员管理</template>
+              <template #title>积分会员</template>
             </el-menu-item>
             <el-menu-item index="/admin/announcement">
               <el-icon><Bell /></el-icon>
@@ -274,6 +274,18 @@
 
         <!-- Sidebar footer glow -->
         <div class="sidebar-footer-glow"></div>
+
+        <!-- 底部：关于超链接 + 在线登录用户数，均不是菜单项 -->
+        <div class="sidebar-foot" :class="{ 'is-collapse': isCollapse }">
+          <a class="sidebar-about-link" @click.prevent="aboutVisible = true">
+            <el-icon :size="13"><InfoFilled /></el-icon>
+            <span v-if="!isCollapse">关于</span>
+          </a>
+          <span class="sidebar-online" :title="`当前在线登录用户 ${onlineCount} 人`">
+            <span class="online-dot"></span>
+            <span class="online-text">{{ isCollapse ? onlineCount : `在线 ${onlineCount}` }}</span>
+          </span>
+        </div>
       </el-aside>
 
       <!-- Main content area -->
@@ -300,38 +312,47 @@
               <el-icon :size="18"><Moon /></el-icon>
             </div>
 
-            <!-- 公告铃铛 -->
-            <AnnouncementBell />
+            <!-- 公告铃铛 / 积分 / 用户菜单：仅登录态展示 -->
+            <template v-if="userStore.isLoggedIn">
+              <AnnouncementBell />
 
-            <!-- 我的积分 -->
-            <div class="points-badge" title="我的积分">
-              <el-icon :size="16"><Coin /></el-icon>
-              <span>{{ userStore.userInfo?.points ?? 0 }}</span>
-            </div>
-
-            <!-- User dropdown -->
-            <el-dropdown @command="handleCommand" trigger="click">
-              <div class="user-badge">
-                <div class="avatar-ring">
-                  <el-avatar :size="32" icon="UserFilled" />
-                </div>
-                <div class="user-meta">
-                  <span class="user-name">{{ userStore.userInfo?.username || '用户' }}</span>
-                  <span class="user-role">{{ userRoleName }}</span>
-                </div>
-                <el-icon :size="14" class="dropdown-arrow"><ArrowDown /></el-icon>
+              <!-- 我的积分 -->
+              <div class="points-badge" title="我的积分">
+                <el-icon :size="16"><Coin /></el-icon>
+                <span>{{ userStore.userInfo?.points ?? 0 }}</span>
               </div>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">
-                    <el-icon><User /></el-icon>个人信息
-                  </el-dropdown-item>
-                  <el-dropdown-item command="logout">
-                    <el-icon><SwitchButton /></el-icon>退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+
+              <!-- User dropdown -->
+              <el-dropdown @command="handleCommand" trigger="click">
+                <div class="user-badge">
+                  <div class="avatar-ring">
+                    <el-avatar :size="32" icon="UserFilled" />
+                  </div>
+                  <div class="user-meta">
+                    <span class="user-name">{{ userStore.userInfo?.username || '用户' }}</span>
+                    <span class="user-role">{{ userRoleName }}</span>
+                  </div>
+                  <el-icon :size="14" class="dropdown-arrow"><ArrowDown /></el-icon>
+                </div>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="profile">
+                      <el-icon><User /></el-icon>个人信息
+                    </el-dropdown-item>
+                    <el-dropdown-item command="logout">
+                      <el-icon><SwitchButton /></el-icon>退出登录
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+
+            <!-- 匿名访问：仅保留登录入口，注册在登录弹窗底部切换 -->
+            <template v-else>
+              <el-button type="primary" class="login-entry-btn" @click="authDialog.open('login')">
+                登录
+              </el-button>
+            </template>
           </div>
         </el-header>
 
@@ -353,6 +374,7 @@
     </el-container>
 
     <ThemeSettingDrawer v-model="themeDrawerVisible" />
+    <AboutDialog v-model="aboutVisible" />
   </div>
 </template>
 
@@ -364,15 +386,19 @@ import { UserRoleMap, UserRole } from '@/types/user'
 import type { ApprovalSummary } from '@/types/user'
 import { getApprovalSummary } from '@/api/admin'
 import { getOrgApplicationCount } from '@/api/org'
+import { getOnlineCount } from '@/api/points'
 import AnnouncementBell from '@/components/AnnouncementBell.vue'
 import TagsView from '@/components/TagsView.vue'
 import ThemeSettingDrawer from '@/components/ThemeSettingDrawer.vue'
+import AboutDialog from '@/components/AboutDialog.vue'
 import { useTabsStore } from '@/stores/tabs'
+import { useAuthDialogStore } from '@/stores/authDialog'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const tabsStore = useTabsStore()
+const authDialog = useAuthDialogStore()
 
 // 路由切换时登记多标签页
 watch(
@@ -383,6 +409,24 @@ watch(
 
 const isCollapse = ref(false)
 const themeDrawerVisible = ref(false)
+const aboutVisible = ref(false)
+
+// ---------- 在线登录用户数（复用积分 SSE 连接统计） ----------
+const onlineCount = ref(0)
+let onlineTimer: number | undefined
+
+const loadOnlineCount = async () => {
+  try {
+    const res = await getOnlineCount()
+    if (typeof res?.data === 'number') onlineCount.value = res.data
+  } catch {
+    /* 静默失败，保留上一次数值，避免侧边栏常驻报错 */
+  }
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') void loadOnlineCount()
+}
 
 /**
  * 需要 keep-alive 缓存的页面组件名。
@@ -414,8 +458,12 @@ const handleCommand = (command: string) => {
   if (command === 'profile') {
     router.push('/profile')
   } else if (command === 'logout') {
+    // 退出后留在当前页：个人页会自动切到「登录后查看」空状态
     userStore.logout()
-    router.push('/login')
+    approval.sitePending = 0
+    approval.notePending = 0
+    approval.quizPending = 0
+    orgPending.value = 0
   }
 }
 
@@ -480,13 +528,35 @@ onMounted(() => {
     }, 60000)
   }
   connectPointsStream()
+  void loadOnlineCount()
+  onlineTimer = window.setInterval(() => void loadOnlineCount(), 30000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // token 变化（登录 / 登出 / 自动续期）时重连，避免 SSE 一直拿着旧 token 报 401
 watch(() => userStore.token, () => connectPointsStream())
 
+// 登录态刚变化时 SSE 还在建连/断开，稍等再取在线人数
+watch(() => userStore.token, () => {
+  window.setTimeout(() => void loadOnlineCount(), 1500)
+})
+
+// 登录后补拉管理员/会员角标（匿名进入时不会发起任何个人接口请求）
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (!loggedIn) return
+    if (userStore.isAdmin || userStore.isSuperMember) {
+      void loadApproval()
+      void loadOrgPending()
+    }
+  }
+)
+
 onBeforeUnmount(() => {
   if (approvalTimer) window.clearInterval(approvalTimer)
+  if (onlineTimer) window.clearInterval(onlineTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (pointsSource) pointsSource.close()
 })
 </script>
@@ -671,10 +741,90 @@ onBeforeUnmount(() => {
   }
 }
 
-/* Footer glow */
-.sidebar-footer-glow {
-  height: 80px;
+/* 侧边栏最底部：关于超链接 + 在线人数，贴在最底部，无边框无底色 */
+.sidebar-foot {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 16px 14px;
+
+  &.is-collapse {
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0 12px;
+  }
+}
+
+.sidebar-about-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.6px;
+  color: var(--ev-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s var(--ev-ease-out);
+
+  &:hover {
+    color: var(--ev-primary);
+
+    span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+}
+
+.sidebar-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ev-text-muted);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.online-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ev-aqua);
+  box-shadow: 0 0 6px rgba(79, 195, 232, 0.7);
+  animation: online-breathe 2.4s ease-in-out infinite;
+}
+
+.online-text {
+  letter-spacing: 0.3px;
+}
+
+@keyframes online-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Footer glow：铺在侧栏底部，作为「关于」链接的背景 */
+.sidebar-footer-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  z-index: 1;
   pointer-events: none;
   background: radial-gradient(ellipse at 50% 100%, rgba(79, 195, 232, 0.12) 0%, transparent 70%);
 }
@@ -754,6 +904,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.login-entry-btn {
+  border-radius: 10px;
 }
 
 .points-badge {

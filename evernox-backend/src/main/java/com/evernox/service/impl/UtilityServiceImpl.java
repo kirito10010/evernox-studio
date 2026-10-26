@@ -9,16 +9,13 @@ import com.evernox.dto.EarthquakeItem;
 import com.evernox.dto.WeatherItem;
 import com.evernox.service.UtilityService;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -29,9 +26,14 @@ import java.util.Map;
 @Service
 public class UtilityServiceImpl implements UtilityService {
 
-    /** 国家地震科学数据中心 · 地震速报 AJAX 数据源 */
-    private static final String EARTHQUAKE_URL =
-            "https://data.earthquake.cn/datashare/report.shtml?DISPLAY_TYPE=1&PAGEID=earthquake_subao&catalog_PAGENO=1";
+    /**
+     * 国家地震科学数据中心原页面已下线（站点维护），改用 Wolfx 转发的中国地震台网速报列表。
+     * 数据字段与 CENC 一致：time / location / magnitude / depth / latitude / longitude。
+     */
+    private static final String EARTHQUAKE_URL = "https://api.wolfx.jp/cenc_eqlist.json";
+
+    /** 单次最多返回多少条速报 */
+    private static final int EARTHQUAKE_LIMIT = 50;
 
     /** 和风天气 API Host（个人专属） */
     @Value("${evernox.qweather.host:}")
@@ -60,32 +62,53 @@ public class UtilityServiceImpl implements UtilityService {
     public List<EarthquakeItem> listEarthquakes() {
         List<EarthquakeItem> result = new ArrayList<>();
         try {
-            Document doc = Jsoup.connect(EARTHQUAKE_URL)
+            String body = HttpRequest.get(EARTHQUAKE_URL)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     .timeout(8000)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                    .ignoreContentType(true)
-                    .get();
-            Elements rows = doc.select("tr[id^=earthquake_subao_guid_catalog_tr_]");
-            for (Element row : rows) {
-                Elements cells = row.select("div.cls-data-content-list");
-                // 单元格顺序：序号、时间、经度、纬度、深度、震级、位置、类型
-                if (cells.size() < 8) {
+                    .execute()
+                    .body();
+            JSONObject json = JSONUtil.parseObj(body);
+            for (Object value : json.values()) {
+                if (!(value instanceof JSONObject item)) {
                     continue;
                 }
+                String magnitude = item.getStr("magnitude");
+                String location = item.getStr("location");
+                if (location == null || location.isBlank()) {
+                    location = item.getStr("placeName");
+                }
                 result.add(EarthquakeItem.builder()
-                        .time(text(cells, 1))
-                        .longitude(text(cells, 2))
-                        .latitude(text(cells, 3))
-                        .depth(text(cells, 4))
-                        .magnitude(text(cells, 5))
-                        .location(text(cells, 6))
-                        .type(text(cells, 7))
+                        .time(item.getStr("time"))
+                        .longitude(item.getStr("longitude"))
+                        .latitude(item.getStr("latitude"))
+                        .depth(item.getStr("depth"))
+                        .magnitude(magnitude)
+                        .location(location)
+                        .type(typeText(item.getStr("type")))
                         .build());
+            }
+            // 时间字符串是 yyyy-MM-dd HH:mm:ss，可直接按字符串倒序
+            result.sort(Comparator.comparing((EarthquakeItem item) -> item.getTime(),
+                    Comparator.nullsLast(Comparator.reverseOrder())));
+            if (result.size() > EARTHQUAKE_LIMIT) {
+                result = new ArrayList<>(result.subList(0, EARTHQUAKE_LIMIT));
             }
         } catch (Exception e) {
             log.warn("获取地震速报数据失败: {}", e.getMessage());
         }
         return result;
+    }
+
+    /** reviewed=正式测定，automatic=自动测定 */
+    private String typeText(String type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type.toLowerCase()) {
+            case "reviewed" -> "正式测定";
+            case "automatic" -> "自动测定";
+            default -> type;
+        };
     }
 
     @Override
@@ -199,9 +222,5 @@ public class UtilityServiceImpl implements UtilityService {
             log.warn("获取城市天气失败: location={}, err={}", locationId, e.getMessage());
         }
         return null;
-    }
-
-    private String text(Elements cells, int index) {
-        return cells.get(index).text().trim();
     }
 }

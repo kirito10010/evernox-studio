@@ -1,5 +1,5 @@
 <template>
-  <div class="notes-page">
+  <div v-if="userStore.isLoggedIn" class="notes-page">
     <div class="page-header">
       <div class="header-text">
         <h2>记事本</h2>
@@ -95,9 +95,14 @@
       <el-empty v-else-if="!detailLoading" description="空白笔记" />
     </el-drawer>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后使用记事本"
+    description="登录后可记录、编辑并管理你的私人笔记。"
+  />
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import RichTextViewer from '@/components/RichTextViewer.vue'
@@ -115,7 +120,11 @@ import {
   withdrawNote,
 } from '@/api/note'
 import { NoteStatus, NoteStatusMap } from '@/types/note'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 import type { Note, NoteStats } from '@/types/note'
+
+const userStore = useUserStore()
 
 const BATCH_SIZE = 20
 
@@ -317,10 +326,21 @@ const handleDelete = async (note: Note) => {
   }
 }
 
-onMounted(() => {
+const initPage = () => {
   void resetAndLoad()
   void loadStats()
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) initPage()
+  }
+)
 
 onUnmounted(clearCache)
 </script>

@@ -10,9 +10,10 @@ import com.evernox.dto.OllamaSyncStatus;
  */
 public interface AiOllamaService {
 
-    /** 分页查询模型列表，支持关键词/厂商/参数量/abliterated/能力筛选，sort=popular|new|size */
-    IPage<OllamaModelResponse> listModels(String keyword, String vendor, String size, Boolean abliterated,
-                                          String capability, String sort, int page, int pageSize);
+    /** 分页查询模型列表，支持关键词/分类/厂商/参数量/abliterated/能力筛选，sort=popular|new|size */
+    IPage<OllamaModelResponse> listModels(String keyword, String category, String vendor, String size,
+                                          Boolean abliterated, String capability, String sort,
+                                          int page, int pageSize);
 
     /** 模型详情（含全部变体标签） */
     OllamaModelResponse getModelDetail(Long id);

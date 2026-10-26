@@ -41,6 +41,9 @@ import RichTextViewer from '@/components/RichTextViewer.vue'
 import { likePost, favoritePost } from '@/api/topic'
 import type { TopicPost } from '@/types/topic'
 import { formatTime } from '@/utils/format'
+import { useAuthDialogStore } from '@/stores/authDialog'
+
+const authDialog = useAuthDialogStore()
 
 const props = defineProps<{
   post: TopicPost
@@ -51,7 +54,7 @@ defineEmits<{
   (e: 'open', post: TopicPost): void
 }>()
 
-const onLike = async () => {
+const doLike = async () => {
   const res = await likePost(props.post.id)
   if (res.data) {
     props.post.liked = res.data.liked
@@ -59,13 +62,17 @@ const onLike = async () => {
   }
 }
 
-const onFavorite = async () => {
+const doFavorite = async () => {
   const res = await favoritePost(props.post.id)
   if (res.data) {
     props.post.favorited = res.data.favorited
     props.post.favoriteCount = res.data.favoriteCount ?? props.post.favoriteCount
   }
 }
+
+const onLike = () => authDialog.requireAuth(() => void doLike())
+
+const onFavorite = () => authDialog.requireAuth(() => void doFavorite())
 
 </script>
 

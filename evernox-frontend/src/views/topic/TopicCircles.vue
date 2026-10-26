@@ -120,6 +120,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   createTopicCircle,
   deleteTopicCircle,
@@ -132,6 +133,7 @@ import type { TopicCircle } from '@/types/topic'
 
 const router = useRouter()
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 
 const circles = ref<TopicCircle[]>([])
 const total = ref(0)
@@ -187,7 +189,7 @@ const avatarColor = (name: string) => {
   return colors[hash % colors.length]
 }
 
-const toggleFollow = async (c: TopicCircle) => {
+const doToggleFollow = async (c: TopicCircle) => {
   if (c.followed) {
     await unfollowCircle(c.id)
     c.followed = false
@@ -199,11 +201,15 @@ const toggleFollow = async (c: TopicCircle) => {
   }
 }
 
+const toggleFollow = (c: TopicCircle) => authDialog.requireAuth(() => void doToggleFollow(c))
+
 const openCreate = () => {
-  editingCircle.value = null
-  circleForm.name = ''
-  circleForm.description = ''
-  circleDialogVisible.value = true
+  authDialog.requireAuth(() => {
+    editingCircle.value = null
+    circleForm.name = ''
+    circleForm.description = ''
+    circleDialogVisible.value = true
+  })
 }
 
 const openEdit = (c: TopicCircle) => {

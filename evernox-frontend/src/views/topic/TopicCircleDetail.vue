@@ -71,6 +71,7 @@ import PostEditorDialog from '@/components/PostEditorDialog.vue'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
 import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useUserStore } from '@/stores/user'
+import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   deleteTopicCircle,
   followCircle,
@@ -86,6 +87,7 @@ import type { TopicCircle, TopicMember, TopicPost } from '@/types/topic'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const authDialog = useAuthDialogStore()
 const circleId = Number(route.params.id)
 
 const { decryptImage, clearCache } = useImageDecrypt(getTopicImageBlob)
@@ -144,7 +146,7 @@ const reload = () => {
   loadMore()
 }
 
-const toggleFollow = async () => {
+const doToggleFollow = async () => {
   if (!circle.value) return
   if (circle.value.followed) {
     await unfollowCircle(circleId)
@@ -157,8 +159,12 @@ const toggleFollow = async () => {
   }
 }
 
+const toggleFollow = () => authDialog.requireAuth(() => void doToggleFollow())
+
 const openEditor = () => {
-  editorVisible.value = true
+  authDialog.requireAuth(() => {
+    editorVisible.value = true
+  })
 }
 
 const openDetail = (post: TopicPost) => {

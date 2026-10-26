@@ -105,6 +105,20 @@ export interface OrgImportResult {
   emptyNames: string[]
 }
 
+export interface OrgRenegadeUnmatchedItem {
+  line: number
+  name: string
+}
+
+export interface OrgRenegadeImportResult {
+  allMatched: boolean
+  totalLines: number
+  matchedCount: number
+  unmatchedCount: number
+  importedCount: number
+  unmatchedItems: OrgRenegadeUnmatchedItem[]
+}
+
 export interface OrgMemberImportCandidate {
   name: string
   position: string | null
@@ -156,4 +170,67 @@ export interface OrgMembershipApplication {
   username: string | null
   email: string | null
   appliedAt: string | null
+}
+
+// ==================== 一键发包方案 ====================
+
+export type OrgDistributionRankField =
+  | 'totalPoints'
+  | 'thisWeekPoints'
+  | 'powerIncrease'
+  | 'totalPower'
+  | 'copperContribution'
+  | 'beastSacrifice'
+  | 'renegadeCount'
+
+export const OrgDistributionRankLabels: Record<OrgDistributionRankField, string> = {
+  totalPoints: '总积分',
+  thisWeekPoints: '本周积分',
+  powerIncrease: '战力增幅',
+  totalPower: '总战力',
+  copperContribution: '铜币',
+  beastSacrifice: '通灵兽',
+  renegadeCount: '叛忍',
+}
+
+export interface OrgDistributionPlanItem {
+  id?: number
+  packageId: number
+  packageName?: string
+  quantity: number
+  sortOrder?: number
+}
+
+export interface OrgDistributionForced {
+  id?: number
+  memberId: number
+  memberName?: string
+  packageId: number
+  packageName?: string
+}
+
+export interface OrgDistributionPlan {
+  id: number
+  organizationId: number
+  name: string
+  rankField: OrgDistributionRankField
+  items: OrgDistributionPlanItem[]
+  forced: OrgDistributionForced[]
+}
+
+export interface OrgDistributionPlanRequest {
+  name: string
+  rankField: OrgDistributionRankField
+  items: { packageId: number; quantity: number }[]
+  forced: { memberId: number; packageId: number }[]
+}
+
+export interface OrgDistributionRunResult {
+  planName: string
+  assignedCount: number
+  forcedCount: number
+  rankedCount: number
+  skippedZeroBattleCount: number
+  skippedForcedNames: string[]
+  packageSummary: { packageName: string; count: number }[]
 }

@@ -8,11 +8,15 @@
         <component :is="Component" />
       </transition>
     </router-view>
+
+    <!-- 全局登录弹窗：匿名用户在任何页面触发需要登录的操作时打开，不跳转路由 -->
+    <AuthDialog />
   </el-config-provider>
 </template>
 
 <script setup lang="ts">
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import AuthDialog from '@/components/auth/AuthDialog.vue'
 </script>
 
 <style>

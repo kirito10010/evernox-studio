@@ -1,5 +1,5 @@
 <template>
-  <div class="salary-page">
+  <div v-if="userStore.isLoggedIn" class="salary-page">
     <!-- 头部 -->
     <div class="page-header">
       <div class="header-text">
@@ -12,6 +12,9 @@
     <div class="action-bar">
       <el-button type="primary" @click="openAdd">
         <el-icon style="margin-right: 4px"><Plus /></el-icon>添加工资
+      </el-button>
+      <el-button @click="openRecords">
+        <el-icon style="margin-right: 4px"><Document /></el-icon>工资记录
       </el-button>
       <el-button @click="openConfig">
         <el-icon style="margin-right: 4px"><Setting /></el-icon>工资配置
@@ -34,38 +37,112 @@
       <SalaryChart :year="chartYear" :points="chartPoints" />
     </div>
 
-    <!-- 工资记录列表 -->
-    <div class="card record-card">
+    <!-- 最近工资 -->
+    <div class="card recent-card">
       <div class="card-head">
-        <div class="card-title">工资记录</div>
-        <el-select v-model="sortMode" class="sort-select">
-          <el-option label="月份（新 → 旧）" value="month-desc" />
-          <el-option label="月份（旧 → 新）" value="month-asc" />
-          <el-option label="工资（高 → 低）" value="salary-desc" />
-          <el-option label="工资（低 → 高）" value="salary-asc" />
-        </el-select>
+        <div class="card-title">最近工资</div>
+        <el-button type="primary" text @click="openRecords">查看全部</el-button>
       </div>
       <div v-loading="listLoading" class="record-list">
-        <div v-for="r in sortedRecords" :key="r.id ?? r.month" class="record-item">
+        <div v-for="r in recentRecords" :key="r.id ?? r.month" class="record-item">
           <div class="record-main">
             <span class="record-month">{{ formatMonth(r.month) }}</span>
             <el-tag size="small" class="record-tag">{{ r.startDate }} ~ {{ r.endDate }}</el-tag>
             <span class="record-meta">应出勤 {{ formatNum(r.attendanceDays) }} 天</span>
             <span class="record-meta">净绩效 {{ formatNum(r.performanceDays) }}</span>
             <span class="record-meta">绩效薪资 {{ formatMoney(r.performanceSalary) }}</span>
-            <span class="record-meta">加班工资 {{ formatMoney(r.overtimeSalary) }}</span>
           </div>
           <div class="record-total">{{ formatMoney(r.totalSalary) }}</div>
-          <div class="record-actions">
-            <el-button size="small" text type="danger" @click="handleDelete(r)">删除</el-button>
-          </div>
         </div>
-        <el-empty v-if="!listLoading && !sortedRecords.length" description="还没有工资记录" />
+        <el-empty v-if="!listLoading && !recentRecords.length" description="还没有工资记录" />
       </div>
     </div>
 
+    <!-- 工资记录弹窗（全部数据 / 搜索 / 分页 / 编辑 / 删除） -->
+    <el-dialog
+      v-model="recordsVisible"
+      title="工资记录"
+      width="1100px"
+      align-center
+      append-to-body
+      body-class="ev-dialog-body"
+    >
+      <div class="record-tools">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索月份，如 2026-09"
+          clearable
+          style="width: 240px"
+          @input="onSearch"
+        />
+        <el-select v-model="sortMode" class="sort-select" @change="onSearch">
+          <el-option label="月份（新 → 旧）" value="month-desc" />
+          <el-option label="月份（旧 → 新）" value="month-asc" />
+          <el-option label="工资（高 → 低）" value="salary-desc" />
+          <el-option label="工资（低 → 高）" value="salary-asc" />
+        </el-select>
+      </div>
+
+      <el-table :data="pagedRecords" v-loading="listLoading" stripe>
+        <el-table-column label="月份" width="110">
+          <template #default="{ row }">{{ formatMonth(row.month) }}</template>
+        </el-table-column>
+        <el-table-column label="结算周期" min-width="190">
+          <template #default="{ row }">
+            <el-tag size="small">{{ row.startDate }} ~ {{ row.endDate }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="应出勤" width="90" align="right">
+          <template #default="{ row }">{{ formatNum(row.attendanceDays) }}</template>
+        </el-table-column>
+        <el-table-column label="实际出勤" width="100" align="right">
+          <template #default="{ row }">{{ formatNum(row.actualAttendanceDays) }}</template>
+        </el-table-column>
+        <el-table-column label="净绩效" width="100" align="right">
+          <template #default="{ row }">{{ formatNum(row.performanceDays) }}</template>
+        </el-table-column>
+        <el-table-column label="绩效薪资" width="120" align="right">
+          <template #default="{ row }">{{ formatMoney(row.performanceSalary) }}</template>
+        </el-table-column>
+        <el-table-column label="加班" width="110" align="right">
+          <template #default="{ row }">
+            {{ formatNum(row.overtimeDays) }} 天 / {{ formatMoney(row.overtimeSalary) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="迟到" width="90" align="right">
+          <template #default="{ row }">{{ row.lateMinutes }} 分钟</template>
+        </el-table-column>
+        <el-table-column label="出勤比" width="90" align="right">
+          <template #default="{ row }">{{ formatRatio(row.attendanceRatio) }}</template>
+        </el-table-column>
+        <el-table-column label="实发工资" width="130" align="right">
+          <template #default="{ row }">
+            <span class="record-total">{{ formatMoney(row.totalSalary) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="130" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text type="primary" @click="openEditRow(row)">编辑</el-button>
+            <el-button size="small" text type="danger" @click="handleDeleteRow(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="filteredRecords.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="onPageChange"
+          @size-change="onPageSizeChange"
+        />
+      </div>
+    </el-dialog>
+
     <!-- 添加工资弹窗 -->
-    <el-dialog v-model="addVisible" title="添加工资" width="680px" align-center>
+    <el-dialog v-model="addVisible" :title="dialogTitle" width="680px" align-center>
       <div class="salary-toolbar">
         <el-date-picker
           v-model="addMonth"
@@ -207,23 +284,37 @@
       </template>
     </el-dialog>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后记录工资"
+    description="登录后可记录每月工资、社保公积金配置并查看趋势。"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import SalaryChart from '@/components/SalaryChart.vue'
-import { createRecord, deleteRecord, getConfig, listRecords, preview, updateConfig } from '@/api/salary'
+import { createRecord, deleteRecord, getConfig, listRecords, preview, updateConfig, updateRecord } from '@/api/salary'
 import type { SalaryRecord } from '@/types/salary'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 // ---------- 数据 ----------
 const records = ref<SalaryRecord[]>([])
 const listLoading = ref(false)
 
-// 曲线图与排序
+// 曲线图与列表
 type SortMode = 'month-desc' | 'month-asc' | 'salary-desc' | 'salary-asc'
 const chartYear = ref('')
 const sortMode = ref<SortMode>('month-desc')
+
+// 列表搜索 / 分页
+const searchKeyword = ref('')
+const page = ref(1)
+const pageSize = ref(10)
 
 const chartPoints = computed<number[]>(() => {
   const values = new Array<number>(12).fill(0)
@@ -237,8 +328,16 @@ const chartPoints = computed<number[]>(() => {
   return values
 })
 
-const sortedRecords = computed<SalaryRecord[]>(() => {
-  const list = [...records.value]
+const filteredRecords = computed<SalaryRecord[]>(() => {
+  const kw = searchKeyword.value.trim().toLowerCase()
+  const list = records.value.filter((r) => {
+    if (!kw) return true
+    return (
+      r.month.toLowerCase().includes(kw) ||
+      formatMonth(r.month).includes(kw) ||
+      String(r.totalSalary).includes(kw)
+    )
+  })
   switch (sortMode.value) {
     case 'month-asc':
       list.sort((a, b) => a.month.localeCompare(b.month))
@@ -255,13 +354,46 @@ const sortedRecords = computed<SalaryRecord[]>(() => {
   return list
 })
 
-// 添加工资弹窗
+const pagedRecords = computed<SalaryRecord[]>(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredRecords.value.slice(start, start + pageSize.value)
+})
+
+/** 首页只展示最近 5 条，完整数据在弹窗里 */
+const recentRecords = computed<SalaryRecord[]>(() =>
+  [...records.value].sort((a, b) => b.month.localeCompare(a.month)).slice(0, 5)
+)
+
+const recordsVisible = ref(false)
+
+const openRecords = () => {
+  page.value = 1
+  recordsVisible.value = true
+}
+
+const onSearch = () => {
+  page.value = 1
+}
+
+const onPageChange = (value: number) => {
+  page.value = value
+}
+
+const onPageSizeChange = (value: number) => {
+  pageSize.value = value
+  page.value = 1
+}
+
+// 添加工资 / 编辑工资弹窗
 const addVisible = ref(false)
+const editingId = ref<number | null>(null)
 const addMonth = ref<string | null>(null)
 const attendanceDays = ref<number | null>(null)
 const previewData = ref<SalaryRecord | null>(null)
 const previewLoading = ref(false)
 const saving = ref(false)
+
+const dialogTitle = computed(() => (editingId.value ? '编辑工资' : '添加工资'))
 
 // 工资配置弹窗
 const configVisible = ref(false)
@@ -327,13 +459,27 @@ const handleDelete = async (r: SalaryRecord) => {
   }
 }
 
-// ---------- 添加工资 ----------
+// ---------- 添加工资 / 编辑工资 ----------
 const openAdd = () => {
+  editingId.value = null
   addMonth.value = null
   attendanceDays.value = null
   previewData.value = null
   addVisible.value = true
 }
+
+const openEdit = (r: SalaryRecord) => {
+  editingId.value = r.id
+  addMonth.value = r.month
+  attendanceDays.value = Number(r.attendanceDays)
+  previewData.value = null
+  addVisible.value = true
+  void loadPreview()
+}
+
+/** el-table 插槽的 row 是 DefaultRow，这里收窄成 SalaryRecord */
+const openEditRow = (row: unknown) => openEdit(row as SalaryRecord)
+const handleDeleteRow = (row: unknown) => void handleDelete(row as SalaryRecord)
 
 const onMonthChange = (val: string | null) => {
   attendanceDays.value = null
@@ -374,7 +520,12 @@ const handleSave = async () => {
   }
   saving.value = true
   try {
-    await createRecord({ month: addMonth.value, attendanceDays: attendanceDays.value })
+    const payload = { month: addMonth.value, attendanceDays: attendanceDays.value }
+    if (editingId.value) {
+      await updateRecord(editingId.value, payload)
+    } else {
+      await createRecord(payload)
+    }
     addVisible.value = false
     await loadRecords()
   } catch {
@@ -427,8 +578,15 @@ const handleSaveConfig = async () => {
 
 // ---------- 初始化 ----------
 onMounted(() => {
-  void loadRecords()
+  if (userStore.isLoggedIn) void loadRecords()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void loadRecords()
+  }
+)
 </script>
 
 <style scoped lang="scss">
@@ -493,7 +651,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 80px;
+  min-height: 60px;
 }
 
 .record-item {
@@ -535,6 +693,12 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
+.record-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .record-total {
   font-size: 15px;
   font-weight: 700;
@@ -542,8 +706,10 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-.record-actions {
-  flex: 0 0 auto;
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
 }
 
 .year-picker {

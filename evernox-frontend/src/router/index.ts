@@ -24,25 +24,25 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { requiresAuth: true },
     children: [
       {
         path: '',
         name: 'Home',
-        redirect: '/image-host',
+        // 已登录进入个人图床，匿名进入公开图床
+        redirect: () => (localStorage.getItem('accessToken') ? '/image-host' : '/image-host/public'),
       },
       {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/Profile.vue'),
-        meta: { title: '个人信息' },
+        meta: { title: '个人信息', requiresAuth: true },
       },
       // 图床管理
       {
         path: 'image-host',
         name: 'ImageHostHome',
         component: () => import('@/views/image-host/ImageHostHome.vue'),
-        meta: { title: '图床首页' },
+        meta: { title: '图床首页', requiresAuth: true },
       },
       {
         path: 'image-host/public',
@@ -60,13 +60,13 @@ const routes: RouteRecordRaw[] = [
         path: 'image-host/my-images',
         name: 'MyImages',
         component: () => import('@/views/image-host/MyImages.vue'),
-        meta: { title: '我的图床' },
+        meta: { title: '我的图床', requiresAuth: true },
       },
       {
         path: 'image-host/my-albums',
         name: 'MyAlbums',
         component: () => import('@/views/image-host/MyAlbums.vue'),
-        meta: { title: '我的相册' },
+        meta: { title: '我的相册', requiresAuth: true },
       },
       {
         path: 'image/:id',
@@ -85,7 +85,7 @@ const routes: RouteRecordRaw[] = [
         path: 'site/mine',
         name: 'MySites',
         component: () => import('@/views/site/MySites.vue'),
-        meta: { title: '我的分享' },
+        meta: { title: '我的分享', requiresAuth: true },
       },
       // 火影忍者ol
       {
@@ -117,31 +117,31 @@ const routes: RouteRecordRaw[] = [
         path: 'workspace/notes',
         name: 'Notes',
         component: () => import('@/views/workspace/Notes.vue'),
-        meta: { title: '记事本' },
+        meta: { title: '记事本', requiresAuth: true },
       },
       {
         path: 'workspace/todos',
         name: 'Todos',
         component: () => import('@/views/workspace/Todos.vue'),
-        meta: { title: '待办' },
+        meta: { title: '待办', requiresAuth: true },
       },
       {
         path: 'workspace/ledger',
         name: 'Ledger',
         component: () => import('@/views/workspace/Ledger.vue'),
-        meta: { title: '记账' },
+        meta: { title: '记账', requiresAuth: true },
       },
       {
         path: 'workspace/performance',
         name: 'Performance',
         component: () => import('@/views/workspace/Performance.vue'),
-        meta: { title: '记录绩效' },
+        meta: { title: '记录绩效', requiresAuth: true },
       },
       {
         path: 'workspace/salary',
         name: 'Salary',
         component: () => import('@/views/workspace/Salary.vue'),
-        meta: { title: '记录工资' },
+        meta: { title: '记录工资', requiresAuth: true },
       },
       // 话题集中营
       {
@@ -160,7 +160,7 @@ const routes: RouteRecordRaw[] = [
         path: 'topic/mine',
         name: 'TopicMine',
         component: () => import('@/views/topic/TopicMine.vue'),
-        meta: { title: '我的' },
+        meta: { title: '我的', requiresAuth: true },
       },
       {
         path: 'topic/circle/:id',
@@ -173,15 +173,9 @@ const routes: RouteRecordRaw[] = [
         path: 'super-member/org',
         name: 'SuperMemberOrg',
         component: () => import('@/views/super-member/SuperMemberOrg.vue'),
-        meta: { title: '火影组织管理' },
+        meta: { title: '火影组织管理', requiresAuth: true },
       },
       // 小游戏
-      {
-        path: 'games/sandbox',
-        name: 'GameSandbox',
-        component: () => import('@/views/game/Sandbox.vue'),
-        meta: { title: '沙盘争霸' },
-      },
       {
         path: 'games/support-board',
         name: 'GameSupportBoard',
@@ -314,13 +308,23 @@ router.beforeEach(async (to, _from, next) => {
     await userStore.fetchUserInfo()
   }
 
-  if (to.meta.requiresAuth && !userStore.isLoggedIn) {
-    next('/login')
-  } else if (to.meta.requiresAdmin && !userStore.isAdmin) {
+  // 匿名浏览：requiresAuth 仅作语义标记，不再拦截跳转
+  if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    if (!userStore.isLoggedIn) {
+      const { useAuthDialogStore } = await import('@/stores/authDialog')
+      useAuthDialogStore().open('login')
+    }
     next('/')
   } else if (to.meta.requiresOrgManage && !(userStore.isAdmin || userStore.isSuperMember)) {
+    if (!userStore.isLoggedIn) {
+      const { useAuthDialogStore } = await import('@/stores/authDialog')
+      useAuthDialogStore().open('login')
+    }
     next('/')
-  } else if ((to.path === '/login' || to.path === '/register') && userStore.isLoggedIn) {
+  } else if (
+    (to.path === '/login' || to.path === '/register' || to.path === '/forgot-password') &&
+    userStore.isLoggedIn
+  ) {
     next('/')
   } else {
     next()

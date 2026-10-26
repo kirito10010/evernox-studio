@@ -1,6 +1,8 @@
 package com.evernox.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
@@ -11,29 +13,27 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 沙盘争霸结算发奖记录
+ * 一键发包方案的必发玩家
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("game_reward")
-public class GameReward {
+@TableName("org_distribution_forced_player")
+public class OrgDistributionForcedPlayer {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long roundId;
+    /** 方案ID */
+    private Long planId;
 
-    private Long userId;
+    /** 组织成员ID（org_member.id） */
+    private Long memberId;
 
-    /** 排名（参与奖可为0） */
-    private Integer rank;
+    /** 必发礼包ID（必须存在于方案队列中） */
+    private Long packageId;
 
-    private Integer points;
-
-    /** 榜单类型：total/rookie/participation */
-    private String boardType;
-
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

@@ -9,19 +9,27 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 沙盘争霸城市邻接关系（静态表，种子时按中心距离计算）
+ * 一键发包方案中的礼包队列条目
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("game_city_adjacency")
-public class GameCityAdjacency {
+@TableName("org_distribution_plan_item")
+public class OrgDistributionPlanItem {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long cityId;
+    /** 方案ID */
+    private Long planId;
 
-    private Long adjacentCityId;
+    /** 礼包ID */
+    private Long packageId;
+
+    /** 发放数量 */
+    private Integer quantity;
+
+    /** 队列顺序 */
+    private Integer sortOrder;
 }

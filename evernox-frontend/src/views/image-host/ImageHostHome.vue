@@ -1,5 +1,5 @@
 <template>
-  <div class="image-host-home">
+  <div v-if="userStore.isLoggedIn" class="image-host-home">
     <div class="home-body">
       <div class="home-main">
         <!-- Hero Banner -->
@@ -172,10 +172,15 @@
 
     <ImageLightbox v-model="lightboxVisible" :image="lightboxImage" :src="lightboxSrc" />
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看你的图床"
+    description="登录后可上传图片、管理相册并查看存储统计。"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { getImageStats, getAlbumStats, getMyImages, getStorageStats, getImageThumbnail } from '@/api/image'
 import type { ImageResponse, StorageStats } from '@/api/image'
 import { useImageDecrypt } from '@/composables/useImageDecrypt'
@@ -187,6 +192,10 @@ import UploadModal from '@/components/UploadModal.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import LazyImage from '@/components/LazyImage.vue'
 import { aspectRatioOf, formatBytes, photoSharePercent, photoUsagePercent } from '@/utils/image'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const { decryptImage } = useImageDecrypt()
 const { decryptImage: loadThumb } = useImageDecrypt(getImageThumbnail)
@@ -276,11 +285,22 @@ const statList = computed(() => [
   },
 ])
 
-onMounted(async () => {
+const initPage = async () => {
   await loadStats()
   await loadRecent()
-  loadStorage()
+  void loadStorage()
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) void initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void initPage()
+  }
+)
 
 const loadStats = async () => {
   try {

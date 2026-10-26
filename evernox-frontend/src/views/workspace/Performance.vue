@@ -1,5 +1,5 @@
 <template>
-  <div class="performance-page">
+  <div v-if="userStore.isLoggedIn" class="performance-page">
     <!-- 头部 -->
     <div class="page-header">
       <div class="header-text">
@@ -139,7 +139,7 @@
           <el-input :model-value="formatNum(currentQuota)" disabled />
         </el-form-item>
         <el-form-item label="实际工作量">
-          <el-input-number v-model="form.actualWorkload" :min="1" :max="9999999999" :precision="0" :step="1" style="width: 100%" />
+          <el-input-number v-model="form.actualWorkload" :min="0.001" :max="9999999999" :step="1" style="width: 100%" />
         </el-form-item>
         <el-form-item label="绩效人天">
           <el-input :model-value="previewDaysText" disabled />
@@ -330,10 +330,16 @@
       </template>
     </el-dialog>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后记录绩效"
+    description="登录后可记录项目绩效、加班与迟到数据，并查看统计图表。"
+  />
 </template>
 
+
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PerformanceChart from '@/components/PerformanceChart.vue'
 import {
@@ -365,7 +371,10 @@ import type {
   ProcessType,
 } from '@/types/performance'
 import { currentPeriodLabel, periodRange } from '@/utils/performance'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const PAGE_SIZE = 10
 
 // ---------- 数据 ----------
@@ -443,7 +452,7 @@ function formatDate(d: Date): string {
 
 /** 数值格式化：最多2位小数 */
 const formatNum = (v: number): string =>
-  (Number(v) || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  (Number(v) || 0).toLocaleString('zh-CN', { maximumFractionDigits: 3 })
 
 /** 人天格式化：最多5位小数 */
 const formatDays = (v: number): string =>
@@ -660,7 +669,7 @@ const openRecordForm = (record?: PerformanceRecord) => {
     form.workDate = formatDate(new Date())
     form.projectId = null
     form.processType = 0
-    form.actualWorkload = 0
+    form.actualWorkload = 1
   }
   recordFormVisible.value = true
 }
@@ -683,7 +692,8 @@ const saveForm = async () => {
     projectId: form.projectId,
     workDate: form.workDate,
     processType: form.processType,
-    actualWorkload: form.actualWorkload,
+    // 实际工作量最多 3 位小数；整数仍按整数存储
+    actualWorkload: Math.round(form.actualWorkload * 1000) / 1000,
   }
   try {
     if (editingId.value) {
@@ -955,11 +965,22 @@ const refreshAfterMutation = async () => {
 }
 
 // ---------- 初始化 ----------
-onMounted(async () => {
+const initPage = async () => {
   await loadProjects()
   selectedMonth.value = currentPeriodLabel()
   applyPeriodLabel(selectedMonth.value)
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) void initPage()
 })
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void initPage()
+  }
+)
 </script>
 
 <style scoped lang="scss">

@@ -70,6 +70,15 @@ public class SalaryController {
         return Result.success(salaryService.listRecords(getUserId(request)));
     }
 
+    @PutMapping("/record/{id}")
+    public Result<SalaryRecordResponse> updateRecord(
+            @PathVariable Long id,
+            @Valid @RequestBody SalaryRecordRequest recordRequest,
+            HttpServletRequest httpRequest) {
+        return Result.success("保存成功",
+                salaryService.updateRecord(id, recordRequest, getUserId(httpRequest)));
+    }
+
     @DeleteMapping("/record/{id}")
     public Result<Void> deleteRecord(@PathVariable Long id, HttpServletRequest request) {
         salaryService.deleteRecord(id, getUserId(request));

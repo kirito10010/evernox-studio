@@ -36,8 +36,8 @@ public interface AiArenaService {
     ArenaSyncStatus syncAll();
 
     /**
-     * 导入「本地抓取后上传」的榜单页面并入库（阻塞执行，返回最终状态）。
-     * key = 分类 slug，value = 该分类榜单页的 HTML 原文。
+     * 导入「本地抓取后上传」的榜单数据并入库（阻塞执行，返回最终状态）。
+     * key = 分类 slug，value = 该分类的榜单数据（RSC 数据或旧版整页 HTML）。
      */
-    ArenaSyncStatus importHtml(Map<String, String> htmlByCategory);
+    ArenaSyncStatus importPackage(Map<String, String> payloadByCategory);
 }

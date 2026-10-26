@@ -1,5 +1,5 @@
 <template>
-  <div class="profile-page">
+  <div v-if="userStore.isLoggedIn" class="profile-page">
     <div class="col">
       <div class="profile-card">
         <h2 class="section-title">个人信息</h2>
@@ -83,15 +83,21 @@
       </div>
     </div>
   </div>
+  <AuthRequired
+    v-else
+    title="登录后查看个人信息"
+    description="登录后可查看积分、超级会员状态，并修改账号密码。"
+  />
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
 import { getUserInfo, sendResetCode, resetPassword } from '@/api/auth'
 import { signIn, upgradeSuperMember, redeemCode } from '@/api/points'
 import { useUserStore } from '@/stores/user'
+import AuthRequired from '@/components/auth/AuthRequired.vue'
 import { UserRoleMap, type UserInfoResponse, type UserRole } from '@/types/user'
 
 const userStore = useUserStore()
@@ -161,9 +167,17 @@ const doRedeem = async () => {
 const fmtTime = (v?: string): string => (v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-')
 
 const load = async () => {
+  if (!userStore.isLoggedIn) return
   const res = await getUserInfo()
   userInfo.value = res.data
 }
+
+watch(
+  () => userStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void load()
+  }
+)
 
 const doSignIn = async () => {
   signingIn.value = true

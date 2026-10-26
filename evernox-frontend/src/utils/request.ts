@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import type { AxiosHeaders } from 'axios'
 import { ElMessage } from 'element-plus'
 import type { AuthResponse } from '@/types/user'
 
@@ -26,25 +27,31 @@ request.interceptors.request.use(
 )
 
 /**
- * 跳登录页
+ * 会话失效时打开全局登录弹窗（不跳转路由）
  *
- * 用 router 而非 window.location.href：后者是文档级导航，会整页重载
- * （在部分内嵌浏览器里会被当成新标签页打开）。
- * router 与 store 都用动态 import 引入，避免 request → stores/user → api/auth → request 的循环依赖。
+ * 用动态 import 引入 store，避免 request → stores/user → api/auth → request 的循环依赖。
  */
-const redirectToLogin = async () => {
+const openAuthModal = async () => {
   try {
     const { useUserStore } = await import('@/stores/user')
-    // 同时清掉 Pinia 里的 token，否则路由守卫会因 isLoggedIn 仍为 true 把 /login 弹回首页
     useUserStore().clearToken()
   } catch {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
   }
-  const { default: router } = await import('@/router')
-  if (router.currentRoute.value.path !== '/login') {
-    await router.replace('/login')
+  try {
+    const { useAuthDialogStore } = await import('@/stores/authDialog')
+    useAuthDialogStore().open('login')
+  } catch {
+    // store 未就绪时忽略
   }
+}
+
+/** 请求是否携带了 token：匿名请求的 401 应静默处理，不打扰浏览 */
+const hasAuthHeader = (config?: { headers?: AxiosHeaders | Record<string, unknown> }) => {
+  if (!config?.headers) return false
+  const headers = config.headers as Record<string, unknown>
+  return Boolean(headers.Authorization || headers.authorization)
 }
 
 /** 403 不是登录态问题：别清 token 也别跳登录页，只把停留在管理员页的用户退回首页 */
@@ -115,18 +122,29 @@ request.interceptors.response.use(
 
     const res = response.data
     if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
       if (res.code === 401) {
-        void redirectToLogin()
+        if (hasAuthHeader(response.config)) {
+          // 会话过期：打开登录弹窗，不打断当前页面
+          void openAuthModal()
+        } else {
+          // 匿名请求：不弹窗，但保留提示（登录失败等场景需要反馈）
+          ElMessage.error(res.message || '请求失败')
+        }
+      } else {
+        ElMessage.error(res.message || '请求失败')
       }
       return Promise.reject(new Error(res.message || 'Error'))
     }
     return res
   },
   (error) => {
-    // 处理 HTTP 401 状态码：token 过期 → 尝试刷新后重试；刷新失败再跳登录
+    // 处理 HTTP 401 状态码：token 过期 → 尝试刷新后重试；刷新失败再打开登录弹窗
     if (error.response?.status === 401) {
       const config = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined
+      // 匿名请求（没有 Authorization 头）静默失败，避免匿名浏览时被弹窗打扰
+      if (!hasAuthHeader(config)) {
+        return Promise.reject(error)
+      }
       if (config && !config._retried) {
         config._retried = true
         return refreshAccessToken()
@@ -134,15 +152,15 @@ request.interceptors.response.use(
             if (ok) {
               return request(config)
             }
-            void redirectToLogin()
+            void openAuthModal()
             return Promise.reject(error)
           })
           .catch(() => {
-            void redirectToLogin()
+            void openAuthModal()
             return Promise.reject(error)
           })
       }
-      void redirectToLogin()
+      void openAuthModal()
       return Promise.reject(error)
     }
     // 403：权限不足（如普通账号尝试访问管理员接口）

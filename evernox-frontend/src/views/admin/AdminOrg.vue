@@ -166,8 +166,8 @@
             </el-button>
           </el-upload>
           <el-button type="warning" :disabled="!selectedOrgId || !selectedWeek" @click="calculate">计算积分</el-button>
-          <el-dropdown trigger="click" :disabled="!canDistribute || !distributionPlans.length" @command="runDistribution">
-            <el-button type="primary" :disabled="!canDistribute || !distributionPlans.length" :loading="distributing">
+          <el-dropdown trigger="click" :disabled="!canDistribute" @command="runDistribution" @visible-change="onDistributionDropdownVisible">
+            <el-button type="primary" :disabled="!canDistribute" :loading="distributing">
               一键发包
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
@@ -239,7 +239,8 @@
             :page-sizes="[10, 20, 50, 100]"
             :total="filteredRecords.length"
             layout="total, sizes, prev, pager, next, jumper"
-            small
+            background
+            @size-change="recordPage = 1"
           />
         </div>
       </el-tab-pane>
@@ -581,6 +582,7 @@ import {
   getOrgPointsConfig,
   saveOrgPointsConfig,
   getOrgPackages,
+  getOrgDistributionPlans,
   createOrgPackage,
   updateOrgPackage,
   deleteOrgPackage,
@@ -958,6 +960,28 @@ const onDistributionPlansUpdated = (plans: OrgDistributionPlan[]) => {
   distributionPlans.value = plans
 }
 
+/**
+ * 主动从后端拉一次方案列表。
+ * 「发包设置」标签页是懒加载的：如果用户新增方案后没等它刷新就切到周记录，
+ * 或者在别处改过方案，下拉里会缺新方案。切到周记录、切换组织、展开下拉时都补拉一次。
+ */
+const loadDistributionPlans = async () => {
+  if (!selectedOrgId.value) {
+    distributionPlans.value = []
+    return
+  }
+  try {
+    const res = await getOrgDistributionPlans(selectedOrgId.value)
+    distributionPlans.value = res.data ?? []
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+const onDistributionDropdownVisible = (visible: boolean) => {
+  if (visible) void loadDistributionPlans()
+}
+
 const runDistribution = async (planId: unknown) => {
   if (!selectedOrgId.value || !selectedWeek.value) return
   const plan = distributionPlans.value.find((p) => p.id === Number(planId))
@@ -1240,6 +1264,7 @@ const rejectApplication = async (row: OrgMembershipApplication) => {
 
 watch(activeTab, (val) => {
   if (val === 'applications') loadApplications()
+  if (val === 'records') void loadDistributionPlans()
 })
 
 watch(recordKeyword, () => {
@@ -1252,6 +1277,7 @@ watch(selectedOrgId, () => {
   loadPackages()
   loadWeeks()
   loadRecords()
+  void loadDistributionPlans()
 })
 
 onMounted(async () => {
@@ -1262,6 +1288,7 @@ onMounted(async () => {
   await loadWeeks()
   await loadRecords()
   await loadApplications()
+  void loadDistributionPlans()
 })
 </script>
 

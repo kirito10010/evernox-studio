@@ -68,10 +68,13 @@
     <div class="pagination-wrap" v-if="total > pageSize">
       <el-pagination
         v-model:current-page="currentPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[12, 24, 48]"
         :total="total"
-        layout="prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="loadAlbums"
+        @size-change="onSizeChange"
       />
     </div>
 
@@ -160,7 +163,7 @@ const albums = ref<AlbumResponse[]>([])
 const albumCoverUrls = reactive(new Map<number, string>())
 const loading = ref(false)
 const currentPage = ref(1)
-const pageSize = 12
+const pageSize = ref(12)
 const total = ref(0)
 /** 每次访问随机一个种子，本次访问内翻页顺序保持一致 */
 const seed = ref(Math.floor(Math.random() * 2147483647))
@@ -216,13 +219,18 @@ onUnmounted(() => {
 const loadAlbums = async () => {
   loading.value = true
   try {
-    const res = await getPublicAlbums(currentPage.value, pageSize, undefined, seed.value)
+    const res = await getPublicAlbums(currentPage.value, pageSize.value, undefined, seed.value)
     if (res.data) {
       albums.value = res.data.records || []
       total.value = res.data.total || 0
     }
   } catch { /* ignore */ }
   finally { loading.value = false }
+}
+
+const onSizeChange = () => {
+  currentPage.value = 1
+  void loadAlbums()
 }
 
 const openAlbum = async (album: AlbumResponse) => {

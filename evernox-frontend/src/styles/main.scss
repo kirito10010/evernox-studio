@@ -16,8 +16,27 @@
   --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
   /* 弹窗底色：接近不透明，避免透过背景文字影响阅读 */
   --ev-bg-dialog:       rgba(255, 255, 255, 0.97);
-  --ev-bg-tint:         rgba(47, 124, 246, 0.05);
-  --ev-bg-tint-strong:  rgba(47, 124, 246, 0.10);
+  --ev-bg-tint:         rgba(var(--ev-primary-rgb), 0.05);
+  --ev-bg-tint-strong:  rgba(var(--ev-primary-rgb), 0.10);
+
+  /* 主色 RGB 通道：主题内所有半透明高光/阴影统一引用这三个通道 */
+  --ev-primary-rgb: 47, 124, 246;
+  --ev-aqua-rgb:    79, 195, 232;
+  --ev-primary-soft-rgb: 127, 178, 251;
+  --ev-aqua-soft-rgb:    165, 228, 242;
+  --ev-mist-rgb:         207, 230, 255;
+  --ev-ink-rgb:     18, 48, 79;
+  /* 背景点阵颜色 */
+  --ev-dot-color:   rgba(var(--ev-primary-rgb), 0.045);
+
+  /* Element Plus 主色随主题（tabs / link / date-picker 等原生组件） */
+  --el-color-primary: #2f7cf6;
+  --el-color-primary-light-3: #6a9ff9;
+  --el-color-primary-light-5: #97bdfb;
+  --el-color-primary-light-7: #c3d9fd;
+  --el-color-primary-light-8: #d5e4fd;
+  --el-color-primary-light-9: #eaf1fe;
+  --el-color-primary-dark-2: #2663c5;
 
   /* Palette — clear blue → aqua */
   --ev-primary:       #2f7cf6;
@@ -54,27 +73,27 @@
   --ev-text-on-accent:  #ffffff;
 
   /* Borders — barely-there blue */
-  --ev-border-subtle:  rgba(47, 124, 246, 0.08);
-  --ev-border-default: rgba(47, 124, 246, 0.14);
-  --ev-border-hover:   rgba(47, 124, 246, 0.34);
-  --ev-border-active:  rgba(47, 124, 246, 0.55);
+  --ev-border-subtle:  rgba(var(--ev-primary-rgb), 0.08);
+  --ev-border-default: rgba(var(--ev-primary-rgb), 0.14);
+  --ev-border-hover:   rgba(var(--ev-primary-rgb), 0.34);
+  --ev-border-active:  rgba(var(--ev-primary-rgb), 0.55);
   --ev-border-gloss:   rgba(255, 255, 255, 0.75);
 
   /* Shadows — layered, low-opacity blue */
-  --ev-shadow-xs:    0 1px 2px rgba(18, 48, 79, 0.04);
-  --ev-shadow-sm:    0 2px 8px rgba(18, 48, 79, 0.05);
-  --ev-shadow-card:  0 1px 2px rgba(18, 48, 79, 0.04),
-                     0 8px 24px -8px rgba(47, 124, 246, 0.12);
-  --ev-shadow-lg:    0 2px 4px rgba(18, 48, 79, 0.04),
-                     0 12px 32px -10px rgba(47, 124, 246, 0.16),
-                     0 24px 60px -20px rgba(47, 124, 246, 0.14);
-  --ev-shadow-float: 0 20px 50px -16px rgba(47, 124, 246, 0.24);
+  --ev-shadow-xs:    0 1px 2px rgba(var(--ev-ink-rgb), 0.04);
+  --ev-shadow-sm:    0 2px 8px rgba(var(--ev-ink-rgb), 0.05);
+  --ev-shadow-card:  0 1px 2px rgba(var(--ev-ink-rgb), 0.04),
+                     0 8px 24px -8px rgba(var(--ev-primary-rgb), 0.12);
+  --ev-shadow-lg:    0 2px 4px rgba(var(--ev-ink-rgb), 0.04),
+                     0 12px 32px -10px rgba(var(--ev-primary-rgb), 0.16),
+                     0 24px 60px -20px rgba(var(--ev-primary-rgb), 0.14);
+  --ev-shadow-float: 0 20px 50px -16px rgba(var(--ev-primary-rgb), 0.24);
   --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.9),
-                     inset 0 -1px 0 rgba(47, 124, 246, 0.05);
+                     inset 0 -1px 0 rgba(var(--ev-primary-rgb), 0.05);
 
   /* Glow — soft, never dirty on light surfaces */
-  --ev-glow-violet:  0 8px 28px -8px rgba(47, 124, 246, 0.32);
-  --ev-glow-cyan:    0 8px 28px -8px rgba(79, 195, 232, 0.30);
+  --ev-glow-violet:  0 8px 28px -8px rgba(var(--ev-primary-rgb), 0.32);
+  --ev-glow-cyan:    0 8px 28px -8px rgba(var(--ev-aqua-rgb), 0.30);
   --ev-glow-rose:    0 8px 28px -8px rgba(242, 99, 127, 0.28);
   --ev-glow-emerald: 0 8px 28px -8px rgba(127, 216, 232, 0.28);
 
@@ -98,7 +117,7 @@
 }
 
 /* ============================================================
-   深色主题（data-theme='dark'）
+   墨夜（data-theme='dark'）
    覆盖背景 / 文字 / 边框 / 阴影等令牌；主色与渐变保持蓝色系
    ============================================================ */
 [data-theme='dark'] {
@@ -111,8 +130,18 @@
   --ev-bg-glass-light:  rgba(26, 36, 52, 0.45);
   /* 深色下弹窗同样压重，避免背景内容透出干扰阅读 */
   --ev-bg-dialog:       rgba(24, 34, 49, 0.98);
-  --ev-bg-tint:         rgba(47, 124, 246, 0.10);
-  --ev-bg-tint-strong:  rgba(47, 124, 246, 0.16);
+  --ev-bg-tint:         rgba(var(--ev-primary-rgb), 0.10);
+  --ev-bg-tint-strong:  rgba(var(--ev-primary-rgb), 0.16);
+  --ev-primary-rgb: 47, 124, 246;
+  --ev-aqua-rgb:    79, 195, 232;
+  --ev-primary-soft-rgb: 127, 178, 251;
+  --ev-aqua-soft-rgb:    165, 228, 242;
+  --ev-mist-rgb:         42, 54, 72;
+  --ev-ink-rgb:     10, 16, 24;
+  --ev-dot-color:   rgba(122, 162, 255, 0.07);
+  /* 深色只改主色；浅色梯度继续沿用 Element Plus 暗色主题的深底混色 */
+  --el-color-primary: #4a8df8;
+  --el-color-primary-dark-2: #3b71c6;
 
   /* Text — 高对比浅色，保证阅读清晰 */
   --ev-text-primary:    #e6edf5;
@@ -123,8 +152,8 @@
   /* Borders — 半透明白 */
   --ev-border-subtle:  rgba(255, 255, 255, 0.06);
   --ev-border-default: rgba(255, 255, 255, 0.12);
-  --ev-border-hover:   rgba(47, 124, 246, 0.42);
-  --ev-border-active:  rgba(47, 124, 246, 0.62);
+  --ev-border-hover:   rgba(var(--ev-primary-rgb), 0.42);
+  --ev-border-active:  rgba(var(--ev-primary-rgb), 0.62);
   --ev-border-gloss:   rgba(255, 255, 255, 0.08);
 
   /* 主色微调：深色下 hover 提亮而非变暗 */
@@ -140,6 +169,164 @@
                      0 12px 32px -10px rgba(0, 0, 0, 0.5);
   --ev-shadow-float: 0 20px 50px -16px rgba(0, 0, 0, 0.6);
   --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* 原生滚动条 / 表单控件跟随暗色 */
+  color-scheme: dark;
+}
+
+/* ============================================================
+   青瓷（data-theme='celadon'）
+   茶青 / 薄荷调，清新温润的浅色主题
+   ============================================================ */
+[data-theme='celadon'] {
+  --ev-bg-deep:         #edf7f3;
+  --ev-bg-surface:      #f6fcfa;
+  --ev-bg-elevated:     #ffffff;
+  --ev-bg-glass:        rgba(255, 255, 255, 0.66);
+  --ev-bg-glass-strong: rgba(255, 255, 255, 0.84);
+  --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
+  --ev-bg-dialog:       rgba(255, 255, 255, 0.975);
+  --ev-bg-tint:         rgba(61, 156, 138, 0.06);
+  --ev-bg-tint-strong:  rgba(61, 156, 138, 0.12);
+
+  --ev-primary-rgb: 61, 156, 138;
+  --ev-aqua-rgb:    111, 184, 171;
+  --ev-primary-soft-rgb: 143, 201, 189;
+  --ev-aqua-soft-rgb:    191, 227, 220;
+  --ev-mist-rgb:         207, 232, 226;
+  --ev-ink-rgb:     23, 58, 51;
+  --ev-dot-color:   rgba(61, 156, 138, 0.05);
+
+  --ev-primary:       #3d9c8a;
+  --ev-primary-hover: #2f8576;
+  --ev-primary-soft:  #8fc9bd;
+  --ev-aqua:          #6fb8ab;
+  --ev-aqua-soft:     #bfe3dc;
+  --ev-mist:          #cfe8e2;
+  --ev-danger:        #e2727f;
+  --ev-success:       #4caf8f;
+  --ev-warning:       #d9a441;
+
+  --ev-text-primary:   #173a33;
+  --ev-text-secondary: #48685f;
+  --ev-text-muted:     #84a49b;
+  --ev-text-on-accent: #ffffff;
+
+  --ev-border-subtle:  rgba(61, 156, 138, 0.10);
+  --ev-border-default: rgba(61, 156, 138, 0.18);
+  --ev-border-hover:   rgba(61, 156, 138, 0.38);
+  --ev-border-active:  rgba(61, 156, 138, 0.58);
+  --ev-border-gloss:   rgba(255, 255, 255, 0.78);
+
+  --ev-shadow-xs:    0 1px 2px rgba(23, 58, 51, 0.04);
+  --ev-shadow-sm:    0 2px 8px rgba(23, 58, 51, 0.05);
+  --ev-shadow-card:  0 1px 2px rgba(23, 58, 51, 0.04),
+                     0 8px 24px -8px rgba(61, 156, 138, 0.14);
+  --ev-shadow-lg:    0 2px 4px rgba(23, 58, 51, 0.04),
+                     0 12px 32px -10px rgba(61, 156, 138, 0.18),
+                     0 24px 60px -20px rgba(61, 156, 138, 0.16);
+  --ev-shadow-float: 0 20px 50px -16px rgba(61, 156, 138, 0.26);
+  --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                     inset 0 -1px 0 rgba(61, 156, 138, 0.05);
+
+  --ev-glow-violet:  0 8px 28px -8px rgba(61, 156, 138, 0.32);
+  --ev-glow-cyan:    0 8px 28px -8px rgba(111, 184, 171, 0.30);
+  --ev-glow-rose:    0 8px 28px -8px rgba(226, 114, 127, 0.26);
+  --ev-glow-emerald: 0 8px 28px -8px rgba(124, 201, 179, 0.28);
+
+  --ev-grad-aurora:       linear-gradient(135deg, #3d9c8a 0%, #6fb8ab 55%, #a9d8cd 100%);
+  --ev-grad-aurora-soft:  linear-gradient(135deg, rgba(61,156,138,.14) 0%, rgba(111,184,171,.10) 50%, rgba(169,216,205,.14) 100%);
+  --ev-grad-violet-pink:  linear-gradient(135deg, #3d9c8a 0%, #5aa99a 100%);
+  --ev-grad-cyan-emerald: linear-gradient(135deg, #6fb8ab 0%, #a9d8cd 100%);
+  --ev-grad-mesh:
+    radial-gradient(ellipse 80% 60% at 12% 8%,   rgba(61,156,138,.14), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 88% 12%,  rgba(111,184,171,.13), transparent 60%),
+    radial-gradient(ellipse 90% 70% at 50% 100%, rgba(169,216,205,.18), transparent 65%);
+
+  --el-color-primary: #3d9c8a;
+  --el-color-primary-light-3: #6fb5a7;
+  --el-color-primary-light-5: #97c9bf;
+  --el-color-primary-light-7: #beddd6;
+  --el-color-primary-light-8: #d2e7e2;
+  --el-color-primary-light-9: #e8f4f1;
+  --el-color-primary-dark-2: #318073;
+}
+
+/* ============================================================
+   藕荷（data-theme='lotus'）
+   淡紫 / 藕粉调，清雅柔和的浅色主题
+   ============================================================ */
+[data-theme='lotus'] {
+  --ev-bg-deep:         #f8f3f9;
+  --ev-bg-surface:      #fcf8fd;
+  --ev-bg-elevated:     #ffffff;
+  --ev-bg-glass:        rgba(255, 255, 255, 0.66);
+  --ev-bg-glass-strong: rgba(255, 255, 255, 0.84);
+  --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
+  --ev-bg-dialog:       rgba(255, 255, 255, 0.975);
+  --ev-bg-tint:         rgba(150, 119, 173, 0.06);
+  --ev-bg-tint-strong:  rgba(150, 119, 173, 0.12);
+
+  --ev-primary-rgb: 150, 119, 173;
+  --ev-aqua-rgb:    185, 163, 201;
+  --ev-primary-soft-rgb: 195, 174, 211;
+  --ev-aqua-soft-rgb:    222, 210, 231;
+  --ev-mist-rgb:         232, 220, 237;
+  --ev-ink-rgb:     59, 47, 67;
+  --ev-dot-color:   rgba(150, 119, 173, 0.05);
+
+  --ev-primary:       #9677ad;
+  --ev-primary-hover: #815f99;
+  --ev-primary-soft:  #c3aed3;
+  --ev-aqua:          #b9a3c9;
+  --ev-aqua-soft:     #ded2e7;
+  --ev-mist:          #e8dced;
+  --ev-danger:        #d9738e;
+  --ev-success:       #57a992;
+  --ev-warning:       #c99a4e;
+
+  --ev-text-primary:   #3b2f43;
+  --ev-text-secondary: #65566f;
+  --ev-text-muted:     #9a8aa3;
+  --ev-text-on-accent: #ffffff;
+
+  --ev-border-subtle:  rgba(150, 119, 173, 0.10);
+  --ev-border-default: rgba(150, 119, 173, 0.18);
+  --ev-border-hover:   rgba(150, 119, 173, 0.38);
+  --ev-border-active:  rgba(150, 119, 173, 0.58);
+  --ev-border-gloss:   rgba(255, 255, 255, 0.78);
+
+  --ev-shadow-xs:    0 1px 2px rgba(59, 47, 67, 0.04);
+  --ev-shadow-sm:    0 2px 8px rgba(59, 47, 67, 0.05);
+  --ev-shadow-card:  0 1px 2px rgba(59, 47, 67, 0.04),
+                     0 8px 24px -8px rgba(150, 119, 173, 0.14);
+  --ev-shadow-lg:    0 2px 4px rgba(59, 47, 67, 0.04),
+                     0 12px 32px -10px rgba(150, 119, 173, 0.18),
+                     0 24px 60px -20px rgba(150, 119, 173, 0.16);
+  --ev-shadow-float: 0 20px 50px -16px rgba(150, 119, 173, 0.26);
+  --ev-inset-gloss:  inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                     inset 0 -1px 0 rgba(150, 119, 173, 0.05);
+
+  --ev-glow-violet:  0 8px 28px -8px rgba(150, 119, 173, 0.32);
+  --ev-glow-cyan:    0 8px 28px -8px rgba(185, 163, 201, 0.30);
+  --ev-glow-rose:    0 8px 28px -8px rgba(217, 115, 142, 0.26);
+  --ev-glow-emerald: 0 8px 28px -8px rgba(87, 169, 146, 0.26);
+
+  --ev-grad-aurora:       linear-gradient(135deg, #9677ad 0%, #b9a3c9 55%, #d9c9e4 100%);
+  --ev-grad-aurora-soft:  linear-gradient(135deg, rgba(150,119,173,.14) 0%, rgba(185,163,201,.10) 50%, rgba(217,201,228,.14) 100%);
+  --ev-grad-violet-pink:  linear-gradient(135deg, #9677ad 0%, #b98cae 100%);
+  --ev-grad-cyan-emerald: linear-gradient(135deg, #b9a3c9 0%, #d9c9e4 100%);
+  --ev-grad-mesh:
+    radial-gradient(ellipse 80% 60% at 12% 8%,   rgba(150,119,173,.14), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 88% 12%,  rgba(185,163,201,.13), transparent 60%),
+    radial-gradient(ellipse 90% 70% at 50% 100%, rgba(217,201,228,.18), transparent 65%);
+
+  --el-color-primary: #9677ad;
+  --el-color-primary-light-3: #b295c3;
+  --el-color-primary-light-5: #c3aed3;
+  --el-color-primary-light-7: #d9cce3;
+  --el-color-primary-light-8: #e3daeb;
+  --el-color-primary-light-9: #f2edf6;
+  --el-color-primary-dark-2: #7a5f8c;
 }
 
 /* ---------- Reset ---------- */
@@ -329,12 +516,12 @@ textarea:focus-visible,
 
 /* ---------- Text selection ---------- */
 ::selection {
-  background: rgba(47, 124, 246, 0.18);
+  background: rgba(var(--ev-primary-rgb), 0.18);
   color: var(--ev-text-primary);
 }
 
 ::-moz-selection {
-  background: rgba(47, 124, 246, 0.18);
+  background: rgba(var(--ev-primary-rgb), 0.18);
   color: var(--ev-text-primary);
 }
 
@@ -375,7 +562,7 @@ textarea:focus-visible,
   box-shadow:
     0 0 0 1px var(--ev-border-default) inset,
     var(--ev-inset-gloss),
-    0 1px 2px rgba(18, 48, 79, 0.03) !important;
+    0 1px 2px rgba(var(--ev-ink-rgb), 0.03) !important;
   border-radius: var(--ev-radius-md) !important;
   transition: all 0.3s var(--ev-ease-out) !important;
 
@@ -384,7 +571,7 @@ textarea:focus-visible,
     box-shadow:
       0 0 0 1px var(--ev-border-hover) inset,
       var(--ev-inset-gloss),
-      0 1px 2px rgba(18, 48, 79, 0.04) !important;
+      0 1px 2px rgba(var(--ev-ink-rgb), 0.04) !important;
   }
 }
 
@@ -394,7 +581,7 @@ textarea:focus-visible,
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
       var(--ev-inset-gloss),
-      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+      0 1px 3px rgba(var(--ev-ink-rgb), 0.05) !important;
   }
 
 
@@ -467,7 +654,7 @@ textarea:focus-visible,
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
       var(--ev-inset-gloss),
-      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+      0 1px 3px rgba(var(--ev-ink-rgb), 0.05) !important;
   }
 }
 
@@ -483,7 +670,7 @@ textarea:focus-visible,
     box-shadow:
       0 0 0 1px var(--ev-border-default) inset,
       var(--ev-inset-gloss),
-      0 1px 3px rgba(18, 48, 79, 0.05) !important;
+      0 1px 3px rgba(var(--ev-ink-rgb), 0.05) !important;
   }
 }
 
@@ -515,17 +702,17 @@ textarea:focus-visible,
   color: #ffffff !important;
   font-weight: 600 !important;
   letter-spacing: 0.2px !important;
-  box-shadow: 0 2px 6px rgba(47, 124, 246, 0.22) !important;
+  box-shadow: 0 2px 6px rgba(var(--ev-primary-rgb), 0.22) !important;
 
   &:hover {
     background: var(--ev-primary-hover) !important;
     border-color: var(--ev-primary-hover) !important;
     color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(47, 124, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(var(--ev-primary-rgb), 0.3) !important;
   }
 
   &:active {
-    box-shadow: 0 1px 3px rgba(47, 124, 246, 0.22) !important;
+    box-shadow: 0 1px 3px rgba(var(--ev-primary-rgb), 0.22) !important;
   }
 
   &.is-disabled,
@@ -644,7 +831,7 @@ textarea:focus-visible,
 }
 
 .el-overlay {
-  background-color: rgba(18, 48, 79, 0.22) !important;
+  background-color: rgba(var(--ev-ink-rgb), 0.22) !important;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -659,9 +846,9 @@ textarea:focus-visible,
 
 /* --- Drawer --- */
 .el-drawer {
-  background: var(--ev-bg-glass-strong) !important;
-  backdrop-filter: var(--ev-blur-lg);
-  -webkit-backdrop-filter: var(--ev-blur-lg);
+  background: var(--ev-bg-dialog) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 
   .el-drawer__title {
     color: var(--ev-text-primary) !important;
@@ -829,7 +1016,7 @@ textarea:focus-visible,
     border-color: var(--ev-primary) !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    box-shadow: 0 2px 6px rgba(47, 124, 246, 0.22) !important;
+    box-shadow: 0 2px 6px rgba(var(--ev-primary-rgb), 0.22) !important;
   }
 }
 
@@ -949,5 +1136,50 @@ textarea:focus-visible,
   .el-divider__text {
     background: transparent !important;
     color: var(--ev-text-muted) !important;
+  }
+}
+
+/* --- Pagination --- */
+/* 全站分页统一规格：total / sizes / prev / pager / next / jumper
+   用 gap 统一间距，避免不同页面出现「挤在一起」或「缺胳膊少腿」 */
+.el-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  .el-pagination__total,
+  .el-pagination__sizes,
+  .el-pagination__jump {
+    margin: 0 !important;
+  }
+
+  .el-pagination__jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .el-pagination__editor {
+    margin: 0 2px;
+  }
+
+  .btn-prev,
+  .btn-next {
+    margin: 0 !important;
+  }
+
+  .el-pager {
+    display: flex;
+    gap: 6px;
+    margin: 0 !important;
+
+    li {
+      margin: 0 !important;
+    }
+  }
+
+  .el-pagination__sizes .el-select {
+    width: 112px;
   }
 }

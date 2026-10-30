@@ -22,8 +22,8 @@
           :collapse="isCollapse"
           :collapse-transition="false"
           background-color="transparent"
-          text-color="#4c6b8a"
-          active-text-color="#2f7cf6"
+          text-color="var(--ev-text-secondary)"
+          active-text-color="var(--ev-primary)"
           class="sidebar-menu"
           router
           unique-opened
@@ -169,6 +169,10 @@
               <el-icon><EditPen /></el-icon>
               <template #title>记事本</template>
             </el-menu-item>
+            <el-menu-item index="/workspace/notes/community">
+              <el-icon><Reading /></el-icon>
+              <template #title>公开笔记</template>
+            </el-menu-item>
             <el-menu-item index="/workspace/todos">
               <el-icon><List /></el-icon>
               <template #title>待办</template>
@@ -187,7 +191,14 @@
             </el-menu-item>
           </el-sub-menu>
 
+          <!-- 个人项目发布：按管理员账号隔离，放在个人区而不是共享管理员菜单 -->
+          <el-menu-item v-if="userStore.isAdmin" index="/workspace/projects">
+            <el-icon><Box /></el-icon>
+            <template #title>项目管理</template>
+          </el-menu-item>
+
           <!-- 4. 会员与管理：管理员固定最后，超级会员紧挨其上方 -->
+
           <el-sub-menu index="super-member">
             <template #title>
               <el-icon><StarFilled /></el-icon>
@@ -214,7 +225,9 @@
               <el-icon><UserFilled /></el-icon>
               <template #title>用户管理</template>
             </el-menu-item>
+
             <el-menu-item index="/admin/assets">
+
               <el-icon><PictureFilled /></el-icon>
               <template #title>相册图床</template>
             </el-menu-item>
@@ -281,9 +294,14 @@
             <el-icon :size="13"><InfoFilled /></el-icon>
             <span v-if="!isCollapse">关于</span>
           </a>
-          <span class="sidebar-online" :title="`当前在线登录用户 ${onlineCount} 人`">
+          <span
+            class="sidebar-online"
+            :title="onlineCount === null ? '正在获取在线人数' : `当前在线登录用户 ${onlineCount} 人`"
+          >
             <span class="online-dot"></span>
-            <span class="online-text">{{ isCollapse ? onlineCount : `在线 ${onlineCount}` }}</span>
+            <span class="online-text">
+              {{ isCollapse ? (onlineCount ?? '–') : `在线 ${onlineCount ?? '–'}` }}
+            </span>
           </span>
         </div>
       </el-aside>
@@ -412,7 +430,8 @@ const themeDrawerVisible = ref(false)
 const aboutVisible = ref(false)
 
 // ---------- 在线登录用户数（复用积分 SSE 连接统计） ----------
-const onlineCount = ref(0)
+// null = 还没取到：显示「–」，避免先闪一个错误的 0
+const onlineCount = ref<number | null>(null)
 let onlineTimer: number | undefined
 
 const loadOnlineCount = async () => {
@@ -423,6 +442,9 @@ const loadOnlineCount = async () => {
     /* 静默失败，保留上一次数值，避免侧边栏常驻报错 */
   }
 }
+
+// 尽早发出首个请求：放在 setup 顶层，早于 SSE 建连，避免被长连接占满并发槽位后排队
+void loadOnlineCount()
 
 const handleVisibilityChange = () => {
   if (document.visibilityState === 'visible') void loadOnlineCount()
@@ -440,7 +462,12 @@ const handleVisibilityChange = () => {
  */
 const KEEP_ALIVE_NAMES = ['AiArenaLeaderboard', 'AiOllamaModels']
 
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/workspace/projects')) return '/workspace/projects'
+  return route.path
+})
+
+
 
 const userRoleName = computed(() => {
   return UserRoleMap[userStore.userRole as UserRole] || '普通成员'
@@ -506,6 +533,11 @@ const connectPointsStream = () => {
   if (!token) return
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
   pointsSource = new EventSource(`${base}/points/stream?token=${encodeURIComponent(token)}`)
+  // 后端 register 成功后立刻推送 ready：此时本连接已计入在线数，马上刷新一次，
+  // 否则要等 30 秒轮询才会把自己算进去
+  pointsSource.addEventListener('ready', () => {
+    void loadOnlineCount()
+  })
   pointsSource.addEventListener('points-changed', (e) => {
     try {
       const data = JSON.parse((e as MessageEvent).data)
@@ -528,7 +560,6 @@ onMounted(() => {
     }, 60000)
   }
   connectPointsStream()
-  void loadOnlineCount()
   onlineTimer = window.setInterval(() => void loadOnlineCount(), 30000)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
@@ -615,7 +646,7 @@ onBeforeUnmount(() => {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(47, 124, 246, 0.14), rgba(79, 195, 232, 0.14));
+  background: linear-gradient(135deg, rgba(var(--ev-primary-rgb), 0.14), rgba(var(--ev-aqua-rgb), 0.14));
   border: 1px solid var(--ev-border-default);
   display: flex;
   align-items: center;
@@ -639,7 +670,7 @@ onBeforeUnmount(() => {
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 2.5px;
-  background: linear-gradient(135deg, #2f7cf6 0%, #4fc3e8 100%);
+  background: linear-gradient(135deg, var(--ev-primary) 0%, var(--ev-aqua) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -652,8 +683,8 @@ onBeforeUnmount(() => {
   margin: 0 16px 8px;
   background: linear-gradient(90deg,
     transparent,
-    rgba(47, 124, 246, 0.22),
-    rgba(79, 195, 232, 0.22),
+    rgba(var(--ev-primary-rgb), 0.22),
+    rgba(var(--ev-aqua-rgb), 0.22),
     transparent
   );
   flex-shrink: 0;
@@ -710,8 +741,8 @@ onBeforeUnmount(() => {
 
   :deep(.el-menu-item.is-active) {
     background: linear-gradient(135deg,
-      rgba(47, 124, 246, 0.12) 0%,
-      rgba(79, 195, 232, 0.08) 100%
+      rgba(var(--ev-primary-rgb), 0.12) 0%,
+      rgba(var(--ev-aqua-rgb), 0.08) 100%
     ) !important;
     color: var(--ev-primary) !important;
     font-weight: 600 !important;
@@ -728,7 +759,7 @@ onBeforeUnmount(() => {
       height: 20px;
       border-radius: 0 3px 3px 0;
       background: var(--ev-grad-aurora);
-      box-shadow: 0 0 8px rgba(47, 124, 246, 0.35);
+      box-shadow: 0 0 8px rgba(var(--ev-primary-rgb), 0.35);
     }
   }
 
@@ -798,7 +829,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--ev-aqua);
-  box-shadow: 0 0 6px rgba(79, 195, 232, 0.7);
+  box-shadow: 0 0 6px rgba(var(--ev-aqua-rgb), 0.7);
   animation: online-breathe 2.4s ease-in-out infinite;
 }
 
@@ -826,7 +857,7 @@ onBeforeUnmount(() => {
   height: 96px;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 100%, rgba(79, 195, 232, 0.12) 0%, transparent 70%);
+  background: radial-gradient(ellipse at 50% 100%, rgba(var(--ev-aqua-rgb), 0.12) 0%, transparent 70%);
 }
 
 /* ============================================================
@@ -890,7 +921,7 @@ onBeforeUnmount(() => {
   height: 6px;
   border-radius: 50%;
   background: var(--ev-aqua);
-  box-shadow: 0 0 8px rgba(79, 195, 232, 0.55);
+  box-shadow: 0 0 8px rgba(var(--ev-aqua-rgb), 0.55);
 }
 
 .indicator-text {
@@ -1082,7 +1113,7 @@ onBeforeUnmount(() => {
     right: 0;
     width: 60%;
     height: 45%;
-    background: radial-gradient(ellipse at top right, rgba(79, 195, 232, 0.10) 0%, transparent 62%);
+    background: radial-gradient(ellipse at top right, rgba(var(--ev-aqua-rgb), 0.10) 0%, transparent 62%);
     pointer-events: none;
     z-index: 0;
   }

@@ -86,7 +86,7 @@ const brandFeatures: AuthFeature[] = [
 .blob-1 {
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(47, 124, 246, 0.28) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-primary-rgb), 0.28) 0%, transparent 70%);
   top: -180px;
   left: -120px;
 }
@@ -94,7 +94,7 @@ const brandFeatures: AuthFeature[] = [
 .blob-2 {
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(79, 195, 232, 0.26) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-aqua-rgb), 0.26) 0%, transparent 70%);
   bottom: -150px;
   right: -100px;
 }
@@ -102,7 +102,7 @@ const brandFeatures: AuthFeature[] = [
 .blob-3 {
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(165, 228, 242, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-aqua-soft-rgb), 0.3) 0%, transparent 70%);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -111,7 +111,7 @@ const brandFeatures: AuthFeature[] = [
 .blob-4 {
   width: 350px;
   height: 350px;
-  background: radial-gradient(circle, rgba(207, 230, 255, 0.42) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-mist-rgb),  0.42) 0%, transparent 70%);
   top: 20%;
   right: 15%;
 }
@@ -128,14 +128,14 @@ const brandFeatures: AuthFeature[] = [
   position: absolute;
   border-radius: 50%;
 
-  &.particle-1 { left: 12%; top: 25%; width: 5px; height: 5px; background: rgba(47,124,246,0.45); box-shadow: 0 0 10px rgba(47,124,246,0.35); }
-  &.particle-2 { left: 78%; top: 15%; width: 4px; height: 4px; background: rgba(79,195,232,0.45); box-shadow: 0 0 10px rgba(79,195,232,0.35); }
-  &.particle-3 { left: 45%; top: 70%; width: 6px; height: 6px; background: rgba(127,178,251,0.40); box-shadow: 0 0 10px rgba(127,178,251,0.30); }
-  &.particle-4 { left: 88%; top: 60%; width: 3px; height: 3px; background: rgba(165,228,242,0.55); box-shadow: 0 0 10px rgba(165,228,242,0.4); }
-  &.particle-5 { left: 30%; top: 45%; width: 5px; height: 5px; background: rgba(47,124,246,0.40); box-shadow: 0 0 10px rgba(47,124,246,0.30); }
-  &.particle-6 { left: 65%; top: 85%; width: 4px; height: 4px; background: rgba(79,195,232,0.45); box-shadow: 0 0 10px rgba(79,195,232,0.35); }
-  &.particle-7 { left: 20%; top: 80%; width: 5px; height: 5px; background: rgba(127,178,251,0.40); box-shadow: 0 0 10px rgba(127,178,251,0.30); }
-  &.particle-8 { left: 55%; top: 30%; width: 4px; height: 4px; background: rgba(165,228,242,0.55); box-shadow: 0 0 10px rgba(165,228,242,0.4); }
+  &.particle-1 { left: 12%; top: 25%; width: 5px; height: 5px; background: rgba(var(--ev-primary-rgb), 0.45); box-shadow: 0 0 10px rgba(var(--ev-primary-rgb), 0.35); }
+  &.particle-2 { left: 78%; top: 15%; width: 4px; height: 4px; background: rgba(var(--ev-aqua-rgb), 0.45); box-shadow: 0 0 10px rgba(var(--ev-aqua-rgb), 0.35); }
+  &.particle-3 { left: 45%; top: 70%; width: 6px; height: 6px; background: rgba(var(--ev-primary-soft-rgb), 0.40); box-shadow: 0 0 10px rgba(var(--ev-primary-soft-rgb), 0.30); }
+  &.particle-4 { left: 88%; top: 60%; width: 3px; height: 3px; background: rgba(var(--ev-aqua-soft-rgb), 0.55); box-shadow: 0 0 10px rgba(var(--ev-aqua-soft-rgb), 0.4); }
+  &.particle-5 { left: 30%; top: 45%; width: 5px; height: 5px; background: rgba(var(--ev-primary-rgb), 0.40); box-shadow: 0 0 10px rgba(var(--ev-primary-rgb), 0.30); }
+  &.particle-6 { left: 65%; top: 85%; width: 4px; height: 4px; background: rgba(var(--ev-aqua-rgb), 0.45); box-shadow: 0 0 10px rgba(var(--ev-aqua-rgb), 0.35); }
+  &.particle-7 { left: 20%; top: 80%; width: 5px; height: 5px; background: rgba(var(--ev-primary-soft-rgb), 0.40); box-shadow: 0 0 10px rgba(var(--ev-primary-soft-rgb), 0.30); }
+  &.particle-8 { left: 55%; top: 30%; width: 4px; height: 4px; background: rgba(var(--ev-aqua-soft-rgb), 0.55); box-shadow: 0 0 10px rgba(var(--ev-aqua-soft-rgb), 0.4); }
 }
 
 /* ---- Grid Overlay ---- */
@@ -144,8 +144,8 @@ const brandFeatures: AuthFeature[] = [
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(47, 124, 246, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(47, 124, 246, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(var(--ev-primary-rgb), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ev-primary-rgb), 0.05) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 70%);
   -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 70%);

@@ -38,11 +38,13 @@ public class StorageConfig {
     private static final String NOTE_IMAGE_DIR = "notes";
     private static final String ANNOUNCEMENT_DIR = "announcements";
     private static final String TOPIC_DIR = "topics";
-
+    private static final String RELEASE_DIR = "releases";
+    private static final String RELEASE_UPLOAD_DIR = "releases/.uploads";
 
     /**
      * 数据存储根目录
      */
+
     private String dataDir = "./data";
 
     /**
@@ -74,6 +76,10 @@ public class StorageConfig {
             Files.createDirectories(basePath.resolve(ANNOUNCEMENT_DIR));
             // 话题帖子插图同理：只服务于话题帖子
             Files.createDirectories(basePath.resolve(TOPIC_DIR));
+            // 版本发布：正式附件与分片临时目录分开
+            Files.createDirectories(basePath.resolve(RELEASE_DIR));
+            Files.createDirectories(basePath.resolve(RELEASE_UPLOAD_DIR));
+
 
             log.info("数据存储目录已初始化: {}", basePath);
         } catch (IOException e) {
@@ -138,6 +144,27 @@ public class StorageConfig {
     public Path getThumbnailPath(Long userId) {
         return getDataPath().resolve("thumbnails").resolve(String.valueOf(userId));
     }
+
+    /** 版本发布附件根目录 */
+    public Path getReleaseRoot() {
+        return getDataPath().resolve(RELEASE_DIR);
+    }
+
+    /** 分片上传临时根目录 */
+    public Path getReleaseUploadRoot() {
+        return getDataPath().resolve(RELEASE_UPLOAD_DIR);
+    }
+
+    /** 单次分片上传的临时目录 */
+    public Path getReleaseUploadDir(String uploadId) {
+        return getReleaseUploadRoot().resolve(uploadId);
+    }
+
+    /** 正式附件目录：projects/{projectId}/{storageKey} */
+    public Path getReleaseAssetDir(Long projectId, String storageKey) {
+        return getReleaseRoot().resolve(String.valueOf(projectId)).resolve(storageKey);
+    }
+
 
     /**
      * 确保用户目录存在

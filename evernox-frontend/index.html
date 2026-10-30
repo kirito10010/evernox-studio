@@ -8,6 +8,7 @@
     <script>
       try {
         var t = localStorage.getItem('evernox_theme') || 'light'
+        if (['light', 'dark', 'celadon', 'lotus'].indexOf(t) < 0) t = 'light'
         document.documentElement.setAttribute('data-theme', t)
         if (t === 'dark') document.documentElement.classList.add('dark')
       } catch (e) {}
@@ -23,6 +24,14 @@
       }
       html[data-theme='dark'], html[data-theme='dark'] body {
         background: #0f1621;
+      }
+      /* 青瓷 */
+      html[data-theme='celadon'], html[data-theme='celadon'] body {
+        background: #edf7f3;
+      }
+      /* 藕荷 */
+      html[data-theme='lotus'], html[data-theme='lotus'] body {
+        background: #f8f3f9;
       }
     </style>
   </head>

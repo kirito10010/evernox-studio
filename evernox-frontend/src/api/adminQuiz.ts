@@ -2,7 +2,8 @@ import { get, post, put, del } from '@/utils/request'
 import { buildQuery } from '@/utils/query'
 import type { Result } from '@/types/user'
 import type { PageResult } from '@/api/image'
-import type { AdminQuizListParams, QuizImportResult, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+import type { AdminQuizListParams, QuizImportItem, QuizImportResult, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+
 
 export const getAdminQuizList = (
   params: AdminQuizListParams
@@ -34,11 +35,7 @@ export const rejectQuiz = (id: number): Promise<Result<void>> => {
   return post(`/admin/quiz/${id}/reject`)
 }
 
-export const importQuizExcel = (file: File): Promise<Result<QuizImportResult>> => {
-  const formData = new FormData()
-  formData.append('file', file)
-  return post('/admin/quiz/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 120000,
-  })
+export const importQuizJson = (items: QuizImportItem[]): Promise<Result<QuizImportResult>> => {
+  return post('/admin/quiz/import', items, { timeout: 120000 })
 }
+

@@ -11,6 +11,7 @@
           <div class="stat"><span class="num">{{ stats.pending ?? '—' }}</span><span class="label">待审批</span></div>
           <div class="stat"><span class="num">{{ stats.published ?? '—' }}</span><span class="label">已公开</span></div>
         </div>
+        <el-button @click="router.push('/workspace/notes/community')">看看公开笔记</el-button>
         <el-button type="primary" @click="openCreate">写笔记</el-button>
       </div>
     </div>
@@ -43,7 +44,7 @@
           驳回：{{ note.rejectReason }}
         </p>
         <div class="card-foot" @click.stop>
-          <span class="time">{{ note.updatedAt }}</span>
+          <span class="time">{{ formatDateTime(note.updatedAt) }}</span>
           <div class="actions">
             <el-button size="small" text @click="togglePin(note)">
               {{ note.pinned === 1 ? '取消置顶' : '置顶' }}
@@ -66,30 +67,71 @@
         <el-button v-else-if="hasMore && !supportsObserver" text @click="loadMore">加载更多</el-button>
       </div>
     </div>
-    <el-drawer v-model="editorVisible" :title="editingId ? '编辑笔记' : '写笔记'" size="720px">
-      <el-form label-position="top">
-        <el-form-item label="标题">
-          <el-input v-model="form.title" maxlength="100" show-word-limit placeholder="给这篇笔记起个名字" />
-        </el-form-item>
-        <el-form-item label="正文">
+    <el-drawer
+      v-model="editorVisible"
+      :with-header="false"
+      size="780px"
+      class="note-editor-drawer"
+    >
+      <div class="editor-shell">
+        <header class="editor-header">
+          <div class="editor-heading">
+            <span class="editor-kicker">{{ editingId ? 'EDIT NOTE' : 'NEW NOTE' }}</span>
+            <h3>{{ editingId ? '编辑笔记' : '写笔记' }}</h3>
+            <p>记录想法、整理灵感，支持富文本与插图</p>
+          </div>
+          <el-button
+            text
+            circle
+            class="editor-close"
+            aria-label="关闭"
+            @click="editorVisible = false"
+          >
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </header>
+
+        <div class="editor-title-field">
+          <el-input
+            v-model="form.title"
+            maxlength="100"
+            show-word-limit
+            placeholder="给这篇笔记起个名字"
+            class="title-input"
+          />
+        </div>
+
+        <div class="editor-card">
           <RichTextEditor
             v-if="editorVisible"
             ref="editorRef"
             v-model="form.content"
             :loader="decryptImage"
+            placeholder="开始写点什么…"
           />
-        </el-form-item>
-      </el-form>
+        </div>
+      </div>
+
       <template #footer>
-        <el-button @click="editorVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+        <div class="editor-footer">
+          <div class="editor-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>保存后为私有笔记，申请公开需管理员审批</span>
+          </div>
+          <div class="editor-actions">
+            <el-button @click="editorVisible = false">取消</el-button>
+            <el-button type="primary" :loading="saving" @click="handleSave">
+              {{ editingId ? '保存修改' : '保存笔记' }}
+            </el-button>
+          </div>
+        </div>
       </template>
     </el-drawer>
 
     <el-drawer v-model="detailVisible" :title="detail?.title || '笔记'" size="720px">
       <div v-if="detail" class="detail-meta">
         <span class="chip" :class="`s-${detail.status}`">{{ NoteStatusMap[detail.status] }}</span>
-        <span class="time">更新于 {{ detail.updatedAt }}</span>
+        <span class="time">更新于 {{ formatDateTime(detail.updatedAt) }}</span>
       </div>
       <RichTextViewer v-if="detail && detailVisible" :html="detail.content || ''" :loader="decryptImage" />
       <el-empty v-else-if="!detailLoading" description="空白笔记" />
@@ -103,6 +145,7 @@
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import RichTextViewer from '@/components/RichTextViewer.vue'
@@ -120,11 +163,13 @@ import {
   withdrawNote,
 } from '@/api/note'
 import { NoteStatus, NoteStatusMap } from '@/types/note'
+import { formatDateTime } from '@/utils/format'
 import AuthRequired from '@/components/auth/AuthRequired.vue'
 import { useUserStore } from '@/stores/user'
 import type { Note, NoteStats } from '@/types/note'
 
 const userStore = useUserStore()
+const router = useRouter()
 
 const BATCH_SIZE = 20
 
@@ -543,6 +588,225 @@ onUnmounted(clearCache)
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding: 28px 30px 24px;
+  background:
+    radial-gradient(110% 120% at 100% 0%, rgba(var(--ev-primary-rgb), 0.1), transparent 55%),
+    var(--ev-bg-deep);
+}
+
+.editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.editor-heading {
+  min-width: 0;
+
+  h3 {
+    margin: 6px 0 4px;
+    font-size: 24px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: var(--ev-text-primary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--ev-text-muted);
+  }
+}
+
+.editor-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ev-primary);
+}
+
+.editor-close {
+  flex-shrink: 0;
+  color: var(--ev-text-muted);
+
+  &:hover {
+    color: var(--ev-text-primary);
+  }
+}
+
+.editor-title-field {
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--ev-border-subtle);
+
+  :deep(.el-input__wrapper) {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  :deep(.el-input__inner) {
+    height: 46px;
+    font-size: 24px;
+    font-weight: 750;
+    color: var(--ev-text-primary);
+  }
+
+  :deep(.el-input__inner::placeholder) {
+    color: var(--ev-text-muted);
+    font-weight: 600;
+  }
+
+  :deep(.el-input__count) {
+    background: transparent;
+    color: var(--ev-text-muted);
+  }
+}
+
+.editor-card {
+  border: 1px solid var(--ev-border-subtle);
+  border-radius: 16px;
+  background: var(--ev-bg-surface);
+  box-shadow: var(--ev-shadow-sm);
+  overflow: hidden;
+
+  :deep(.rich-editor) {
+    gap: 0;
+  }
+
+  :deep(.ql-toolbar.ql-snow) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 9px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--ev-border-subtle);
+    background: var(--ev-bg-tint);
+  }
+
+  :deep(.ql-toolbar.ql-snow .ql-formats) {
+    margin-right: 10px;
+  }
+
+  :deep(.ql-toolbar.ql-snow .ql-stroke) {
+    stroke: var(--ev-text-secondary);
+  }
+
+  :deep(.ql-toolbar.ql-snow .ql-fill) {
+    fill: var(--ev-text-secondary);
+  }
+
+  :deep(.ql-toolbar.ql-snow .ql-picker) {
+    color: var(--ev-text-secondary);
+  }
+
+  :deep(.ql-toolbar.ql-snow button:hover .ql-stroke),
+  :deep(.ql-toolbar.ql-snow button.ql-active .ql-stroke) {
+    stroke: var(--ev-primary);
+  }
+
+  :deep(.ql-toolbar.ql-snow button:hover .ql-fill),
+  :deep(.ql-toolbar.ql-snow button.ql-active .ql-fill) {
+    fill: var(--ev-primary);
+  }
+
+  :deep(.ql-toolbar.ql-snow .ql-picker-options) {
+    border-color: var(--ev-border-subtle);
+    background: var(--ev-bg-elevated);
+    box-shadow: var(--ev-shadow-sm);
+  }
+
+  :deep(.ql-container.ql-snow) {
+    border: 0;
+  }
+
+  :deep(.editor-body) {
+    min-height: 340px;
+    background: transparent;
+  }
+
+  :deep(.ql-editor) {
+    min-height: 340px;
+    padding: 18px 20px;
+    font-size: 14.5px;
+    line-height: 1.8;
+    color: var(--ev-text-primary);
+  }
+
+  :deep(.ql-editor.ql-blank::before) {
+    color: var(--ev-text-muted);
+    font-style: normal;
+  }
+
+  :deep(.ql-editor img) {
+    max-width: 100%;
+    border-radius: 10px;
+  }
+
+  :deep(.editor-tip) {
+    padding: 8px 14px 10px;
+    border-top: 1px dashed var(--ev-border-subtle);
+    background: var(--ev-bg-surface);
+    font-size: 11.5px;
+  }
+}
+
+.editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 30px;
+}
+
+.editor-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ev-text-muted);
+}
+
+.editor-actions {
+  display: flex;
+  gap: 10px;
+}
+</style>
+
+<style lang="scss">
+.note-editor-drawer {
+  .el-drawer__body {
+    padding: 0;
+    overflow-y: auto;
+  }
+
+  .el-drawer__footer {
+    padding: 0;
+    border-top: 1px solid var(--ev-border-subtle);
+    background: var(--ev-bg-surface);
+  }
+}
+
+@media (max-width: 820px) {
+  .note-editor-drawer {
+    width: 100% !important;
+  }
+
+  .note-editor-drawer .editor-shell {
+    padding: 20px 18px;
+  }
+
+  .note-editor-drawer .editor-footer {
+    padding: 12px 18px;
+  }
 }
 </style>
 

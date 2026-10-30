@@ -8,8 +8,11 @@ export interface QuizQuestion {
   answer: string
   status: number
   score?: number | null
+  /** 当前用户对无答案题目已投的选项 */
+  myVote?: string | null
   createdAt: string
 }
+
 
 export interface QuizQuestionRequest {
   question: string
@@ -20,10 +23,38 @@ export interface QuizQuestionRequest {
   answer: string
 }
 
+export interface QuizImportItem {
+  question: string
+  options: string[]
+  answer: string
+}
+
 export interface QuizImportResult {
   imported: number
+  updated: number
   skipped: number
 }
+
+export interface QuizVoteRequest {
+  questionId: number
+  answer: string
+}
+
+export interface QuizVoteResult {
+  resolved: boolean
+  answer?: string | null
+  rewarded: boolean
+  points: number
+  votes: number
+  message: string
+}
+
+export interface QuizPendingResult {
+  total: number
+  items: QuizQuestion[]
+}
+
+
 
 export const QuizStatusMap: Record<number, string> = {
   0: '待审批',

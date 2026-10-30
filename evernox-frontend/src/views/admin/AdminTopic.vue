@@ -76,7 +76,8 @@
             v-model:page-size="postSize"
             :page-sizes="[10, 20, 50]"
             :total="postTotal"
-            layout="total, sizes, prev, pager, next"
+            layout="total, sizes, prev, pager, next, jumper"
+            background
             @current-change="loadPosts"
             @size-change="reloadPosts"
           />
@@ -141,7 +142,8 @@
             v-model:page-size="commentSize"
             :page-sizes="[10, 20, 50]"
             :total="commentTotal"
-            layout="total, sizes, prev, pager, next"
+            layout="total, sizes, prev, pager, next, jumper"
+            background
             @current-change="loadComments"
             @size-change="reloadComments"
           />
@@ -215,7 +217,8 @@
             v-model:page-size="circleSize"
             :page-sizes="[10, 20, 50]"
             :total="circleTotal"
-            layout="total, sizes, prev, pager, next"
+            layout="total, sizes, prev, pager, next, jumper"
+            background
             @current-change="loadCircles"
             @size-change="reloadCircles"
           />

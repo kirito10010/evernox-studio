@@ -126,14 +126,16 @@
         <el-empty v-if="!listLoading && !records.length" description="没有符合条件的消费记录" />
       </div>
 
-      <div v-if="recordsTotal > PAGE_SIZE" class="pagination-wrap">
+      <div v-if="recordsTotal > recordsSize" class="pagination-wrap">
         <el-pagination
           v-model:current-page="recordsPage"
-          :page-size="PAGE_SIZE"
+          v-model:page-size="recordsSize"
+          :page-sizes="[10, 20, 50]"
           :total="recordsTotal"
-          layout="prev, pager, next, total"
+          layout="total, sizes, prev, pager, next, jumper"
           background
           @current-change="loadRecordsPage"
+          @size-change="onRecordsSizeChange"
         />
       </div>
     </el-dialog>
@@ -224,7 +226,7 @@ import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
 const RECENT_SIZE = 5
-const PAGE_SIZE = 10
+const DEFAULT_PAGE_SIZE = 10
 
 // ---------- 数据 ----------
 const categories = ref<ExpenseCategory[]>([])
@@ -243,6 +245,7 @@ const recordsVisible = ref(false)
 const records = ref<ExpenseRecord[]>([])
 const recordsTotal = ref(0)
 const recordsPage = ref(1)
+const recordsSize = ref(DEFAULT_PAGE_SIZE)
 const listLoading = ref(false)
 const recordFilter = reactive({
   categoryId: null as number | null,
@@ -446,7 +449,7 @@ const loadRecordsPage = async (page: number) => {
   try {
     const res = await listRecords({
       page,
-      size: PAGE_SIZE,
+      size: recordsSize.value,
       categoryId: recordFilter.categoryId,
       startDate: recordFilter.dateRange?.[0] ?? null,
       endDate: recordFilter.dateRange?.[1] ?? null,
@@ -460,6 +463,11 @@ const loadRecordsPage = async (page: number) => {
   } finally {
     listLoading.value = false
   }
+}
+
+const onRecordsSizeChange = () => {
+  recordsPage.value = 1
+  void loadRecordsPage(1)
 }
 
 const reloadRecords = () => {

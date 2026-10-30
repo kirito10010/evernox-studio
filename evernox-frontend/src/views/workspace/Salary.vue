@@ -135,6 +135,7 @@
           :page-sizes="[10, 20, 50]"
           :total="filteredRecords.length"
           layout="total, sizes, prev, pager, next, jumper"
+          background
           @current-change="onPageChange"
           @size-change="onPageSizeChange"
         />

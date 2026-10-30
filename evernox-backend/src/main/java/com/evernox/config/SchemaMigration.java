@@ -60,8 +60,68 @@ public class SchemaMigration implements ApplicationRunner {
         // 绩效记录：实际工作量放开到 3 位小数（0.125 = 1 小时，定额 8）
         ensureDecimalScale("performance_record", "actual_workload", 3,
                 "DECIMAL(12,3) NOT NULL COMMENT '实际工作量'");
+
+        // 版本发布：项目归属管理员，数据按账号隔离
+        addColumnIfMissing("release_project", "owner_id",
+                "BIGINT NULL COMMENT '所属管理员ID'");
+        addIndexIfMissing("release_project", "idx_owner", "`owner_id`");
+        backfillReleaseProjectOwner();
+
+        // 版本发布：每个版本独立记录下载次数
+        addColumnIfMissing("project_release", "download_count",
+                "BIGINT NOT NULL DEFAULT 0 COMMENT '完整下载次数'");
+        backfillReleaseDownloadCount();
         // ===== 上面是登记区 =====
     }
+
+    /**
+     * 老版本的下载次数只记在附件上：升级时汇总非 blockmap/yml 附件到版本，
+     * 避免页面上原有下载数突然变成 0。
+     */
+    private void backfillReleaseDownloadCount() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE project_release r SET r.download_count = (" +
+                    "SELECT COALESCE(SUM(a.download_count), 0) FROM release_asset a " +
+                    "WHERE a.release_id = r.id AND a.deleted = 0 " +
+                    "AND LOWER(a.file_name) NOT LIKE '%.blockmap' " +
+                    "AND LOWER(a.file_name) NOT LIKE '%.yml' " +
+                    "AND LOWER(a.file_name) NOT LIKE '%.yaml') " +
+                    "WHERE r.download_count = 0 AND EXISTS (" +
+                    "SELECT 1 FROM release_asset a2 WHERE a2.release_id = r.id " +
+                    "AND a2.deleted = 0 AND a2.download_count > 0 " +
+                    "AND LOWER(a2.file_name) NOT LIKE '%.blockmap' " +
+                    "AND LOWER(a2.file_name) NOT LIKE '%.yml' " +
+                    "AND LOWER(a2.file_name) NOT LIKE '%.yaml')");
+            if (updated > 0) {
+                log.info("自动迁移完成：{} 个版本的下载次数已从附件汇总", updated);
+            }
+        } catch (Exception e) {
+            log.error("自动迁移失败：回填 project_release.download_count 失败，请手动执行 UPDATE：{}",
+                    e.getMessage());
+        }
+    }
+
+
+    /**
+     * 老项目没有 owner_id：归到第一个管理员，避免升级后原有项目对所有人不可见。
+     * 新项目由创建接口写入当前管理员 ID。
+     */
+    private void backfillReleaseProjectOwner() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE release_project SET owner_id = " +
+                    "(SELECT id FROM user WHERE role = 'admin' ORDER BY id LIMIT 1) " +
+                    "WHERE owner_id IS NULL");
+            if (updated > 0) {
+                log.info("自动迁移完成：{} 个发布项目已归属第一个管理员", updated);
+            }
+        } catch (Exception e) {
+            log.error("自动迁移失败：回填 release_project.owner_id 失败，请手动执行 UPDATE：{}",
+                    e.getMessage());
+        }
+    }
+
 
     private Integer columnCount(String table, String column) {
         return jdbcTemplate.queryForObject(

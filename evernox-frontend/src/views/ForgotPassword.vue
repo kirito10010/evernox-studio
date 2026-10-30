@@ -65,7 +65,7 @@ const handleSuccess = (_email: string) => {
 .blob-1 {
   width: 560px;
   height: 560px;
-  background: radial-gradient(circle, rgba(47, 124, 246, 0.26) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-primary-rgb), 0.26) 0%, transparent 70%);
   top: -160px;
   left: -120px;
 }
@@ -73,7 +73,7 @@ const handleSuccess = (_email: string) => {
 .blob-2 {
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(79, 195, 232, 0.24) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--ev-aqua-rgb), 0.24) 0%, transparent 70%);
   bottom: -140px;
   right: -100px;
 }
@@ -98,12 +98,12 @@ const handleSuccess = (_email: string) => {
   position: absolute;
   border-radius: 50%;
 
-  &.particle-1 { left: 15%; top: 30%; width: 5px; height: 5px; background: rgba(47,124,246,0.45); }
-  &.particle-2 { left: 75%; top: 20%; width: 4px; height: 4px; background: rgba(79,195,232,0.45); }
-  &.particle-3 { left: 40%; top: 70%; width: 6px; height: 6px; background: rgba(127,178,251,0.40); }
-  &.particle-4 { left: 85%; top: 60%; width: 3px; height: 3px; background: rgba(165,228,242,0.55); }
-  &.particle-5 { left: 25%; top: 50%; width: 5px; height: 5px; background: rgba(79,195,232,0.45); }
-  &.particle-6 { left: 60%; top: 82%; width: 4px; height: 4px; background: rgba(47,124,246,0.42); }
+  &.particle-1 { left: 15%; top: 30%; width: 5px; height: 5px; background: rgba(var(--ev-primary-rgb), 0.45); }
+  &.particle-2 { left: 75%; top: 20%; width: 4px; height: 4px; background: rgba(var(--ev-aqua-rgb), 0.45); }
+  &.particle-3 { left: 40%; top: 70%; width: 6px; height: 6px; background: rgba(var(--ev-primary-soft-rgb), 0.40); }
+  &.particle-4 { left: 85%; top: 60%; width: 3px; height: 3px; background: rgba(var(--ev-aqua-soft-rgb), 0.55); }
+  &.particle-5 { left: 25%; top: 50%; width: 5px; height: 5px; background: rgba(var(--ev-aqua-rgb), 0.45); }
+  &.particle-6 { left: 60%; top: 82%; width: 4px; height: 4px; background: rgba(var(--ev-primary-rgb), 0.42); }
 }
 
 .grid-overlay {
@@ -111,8 +111,8 @@ const handleSuccess = (_email: string) => {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(47, 124, 246, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(47, 124, 246, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(var(--ev-primary-rgb), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ev-primary-rgb), 0.05) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 70%);
   -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 50%, black 20%, transparent 70%);
@@ -145,7 +145,7 @@ const handleSuccess = (_email: string) => {
       height: 6px;
       border-radius: 50%;
       background: var(--ev-aqua);
-      box-shadow: 0 0 10px rgba(79, 195, 232, 0.7);
+      box-shadow: 0 0 10px rgba(var(--ev-aqua-rgb), 0.7);
     }
   }
 }

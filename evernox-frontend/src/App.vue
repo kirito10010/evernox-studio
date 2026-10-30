@@ -53,7 +53,7 @@ import AuthDialog from '@/components/auth/AuthDialog.vue'
   position: absolute;
   inset: 0;
   z-index: -1;
-  background-image: radial-gradient(rgba(47, 124, 246, 0.045) 1px, transparent 1px);
+  background-image: radial-gradient(var(--ev-dot-color) 1px, transparent 1px);
   background-size: 22px 22px;
   opacity: 0.6;
   pointer-events: none;

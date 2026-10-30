@@ -153,6 +153,7 @@
             :page-sizes="[20, 40, 60, 100]"
             :total="imageTotal"
             layout="total, sizes, prev, pager, next, jumper"
+            background
             @current-change="loadImages"
             @size-change="onImageSizeChange"
           />
@@ -279,6 +280,7 @@
             :page-sizes="[20, 40, 60, 100]"
             :total="albumTotal"
             layout="total, sizes, prev, pager, next, jumper"
+            background
             @current-change="loadAlbums"
             @size-change="onAlbumSizeChange"
           />
@@ -331,10 +333,13 @@
       <template #footer>
         <el-pagination
           v-model:current-page="drawerPage"
-          :page-size="drawerSize"
+          v-model:page-size="drawerSize"
+          :page-sizes="[24, 48, 96]"
           :total="drawerTotal"
-          layout="total, prev, pager, next"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
           @current-change="loadDrawerImages"
+          @size-change="onDrawerSizeChange"
         />
       </template>
     </el-drawer>
@@ -736,6 +741,11 @@ const openAlbumDrawer = async (row: AlbumResponse) => {
   drawerPage.value = 1
   drawerImages.value = []
   drawerVisible.value = true
+  await loadDrawerImages()
+}
+
+const onDrawerSizeChange = async () => {
+  drawerPage.value = 1
   await loadDrawerImages()
 }
 

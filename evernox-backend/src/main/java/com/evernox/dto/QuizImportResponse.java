@@ -6,8 +6,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Excel 导入结果
+ * JSON 导入结果
  */
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,6 +18,9 @@ public class QuizImportResponse {
     /** 成功导入数量 */
     private int imported;
 
-    /** 跳过数量（重复/空行） */
+    /** 题库中已有该题但答案为空，本次补全了多少条 */
+    private int updated;
+
     private int skipped;
 }
+

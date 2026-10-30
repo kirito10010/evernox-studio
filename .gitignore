@@ -21,6 +21,7 @@ evernox-backend/data/
 
 # ===== 构建产物与依赖（重装后重新构建即可）=====
 evernox-backend/target/
+evernox-backend/target-package/
 evernox-frontend/node_modules/
 evernox-frontend/dist/
 

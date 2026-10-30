@@ -11,6 +11,10 @@ public interface PointsService {
     /** 管理员充值积分 */
     void recharge(Long adminId, Long userId, Integer points, String description);
 
+    /** 系统奖励积分（如测验答案确认），不限制管理员账号 */
+    void award(Long userId, int points, String type, String description);
+
+
     /** 设置超级会员时长（天） */
     void setSuperMember(Long userId, Integer days);
 

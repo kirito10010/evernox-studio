@@ -57,10 +57,13 @@
     <div v-if="total > pageSize" class="pagination-wrap">
       <el-pagination
         v-model:current-page="currentPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[12, 24, 48]"
         :total="total"
-        layout="total, prev, pager, next, jumper"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="loadSites"
+        @size-change="onSizeChange"
       />
     </div>
 
@@ -155,7 +158,7 @@ const sites = ref<SiteLink[]>([])
 const loading = ref(false)
 const activeTab = ref('all')
 const currentPage = ref(1)
-const pageSize = 12
+const pageSize = ref(12)
 const total = ref(0)
 
 const dialogVisible = ref(false)
@@ -204,7 +207,7 @@ const loadSites = async () => {
   try {
     const res = await getMySites({
       page: currentPage.value,
-      size: pageSize,
+      size: pageSize.value,
       status: activeTab.value === 'all' ? undefined : Number(activeTab.value),
     })
     sites.value = res.data?.records || []
@@ -222,6 +225,11 @@ const loadSites = async () => {
 }
 
 const onTabChange = () => {
+  currentPage.value = 1
+  void loadSites()
+}
+
+const onSizeChange = () => {
   currentPage.value = 1
   void loadSites()
 }

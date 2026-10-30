@@ -81,7 +81,8 @@
               v-model:page-size="recentSize"
               :page-sizes="[20, 50, 100]"
               :total="recentTotal"
-              layout="total, sizes, prev, pager, next"
+              layout="total, sizes, prev, pager, next, jumper"
+              background
               @current-change="loadRecent"
               @size-change="reloadRecent"
             />

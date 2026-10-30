@@ -1,10 +1,14 @@
 package com.evernox.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.evernox.dto.QuizImportItem;
 import com.evernox.dto.QuizImportResponse;
+import com.evernox.dto.QuizPendingResponse;
 import com.evernox.dto.QuizQuestionRequest;
 import com.evernox.dto.QuizQuestionResponse;
-import org.springframework.web.multipart.MultipartFile;
+import com.evernox.dto.QuizVoteRequest;
+import com.evernox.dto.QuizVoteResponse;
+
 
 import java.util.List;
 
@@ -15,11 +19,19 @@ public interface QuizQuestionService {
 
     // ==================== 用户侧 ====================
 
-    /** 模糊搜索已通过题目 */
-    List<QuizQuestionResponse> search(String keyword);
+    /** 模糊搜索已通过题目；userId 用于标记当前用户已投的答案 */
+    List<QuizQuestionResponse> search(String keyword, Long userId);
+
+    /** 待确认（无答案）题目面板：总数量 + 当前用户还能作答的题目 */
+    QuizPendingResponse unanswered(int limit, Long userId);
+
+
+    /** 对无答案题目投票；同一答案达到 2 票自动写入答案并奖励积分 */
+    QuizVoteResponse vote(QuizVoteRequest request, Long userId);
 
     /** 用户提交题目（待审批） */
     QuizQuestionResponse submit(QuizQuestionRequest request, Long userId);
+
 
     // ==================== 管理员侧 ====================
 
@@ -38,7 +50,8 @@ public interface QuizQuestionService {
 
     void reject(Long id);
 
-    QuizImportResponse importExcel(MultipartFile file);
+    QuizImportResponse importJson(List<QuizImportItem> items);
+
 
     // ==================== 我的提交（用户侧） ====================
 

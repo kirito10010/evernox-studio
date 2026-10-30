@@ -208,7 +208,7 @@ const visible = computed({
   padding: 26px 28px;
   border: 1px solid var(--ev-border-subtle);
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(47, 124, 246, 0.08), rgba(79, 195, 232, 0.06) 55%, transparent);
+  background: linear-gradient(135deg, rgba(var(--ev-primary-rgb), 0.08), rgba(var(--ev-aqua-rgb), 0.06) 55%, transparent);
 }
 
 .hero-glow {
@@ -218,7 +218,7 @@ const visible = computed({
   width: 340px;
   height: 340px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(79, 195, 232, 0.18), transparent 68%);
+  background: radial-gradient(circle, rgba(var(--ev-aqua-rgb), 0.18), transparent 68%);
   pointer-events: none;
 }
 
@@ -238,7 +238,7 @@ const visible = computed({
   align-items: center;
   justify-content: center;
   border-radius: 13px;
-  background: linear-gradient(135deg, rgba(47, 124, 246, 0.16), rgba(79, 195, 232, 0.16));
+  background: linear-gradient(135deg, rgba(var(--ev-primary-rgb), 0.16), rgba(var(--ev-aqua-rgb), 0.16));
   border: 1px solid var(--ev-border-default);
   box-shadow: var(--ev-inset-gloss);
 
@@ -255,7 +255,7 @@ const visible = computed({
   color: var(--ev-text-primary);
 
   span {
-    background: linear-gradient(135deg, #2f7cf6, #4fc3e8);
+    background: linear-gradient(135deg, var(--ev-primary), var(--ev-aqua));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -280,7 +280,7 @@ h1 {
 }
 
 .accent {
-  background: linear-gradient(135deg, #2f7cf6, #4fc3e8);
+  background: linear-gradient(135deg, var(--ev-primary), var(--ev-aqua));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -392,7 +392,7 @@ h1 {
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--ev-grad-aurora);
-  box-shadow: 0 0 0 4px rgba(47, 124, 246, 0.08);
+  box-shadow: 0 0 0 4px rgba(var(--ev-primary-rgb), 0.08);
 }
 
 /* ---------- Developer ---------- */
@@ -429,8 +429,8 @@ h1 {
   font-size: 18px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #2f7cf6, #4fc3e8);
-  box-shadow: 0 8px 20px -8px rgba(47, 124, 246, 0.6);
+  background: linear-gradient(135deg, var(--ev-primary), var(--ev-aqua));
+  box-shadow: 0 8px 20px -8px rgba(var(--ev-primary-rgb), 0.6);
 }
 
 .contact-list {

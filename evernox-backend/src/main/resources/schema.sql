@@ -500,6 +500,19 @@ CREATE TABLE IF NOT EXISTS `quiz_question` (
     KEY `idx_deleted` (`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='火影忍者OL测验题库';
 
+-- 待确认题目的用户答案投票：同一用户每题只能投一次，同一答案达到 2 票即确认
+CREATE TABLE IF NOT EXISTS `quiz_answer_vote` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '投票ID',
+    `question_id` BIGINT NOT NULL COMMENT '题目ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `answer` VARCHAR(200) NOT NULL COMMENT '选择的答案文本',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '投票时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_question_user` (`question_id`, `user_id`),
+    KEY `idx_question_answer` (`question_id`, `answer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测验待确认答案投票';
+
+
 -- 火影忍者OL官方公告（抓取缓存，source_url 唯一键做 upsert）
 CREATE TABLE IF NOT EXISTS `hyol_announcement` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '公告ID',
@@ -892,4 +905,67 @@ CREATE TABLE IF NOT EXISTS `ai_arena_rank` (
     KEY `idx_input_price` (`input_price`),
     KEY `idx_output_price` (`output_price`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Code Arena模型排行榜(arena.ai)';
+
+-- ==================== 版本发布中心 ====================
+
+-- 发布项目：每个项目独享版本、附件与公开更新地址
+CREATE TABLE IF NOT EXISTS `release_project` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '项目ID',
+    `owner_id` BIGINT NULL COMMENT '所属管理员ID',
+    `name` VARCHAR(80) NOT NULL COMMENT '项目名称',
+    `slug` VARCHAR(60) NOT NULL COMMENT '公开地址标识，创建后不可改',
+    `description` VARCHAR(500) NULL COMMENT '项目描述',
+    `sort` INT NOT NULL DEFAULT 0 COMMENT '排序，越大越靠前',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_slug` (`slug`),
+    KEY `idx_owner` (`owner_id`),
+    KEY `idx_deleted_sort` (`deleted`, `sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='发布项目表';
+
+
+-- 版本发布：tag 只在项目内唯一
+CREATE TABLE IF NOT EXISTS `project_release` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '版本ID',
+    `project_id` BIGINT NOT NULL COMMENT '所属项目ID',
+    `tag` VARCHAR(60) NOT NULL COMMENT '版本标签，如 v1.7.0',
+    `title` VARCHAR(200) NOT NULL COMMENT '发布标题',
+    `notes` MEDIUMTEXT NULL COMMENT '发布说明（纯文本）',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '0草稿/1已发布',
+    `is_latest` TINYINT NOT NULL DEFAULT 0 COMMENT '是否最新版本: 0否/1是',
+    `published_at` DATETIME NULL COMMENT '首次发布时间',
+    `download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '完整下载次数',
+    `created_by` BIGINT NULL COMMENT '创建管理员ID',
+
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_project_status` (`project_id`, `status`, `deleted`),
+    KEY `idx_project_latest` (`project_id`, `is_latest`),
+    KEY `idx_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目版本发布表';
+
+-- 版本附件：release_id 为 NULL 表示已上传但尚未绑定版本
+CREATE TABLE IF NOT EXISTS `release_asset` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '附件ID',
+    `project_id` BIGINT NOT NULL COMMENT '所属项目ID',
+    `release_id` BIGINT NULL COMMENT '所属版本ID，NULL=已上传未绑定',
+    `upload_id` VARCHAR(36) NULL COMMENT '分片上传会话ID',
+    `file_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    `size` BIGINT NOT NULL DEFAULT 0 COMMENT '文件字节数',
+    `sha512` VARCHAR(88) NOT NULL COMMENT 'Base64(SHA-512)',
+    `storage_path` VARCHAR(500) NOT NULL COMMENT '相对 data 目录的存储路径',
+    `download_count` BIGINT NOT NULL DEFAULT 0 COMMENT '完整下载次数',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_upload_id` (`upload_id`),
+    KEY `idx_release` (`release_id`),
+    KEY `idx_project_staged` (`project_id`, `release_id`),
+    KEY `idx_file_name` (`file_name`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='版本附件表';
+
 

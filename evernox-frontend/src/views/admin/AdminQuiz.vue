@@ -2,7 +2,9 @@
   <div class="admin-quiz">
     <div class="page-header">
       <h2>忍者测验管理</h2>
+      <p>没有答案的题目会置顶；用户两人选择一致后自动确认答案并各加 10 积分</p>
     </div>
+
 
     <div class="filter-bar">
       <el-input
@@ -36,11 +38,12 @@
       <el-upload
         :show-file-list="false"
         :auto-upload="false"
-        accept=".xlsx,.xls"
+        accept=".json,application/json"
         :on-change="onImportFile"
       >
-        <el-button :loading="importing">导入 Excel</el-button>
+        <el-button :loading="importing">导入 JSON</el-button>
       </el-upload>
+
     </div>
 
     <el-table v-loading="loading" :data="list" @selection-change="onSelectionChange">
@@ -59,7 +62,13 @@
       </el-table-column>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="question" label="问题" min-width="240" show-overflow-tooltip />
-      <el-table-column prop="answer" label="答案" width="130" show-overflow-tooltip />
+      <el-table-column label="答案" width="130">
+        <template #default="{ row }">
+          <el-tag v-if="!row.answer" type="warning" size="small">待确认</el-tag>
+          <span v-else class="answer-text">{{ row.answer }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="QuizStatusType[row.status] || 'info'" size="small">
@@ -101,7 +110,8 @@
         v-model:page-size="size"
         :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="total, sizes, prev, pager, next"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="load"
         @size-change="reload"
       />
@@ -130,8 +140,13 @@
           <el-input v-model="form.optionD" maxlength="200" />
         </el-form-item>
         <el-form-item label="答案">
-          <el-input v-model="form.answer" maxlength="200" placeholder="正确答案（选项文本）" />
+          <el-input
+            v-model="form.answer"
+            maxlength="200"
+            placeholder="可留空，留空则等待用户确认"
+          />
         </el-form-item>
+
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -154,12 +169,13 @@ import {
   createQuiz,
   deleteQuiz,
   getAdminQuizList,
-  importQuizExcel,
+  importQuizJson,
   rejectQuiz,
   updateQuiz,
 } from '@/api/adminQuiz'
 import { QuizStatusMap, QuizStatusType } from '@/types/quiz'
-import type { QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+import type { QuizImportItem, QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+
 
 const list = ref<QuizQuestion[]>([])
 const total = ref(0)
@@ -252,12 +268,12 @@ const submitForm = async () => {
     !form.optionA.trim() ||
     !form.optionB.trim() ||
     !form.optionC.trim() ||
-    !form.optionD.trim() ||
-    !form.answer.trim()
+    !form.optionD.trim()
   ) {
-    ElMessage.warning('请填写完整的题目信息')
+    ElMessage.warning('请填写完整的问题和四个选项')
     return
   }
+
   saving.value = true
   try {
     const data = {
@@ -311,28 +327,52 @@ const handleBatchDelete = async () => {
   reload()
 }
 
-const onImportFile = (file: UploadFile) => {
+const onImportFile = async (file: UploadFile) => {
   const raw = file.raw
   if (!raw) return
-  if (!/\.(xlsx|xls)$/i.test(raw.name)) {
-    ElMessage.warning('请选择 .xlsx 或 .xls 文件')
+  if (!/\.json$/i.test(raw.name)) {
+    ElMessage.warning('请选择 .json 文件')
     return
   }
   importing.value = true
-  importQuizExcel(raw)
-    .then((res) => {
-      const imported = res.data?.imported ?? 0
-      const skipped = res.data?.skipped ?? 0
-      ElMessage.success(`导入完成：成功 ${imported} 条，跳过 ${skipped} 条`)
-      reload()
+  try {
+    const text = await raw.text()
+    let data: unknown
+    try {
+      data = JSON.parse(text)
+    } catch {
+      ElMessage.error('JSON 格式不正确，请检查文件内容')
+      return
+    }
+    if (!Array.isArray(data)) {
+      ElMessage.error('JSON 顶层必须是数组')
+      return
+    }
+    const items: QuizImportItem[] = data.map((row: unknown) => {
+      const record = (row || {}) as Record<string, unknown>
+      const options = Array.isArray(record.options)
+        ? record.options.map((option) => String(option ?? ''))
+        : []
+      return {
+        question: String(record.question ?? ''),
+        options,
+        answer: record.answer == null ? '' : String(record.answer),
+      }
     })
-    .catch(() => {
-      // 错误已由拦截器提示
-    })
-    .finally(() => {
-      importing.value = false
-    })
+    const res = await importQuizJson(items)
+    const imported = res.data?.imported ?? 0
+    const updated = res.data?.updated ?? 0
+    const skipped = res.data?.skipped ?? 0
+    ElMessage.success(`导入完成：新增 ${imported} 条，补全答案 ${updated} 条，跳过 ${skipped} 条`)
+    reload()
+  } catch {
+    // 请求层已提示
+  } finally {
+    importing.value = false
+  }
 }
+
+
 
 load()
 </script>
@@ -341,12 +381,24 @@ load()
 .admin-quiz {
   .page-header {
     h2 {
-      margin: 0 0 12px;
+      margin: 0 0 4px;
       font-size: 20px;
       font-weight: 700;
       color: var(--ev-text-primary);
     }
+
+    p {
+      margin: 0 0 12px;
+      font-size: 12px;
+      color: var(--ev-text-muted);
+    }
   }
+
+  .answer-text {
+    font-size: 13px;
+    color: var(--ev-text-primary);
+  }
+
 
   .filter-bar {
     display: flex;

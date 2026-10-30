@@ -21,19 +21,31 @@
           />
         </div>
 
+
         <div v-loading="loading" class="result-list">
           <div v-for="q in results" :key="q.id" class="quiz-card">
             <div class="quiz-question">
               <span v-if="q.score != null" class="match">相似度 {{ (q.score * 100).toFixed(0) }}%</span>
+              <span v-if="!q.answer" class="pending-badge">待确认</span>
               {{ q.question }}
             </div>
-            <div class="quiz-options">
-              <div class="option">A. {{ q.optionA }}</div>
-              <div class="option">B. {{ q.optionB }}</div>
-              <div class="option">C. {{ q.optionC }}</div>
-              <div class="option">D. {{ q.optionD }}</div>
-            </div>
-            <div class="quiz-answer">答案：<span class="answer">{{ q.answer }}</span></div>
+
+            <template v-if="q.answer">
+              <div class="quiz-options">
+                <div class="option">A. {{ q.optionA }}</div>
+                <div class="option">B. {{ q.optionB }}</div>
+                <div class="option">C. {{ q.optionC }}</div>
+                <div class="option">D. {{ q.optionD }}</div>
+              </div>
+              <div class="quiz-answer">答案：<span class="answer">{{ q.answer }}</span></div>
+            </template>
+            <template v-else>
+              <QuizVoteOptions
+                :question="q"
+                :disabled="votingId === q.id"
+                @vote="(option) => vote(q, option)"
+              />
+            </template>
           </div>
 
           <el-empty v-if="!loading && keyword && !results.length" description="没有找到相似题目" />
@@ -41,30 +53,65 @@
         </div>
       </div>
 
+
       <aside class="quiz-aside">
-        <div class="aside-title">我的提交</div>
-        <div v-if="mySubmissions.length" class="submission-list">
-          <div v-for="s in mySubmissions" :key="s.id" class="submission-item">
-            <div class="submission-question">{{ s.question }}</div>
-            <div class="submission-meta">
-              <el-tag :type="QuizStatusType[s.status] || 'info'" size="small">
-                {{ QuizStatusMap[s.status] || '未知' }}
-              </el-tag>
-              <span class="submission-time">{{ formatTime(s.createdAt) }}</span>
-            </div>
-            <div v-if="s.status !== 1" class="submission-actions">
-              <el-button size="small" text type="primary" @click="openEdit(s)">修改</el-button>
-              <el-button v-if="s.status === 2" size="small" text @click="onResubmit(s)">重新提交</el-button>
-              <el-button size="small" text type="danger" @click="onDelete(s)">删除</el-button>
+        <section class="pending-panel">
+          <div class="aside-title">
+            <span>待确认题目</span>
+            <span class="pending-count">{{ pendingTotal }}</span>
+          </div>
+          <p class="pending-tip">
+            选择答案后自动上交；连续 3 位用户选择一致即确认，每人 +10 积分
+          </p>
+          <div class="pending-slots">
+            <div
+              v-for="(q, index) in pendingSlots"
+              :key="q?.id ?? `empty-${index}`"
+              class="pending-card"
+            >
+              <template v-if="q">
+                <div class="pending-question">{{ q.question }}</div>
+                <QuizVoteOptions
+                  :question="q"
+                  :disabled="votingId === q.id"
+                  @vote="(option) => vote(q, option)"
+                />
+              </template>
+              <div v-else class="pending-empty">暂无更多题目</div>
             </div>
           </div>
-        </div>
-        <div v-else-if="!userStore.isLoggedIn" class="aside-login-hint">
-          <span>登录后可查看我的提交</span>
-          <el-button size="small" type="primary" plain @click="authDialog.open('login')">去登录</el-button>
-        </div>
-        <el-empty v-else description="还没有提交过题目" :image-size="50" />
+          <div class="pending-actions">
+            <span>共 {{ pendingTotal }} 道待确认</span>
+            <el-button text size="small" :loading="pendingLoading" @click="loadPending">刷新</el-button>
+          </div>
+        </section>
+
+        <section class="submissions-panel">
+          <div class="aside-title">我的提交</div>
+          <div v-if="mySubmissions.length" class="submission-list">
+            <div v-for="s in mySubmissions" :key="s.id" class="submission-item">
+              <div class="submission-question">{{ s.question }}</div>
+              <div class="submission-meta">
+                <el-tag :type="QuizStatusType[s.status] || 'info'" size="small">
+                  {{ QuizStatusMap[s.status] || '未知' }}
+                </el-tag>
+                <span class="submission-time">{{ formatTime(s.createdAt) }}</span>
+              </div>
+              <div v-if="s.status !== 1" class="submission-actions">
+                <el-button size="small" text type="primary" @click="openEdit(s)">修改</el-button>
+                <el-button v-if="s.status === 2" size="small" text @click="onResubmit(s)">重新提交</el-button>
+                <el-button size="small" text type="danger" @click="onDelete(s)">删除</el-button>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="!userStore.isLoggedIn" class="aside-login-hint">
+            <span>登录后可查看我的提交</span>
+            <el-button size="small" type="primary" plain @click="authDialog.open('login')">去登录</el-button>
+          </div>
+          <el-empty v-else description="还没有提交过题目" :image-size="50" />
+        </section>
       </aside>
+
     </div>
 
     <el-dialog
@@ -104,7 +151,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatTime } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
@@ -112,13 +160,17 @@ import { useAuthDialogStore } from '@/stores/authDialog'
 import {
   deleteMySubmission,
   getMySubmissions,
+  getUnansweredQuiz,
   resubmitQuiz,
   searchQuiz,
   submitQuiz,
   updateMySubmission,
+  voteQuiz,
 } from '@/api/quiz'
 import { QuizStatusMap, QuizStatusType } from '@/types/quiz'
 import type { QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+import QuizVoteOptions from '@/components/quiz/QuizVoteOptions.vue'
+
 
 const userStore = useUserStore()
 const authDialog = useAuthDialogStore()
@@ -126,6 +178,18 @@ const authDialog = useAuthDialogStore()
 const keyword = ref('')
 const results = ref<QuizQuestion[]>([])
 const loading = ref(false)
+
+const pendingTotal = ref(0)
+const pendingPool = ref<QuizQuestion[]>([])
+const pendingLoading = ref(false)
+const votingId = ref<number | null>(null)
+
+const pendingSlots = computed(() => [
+  pendingPool.value[0] ?? null,
+  pendingPool.value[1] ?? null,
+])
+
+
 
 const mySubmissions = ref<QuizQuestion[]>([])
 const submitVisible = ref(false)
@@ -165,6 +229,80 @@ const onInput = () => {
 const clearSearch = () => {
   results.value = []
 }
+
+const loadPending = async () => {
+  pendingLoading.value = true
+  try {
+    const res = await getUnansweredQuiz(8)
+    pendingTotal.value = res.data?.total ?? 0
+    pendingPool.value = res.data?.items ?? []
+  } catch {
+    /* 请求层已提示 */
+  } finally {
+    pendingLoading.value = false
+  }
+}
+
+const applyVote = (id: number, myVote: string, answer?: string) => {
+  for (const item of pendingPool.value) {
+    if (item.id === id) {
+      item.myVote = myVote
+      if (answer) item.answer = answer
+    }
+  }
+  for (const item of results.value) {
+    if (item.id === id) {
+      item.myVote = myVote
+      if (answer) item.answer = answer
+    }
+  }
+}
+
+
+const doVote = async (q: QuizQuestion, option: string) => {
+  if (q.myVote || votingId.value != null) return
+  votingId.value = q.id
+  try {
+    const res = await voteQuiz({ questionId: q.id, answer: option })
+    const data = res.data
+    if (!data) return
+
+    // 无论是否确认，这道题都已上交，从待确认队列移除
+    pendingPool.value = pendingPool.value.filter((item) => item.id !== q.id)
+
+    if (data.resolved) {
+      const answer = data.answer || option
+      pendingTotal.value = Math.max(0, pendingTotal.value - 1)
+      applyVote(q.id, option, answer)
+      ElMessage.success(
+        data.rewarded
+          ? `答案已确认：${answer}，连续 3 位用户各获得 ${data.points} 积分`
+          : `答案已确认：${answer}`
+      )
+      if (pendingPool.value.length < 2) await loadPending()
+    } else {
+      applyVote(q.id, option)
+      ElMessage.success(data.message || '已记录你的选择')
+      if (pendingPool.value.length < 2) await loadPending()
+    }
+  } catch {
+    // 可能已被其他用户确认或自己已投过，刷新状态
+    await loadPending()
+    if (keyword.value.trim()) await doSearch()
+  } finally {
+
+
+    votingId.value = null
+  }
+}
+
+const vote = (q: QuizQuestion, option: string) => {
+  if (q.myVote) return
+  authDialog.requireAuth(() => {
+    void doVote(q, option)
+  })
+}
+
 
 const loadSubmissions = async () => {
   if (!userStore.isLoggedIn) return
@@ -251,14 +389,22 @@ const onDelete = async (s: QuizQuestion) => {
   await loadSubmissions()
 }
 
-onMounted(loadSubmissions)
+onMounted(() => {
+  void loadSubmissions()
+  void loadPending()
+})
 
 watch(
   () => userStore.isLoggedIn,
   (loggedIn) => {
-    if (loggedIn) void loadSubmissions()
+    if (loggedIn) {
+      void loadSubmissions()
+      void loadPending()
+      if (keyword.value.trim()) void doSearch()
+    }
   }
 )
+
 </script>
 
 <style scoped lang="scss">
@@ -294,9 +440,36 @@ watch(
     min-width: 0;
   }
 
+  .pending-card {
+
+    padding: 10px 12px;
+    border: 1px solid var(--ev-border-subtle);
+    border-radius: 10px;
+    background: var(--el-bg-color);
+  }
+
+  .pending-question {
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.55;
+    color: var(--ev-text-primary);
+  }
+
+  .pending-badge {
+    margin-right: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(230, 162, 60, 0.14);
+    color: var(--el-color-warning);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
   .search-bar {
     margin-bottom: 14px;
   }
+
 
   .result-list {
     display: flex;
@@ -356,14 +529,74 @@ watch(
   .quiz-aside {
     width: 320px;
     flex-shrink: 0;
-    position: sticky;
-    top: 20px;
 
     .aside-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-size: 14px;
       font-weight: 600;
       color: var(--ev-text-primary);
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+    }
+
+    .pending-panel {
+      padding: 12px;
+      border: 1px solid var(--ev-border-subtle);
+      border-left: 3px solid var(--el-color-warning);
+      border-radius: 12px;
+      background: var(--ev-bg-surface);
+    }
+
+    .pending-count {
+      display: inline-grid;
+      place-items: center;
+      min-width: 22px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: rgba(230, 162, 60, 0.16);
+      color: var(--el-color-warning);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .pending-tip {
+      margin: 0 0 10px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--ev-text-muted);
+    }
+
+    .pending-slots {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pending-empty {
+      padding: 24px 10px;
+      border: 1px dashed var(--ev-border-subtle);
+      border-radius: 10px;
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--ev-text-muted);
+    }
+
+    .pending-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 10.5px;
+      color: var(--ev-text-muted);
+    }
+
+    .submissions-panel {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--ev-border-subtle);
     }
 
     .aside-login-hint {
@@ -378,6 +611,7 @@ watch(
       border: 1px solid var(--ev-border-subtle);
       border-radius: 12px;
     }
+
 
     .submission-list {
       display: flex;
@@ -424,4 +658,22 @@ watch(
     }
   }
 }
+
+@media (max-width: 900px) {
+  .quiz-page {
+    .page-header {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quiz-layout {
+      flex-direction: column;
+    }
+
+    .quiz-aside {
+      width: 100%;
+    }
+  }
+}
 </style>
+

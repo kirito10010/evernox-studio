@@ -86,6 +86,7 @@
         :page-sizes="[10, 20, 50]"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="loadList"
         @size-change="onSizeChange"
       />

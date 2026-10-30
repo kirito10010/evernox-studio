@@ -5,7 +5,10 @@ server:
   compression:
     enabled: true
     min-response-size: 1024
-    mime-types: application/json, application/javascript, text/html, text/plain, text/css, application/octet-stream
+    # 不要包含 application/octet-stream：启动器下载 exe 依赖 Range/Content-Length，
+    # gzip 会改写响应体并破坏断点续传。
+    mime-types: application/json, application/javascript, text/html, text/plain, text/css
+
 
 spring:
   application:
@@ -90,6 +93,17 @@ evernox:
   thumbnail:
     max-width: 400
     quality: 0.7
+  # 版本发布中心
+  release:
+    # 单个附件上限 2GB
+    max-file-size: 2147483648
+    # 分片大小 4MB
+    chunk-size: 4194304
+    # 单片上限 8MB（与 spring.servlet.multipart.max-file-size 一致）
+    max-chunk-size: 8388608
+    # 未完成上传 / 未绑定附件的保留时长（小时）
+    retention-hours: 24
+
   security:
     # 允许跨域的前端来源白名单，多个用逗号分隔
     allowed-origins: ${EVERNOX_ALLOWED_ORIGINS:http://localhost:5211}

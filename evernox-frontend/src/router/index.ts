@@ -120,6 +120,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '记事本', requiresAuth: true },
       },
       {
+        path: 'workspace/notes/community',
+        name: 'NotesCommunity',
+        component: () => import('@/views/workspace/NotesCommunity.vue'),
+        meta: { title: '公开笔记' },
+      },
+      {
         path: 'workspace/todos',
         name: 'Todos',
         component: () => import('@/views/workspace/Todos.vue'),
@@ -143,6 +149,29 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/workspace/Salary.vue'),
         meta: { title: '记录工资', requiresAuth: true },
       },
+      // 个人项目发布：数据按管理员账号隔离，入口放在个人区
+      {
+        path: 'workspace/projects',
+        name: 'AdminProjects',
+        component: () => import('@/views/admin/AdminProjects.vue'),
+        meta: { title: '项目管理', requiresAdmin: true },
+      },
+      {
+        path: 'workspace/projects/:id/releases',
+        name: 'AdminProjectReleases',
+        component: () => import('@/views/admin/AdminProjectReleases.vue'),
+        meta: { title: '版本发布', requiresAdmin: true },
+      },
+      // 兼容旧地址
+      {
+        path: 'admin/projects',
+        redirect: '/workspace/projects',
+      },
+      {
+        path: 'admin/projects/:id/releases',
+        redirect: (to) => `/workspace/projects/${to.params.id}/releases`,
+      },
+
       // 话题集中营
       {
         path: 'topic/square',
@@ -227,6 +256,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/AdminAssets.vue'),
         meta: { title: '相册图床', requiresAdmin: true },
       },
+
       {
         path: 'admin/sites',
         name: 'AdminSites',

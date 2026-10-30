@@ -3,12 +3,15 @@
     <div class="page-header">
       <div class="header-text">
         <h2>笔记审批</h2>
-        <p>通过后笔记正文与插图对所有登录用户可见</p>
+        <p>通过后笔记正文与插图对所有访客可见</p>
       </div>
-      <div class="stat-row">
-        <div class="stat"><span class="num">{{ stats.pending ?? '—' }}</span><span class="label">待审批</span></div>
-        <div class="stat"><span class="num">{{ stats.published ?? '—' }}</span><span class="label">已公开</span></div>
-        <div class="stat"><span class="num">{{ stats.rejected ?? '—' }}</span><span class="label">已驳回</span></div>
+      <div class="header-actions">
+        <div class="stat-row">
+          <div class="stat"><span class="num">{{ stats.pending ?? '—' }}</span><span class="label">待审批</span></div>
+          <div class="stat"><span class="num">{{ stats.published ?? '—' }}</span><span class="label">已公开</span></div>
+          <div class="stat"><span class="num">{{ stats.rejected ?? '—' }}</span><span class="label">已驳回</span></div>
+        </div>
+        <el-button @click="router.push('/workspace/notes/community')">公开笔记</el-button>
       </div>
     </div>
 
@@ -101,6 +104,7 @@
         :page-sizes="[10, 20, 50, 100]"
         :total="total"
         layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="loadNotes"
         @size-change="applyFilters"
       />
@@ -117,6 +121,7 @@
 </template>
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDateTime } from '@/utils/format'
 import RichTextViewer from '@/components/RichTextViewer.vue'
@@ -139,6 +144,8 @@ import type { Note, NoteStats } from '@/types/note'
  * 待审批笔记的插图此刻还是作者的私密图，普通 /image/{id}/file 会 403。
  */
 const { decryptImage, clearCache } = useImageDecrypt(getAdminImageBlob)
+
+const router = useRouter()
 
 const activeTab = ref('pending')
 const notes = ref<Note[]>([])
@@ -336,6 +343,13 @@ onUnmounted(() => {
 .stat-row {
   display: flex;
   gap: 20px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .stat {

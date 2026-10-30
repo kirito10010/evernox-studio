@@ -3,6 +3,7 @@ jwt-keys/
 
 # Maven
 target/
+target-package/
 !.mvn/wrapper/maven-wrapper.jar
 pom.xml.tag
 pom.xml.releaseBackup

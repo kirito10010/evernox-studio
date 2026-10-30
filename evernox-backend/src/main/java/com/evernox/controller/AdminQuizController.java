@@ -2,6 +2,7 @@ package com.evernox.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.evernox.common.Result;
+import com.evernox.dto.QuizImportItem;
 import com.evernox.dto.QuizImportResponse;
 import com.evernox.dto.QuizQuestionRequest;
 import com.evernox.dto.QuizQuestionResponse;
@@ -10,9 +11,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+
 
 /**
  * 火影忍者OL测验管理控制器（仅管理员）
@@ -75,7 +76,8 @@ public class AdminQuizController {
     }
 
     @PostMapping("/import")
-    public Result<QuizImportResponse> importExcel(@RequestParam("file") MultipartFile file) {
-        return Result.success("导入完成", quizService.importExcel(file));
+    public Result<QuizImportResponse> importJson(@RequestBody List<QuizImportItem> items) {
+        return Result.success("导入完成", quizService.importJson(items));
     }
 }
+

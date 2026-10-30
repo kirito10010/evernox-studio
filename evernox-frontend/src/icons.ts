@@ -68,6 +68,7 @@ export {
   Position,
   Promotion,
   QuestionFilled,
+  Reading,
   Refresh,
   Search,
   Setting,

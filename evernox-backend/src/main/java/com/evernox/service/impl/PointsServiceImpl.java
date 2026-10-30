@@ -75,7 +75,23 @@ public class PointsServiceImpl implements PointsService {
 
     @Override
     @Transactional
+    public void award(Long userId, int points, String type, String description) {
+        if (points <= 0) {
+            throw new BusinessException("奖励积分必须大于0");
+        }
+        User user = requireUser(userId);
+        int balance = (user.getPoints() == null ? 0 : user.getPoints()) + points;
+        user.setPoints(balance);
+        userRepository.updateById(user);
+        insertLog(userId, points, balance, type, description, null);
+        pointsSseRegistry.notifyPointsChanged(userId, balance);
+        log.info("系统奖励积分: userId={}, +{}, type={}", userId, points, type);
+    }
+
+    @Override
+    @Transactional
     public void upgradeSuperMember(Long userId, Integer days) {
+
         int cost = pointsForDays(days);
         User user = requireManageableUser(userId);
         int balance = (user.getPoints() == null ? 0 : user.getPoints());

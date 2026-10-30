@@ -85,8 +85,14 @@ public class SecurityConfig {
                 // 公开接口 - 火影资料
                 .requestMatchers(HttpMethod.GET, "/hyol/announcement/list", "/hyol/ninja/list").permitAll()
                 .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/hyol/announcement/\\d+")).permitAll()
-                .requestMatchers(HttpMethod.GET, "/quiz/search").permitAll()
+                .requestMatchers(HttpMethod.GET, "/quiz/search", "/quiz/unanswered").permitAll()
+
                 .requestMatchers(HttpMethod.GET, "/org/points/organizations").permitAll()
+
+                // 公开接口 - 公开笔记（只读）
+                // 只放行列表与纯数字详情 ID：/note/list、/note/stats 仍需登录
+                .requestMatchers(HttpMethod.GET, "/note/public").permitAll()
+                .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/note/\\d+")).permitAll()
 
                 // 公开接口 - 站内公告（读）
                 .requestMatchers(HttpMethod.GET, "/announcement/list").permitAll()
@@ -125,11 +131,15 @@ public class SecurityConfig {
 
                 // 忍者图鉴本地图片：头像/技能图标 <img src> 直接引用，无鉴权头，需公开
                 .requestMatchers("/hyol/ninja/image/**").permitAll()
-                
+
+                // 公开接口 - 版本发布（启动器更新源，不鉴权）
+                .requestMatchers("/release/public/**").permitAll()
+
                 // 静态资源和文档
                 .requestMatchers("/", "/index.html", "/favicon.ico", "/*.css", "/*.js", "/assets/**").permitAll()
-                
+
                 // Swagger文档 (如果有)
+
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 
                 // 健康检查

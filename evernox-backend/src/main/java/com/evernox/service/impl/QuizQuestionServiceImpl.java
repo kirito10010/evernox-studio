@@ -1,19 +1,25 @@
 package com.evernox.service.impl;
 
-import cn.hutool.poi.excel.ExcelReader;
-import cn.hutool.poi.excel.ExcelUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.evernox.common.ResultCode;
+import com.evernox.dto.QuizImportItem;
 import com.evernox.dto.QuizImportResponse;
+import com.evernox.dto.QuizPendingResponse;
 import com.evernox.dto.QuizQuestionRequest;
+
 import com.evernox.dto.QuizQuestionResponse;
+import com.evernox.dto.QuizVoteRequest;
+import com.evernox.dto.QuizVoteResponse;
+import com.evernox.entity.QuizAnswerVote;
 import com.evernox.entity.QuizQuestion;
 import com.evernox.exception.BusinessException;
+import com.evernox.repository.QuizAnswerVoteRepository;
 import com.evernox.repository.QuizQuestionRepository;
 import com.evernox.service.AdminApprovalService;
+import com.evernox.service.PointsService;
 import com.evernox.service.QuizQuestionService;
 import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +27,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.Collectors;
+
+
 
 /**
  * 火影忍者OL测验题目服务实现
@@ -48,6 +55,9 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final double MIN_SCORE = 0.3;
     private static final int MAX_SEARCH_RESULTS = 20;
+    private static final int MAX_PENDING_RESULTS = 50;
+    private static final int QUIZ_CONSENSUS_POINTS = 10;
+
 
     /** 排序字段白名单 */
     private static final Map<String, String> SORT_COLUMNS = Map.of(
@@ -55,18 +65,22 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
     );
 
     private final QuizQuestionRepository questionRepository;
+    private final QuizAnswerVoteRepository voteRepository;
     private final AdminApprovalService adminApprovalService;
+    private final PointsService pointsService;
+
 
     // ==================== 用户侧 ====================
 
     @Override
-    public List<QuizQuestionResponse> search(String keyword) {
+    public List<QuizQuestionResponse> search(String keyword, Long userId) {
         String query = normalize(keyword);
         if (query.isEmpty()) {
             return List.of();
         }
         List<QuizQuestion> all = questionRepository.selectList(new LambdaQueryWrapper<QuizQuestion>()
                 .eq(QuizQuestion::getStatus, STATUS_APPROVED));
+        Map<Long, String> myVotes = myVotes(userId);
 
         record Scored(QuizQuestion question, double score) {
         }
@@ -74,15 +88,112 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         return all.stream()
                 .map(item -> new Scored(item, similarity(query, normalize(item.getQuestion()))))
                 .filter(s -> s.score() >= MIN_SCORE)
-                .sorted((a, b) -> Double.compare(b.score(), a.score()))
+                // 没有答案的题目置顶，其余按相似度
+                .sorted(Comparator
+                        .comparingInt((Scored s) -> StringUtils.hasText(s.question().getAnswer()) ? 1 : 0)
+                        .thenComparing(Scored::score, Comparator.reverseOrder()))
                 .limit(MAX_SEARCH_RESULTS)
                 .map(s -> {
-                    QuizQuestionResponse resp = QuizQuestionResponse.from(s.question());
+                    QuizQuestionResponse resp = QuizQuestionResponse.from(
+                            s.question(), myVotes.get(s.question().getId()));
                     resp.setScore(s.score());
                     return resp;
                 })
                 .toList();
     }
+
+    @Override
+    public QuizPendingResponse unanswered(int limit, Long userId) {
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PENDING_RESULTS);
+        long total = questionRepository.countPending();
+        List<QuizQuestion> list = questionRepository.findPending(userId, safeLimit);
+        Map<Long, String> myVotes = myVotes(userId);
+        List<QuizQuestionResponse> items = list.stream()
+                .map(q -> QuizQuestionResponse.from(q, myVotes.get(q.getId())))
+                .toList();
+        return QuizPendingResponse.builder()
+                .total(total)
+                .items(items)
+                .build();
+    }
+
+
+    @Override
+    @Transactional
+    public QuizVoteResponse vote(QuizVoteRequest request, Long userId) {
+        if (request == null || request.getQuestionId() == null) {
+            throw new BusinessException("题目ID不能为空");
+        }
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+
+        // 锁住题目行，确保“第三票写入答案 + 发积分”只执行一次
+
+        QuizQuestion question = questionRepository.selectByIdForUpdate(request.getQuestionId());
+        if (question == null || question.getStatus() == null
+                || question.getStatus() != STATUS_APPROVED) {
+            throw new BusinessException("题目不存在或不可作答");
+        }
+        if (StringUtils.hasText(question.getAnswer())) {
+            throw new BusinessException("这道题已经有答案了");
+        }
+        if (voteRepository.findByQuestionAndUser(question.getId(), userId) != null) {
+            throw new BusinessException("你已经回答过这道题");
+        }
+
+        String selected = resolveVoteAnswer(question, request.getAnswer());
+        voteRepository.insert(QuizAnswerVote.builder()
+                .questionId(question.getId())
+                .userId(userId)
+                .answer(selected)
+                .build());
+
+        List<QuizAnswerVote> latest = voteRepository.findLatestVotes(question.getId(), 3);
+        int streak = 0;
+        for (QuizAnswerVote vote : latest) {
+            if (selected.equals(vote.getAnswer())) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        // 连续 3 位用户选择同一个答案才写入题库
+        if (streak >= 3) {
+            question.setAnswer(selected);
+            questionRepository.updateById(question);
+
+            boolean rewarded = false;
+            for (QuizAnswerVote winner : latest) {
+                pointsService.award(winner.getUserId(), QUIZ_CONSENSUS_POINTS,
+                        "quiz_consensus", "忍者测验答案确认");
+                if (userId.equals(winner.getUserId())) {
+                    rewarded = true;
+                }
+            }
+            log.info("测验答案确认: questionId={}, answer={}, streak={}",
+                    question.getId(), selected, streak);
+            return QuizVoteResponse.builder()
+                    .resolved(true)
+                    .answer(selected)
+                    .rewarded(rewarded)
+                    .points(QUIZ_CONSENSUS_POINTS)
+                    .votes(streak)
+                    .message("答案已确认：" + selected + "，连续 3 位用户各获得 "
+                            + QUIZ_CONSENSUS_POINTS + " 积分")
+                    .build();
+        }
+
+        return QuizVoteResponse.builder()
+                .resolved(false)
+                .votes(streak)
+                .points(0)
+                .message("已记录你的选择，还差 " + (3 - streak) + " 位用户连续选择相同答案")
+                .build();
+    }
+
+
 
     @Override
     @Transactional
@@ -122,9 +233,12 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         }
 
         String column = SortColumnResolver.resolve(SORT_COLUMNS, sortField, "created_at");
-        wrapper.orderBy(true, "asc".equalsIgnoreCase(sortOrder), column);
-        wrapper.orderByDesc("id");
+        String direction = "asc".equalsIgnoreCase(sortOrder) ? "ASC" : "DESC";
+        // 无答案题目置顶，其余按用户选择的排序
+        wrapper.last("ORDER BY (answer IS NULL OR answer = '') DESC, "
+                + column + " " + direction + ", id DESC");
         IPage<QuizQuestion> raw = questionRepository.selectPage(newPage(page, size), wrapper);
+
         return raw.convert(QuizQuestionResponse::from);
     }
 
@@ -170,6 +284,8 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
     @Transactional
     public void delete(Long id) {
         require(id);
+        voteRepository.delete(new LambdaQueryWrapper<QuizAnswerVote>()
+                .eq(QuizAnswerVote::getQuestionId, id));
         questionRepository.deleteById(id);
     }
 
@@ -180,8 +296,11 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
             throw new BusinessException("请选择要删除的题目");
         }
         List<Long> distinct = ids.stream().distinct().toList();
+        voteRepository.delete(new LambdaQueryWrapper<QuizAnswerVote>()
+                .in(QuizAnswerVote::getQuestionId, distinct));
         questionRepository.delete(new LambdaQueryWrapper<QuizQuestion>().in(QuizQuestion::getId, distinct));
     }
+
 
     @Override
     @Transactional
@@ -207,29 +326,100 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
 
     @Override
     @Transactional
-    public QuizImportResponse importExcel(MultipartFile file) {
-        List<QuizQuestionRequest> rows = parseExcel(file);
-        int imported = 0;
+    public QuizImportResponse importJson(List<QuizImportItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new BusinessException("导入内容为空");
+        }
+
         int skipped = 0;
-        Set<String> seen = new HashSet<>();
-        for (QuizQuestionRequest row : rows) {
-            String normalized = normalize(row.getQuestion());
-            if (normalized.isEmpty()) {
+        LinkedHashMap<String, QuizImportItem> unique = new LinkedHashMap<>();
+        for (QuizImportItem raw : items) {
+            String question = safeTrim(raw == null ? null : raw.getQuestion());
+            String normalized = normalize(question);
+            List<String> options = raw == null ? null : raw.getOptions();
+            if (normalized.isEmpty() || question.length() > 500
+                    || options == null || options.size() != 4) {
                 skipped++;
                 continue;
             }
-            Long count = questionRepository.selectCount(new LambdaQueryWrapper<QuizQuestion>()
-                    .eq(QuizQuestion::getNormalizedQuestion, normalized));
-            if ((count != null && count > 0) || !seen.add(normalized)) {
+            String a = safeTrim(options.get(0));
+            String b = safeTrim(options.get(1));
+            String c = safeTrim(options.get(2));
+            String d = safeTrim(options.get(3));
+            if (a.isEmpty() || b.isEmpty() || c.isEmpty() || d.isEmpty()
+                    || a.length() > 200 || b.length() > 200 || c.length() > 200 || d.length() > 200) {
                 skipped++;
                 continue;
             }
-            questionRepository.insert(build(row, normalized, STATUS_APPROVED));
+            String answer = safeTrim(raw.getAnswer());
+            if (answer.length() > 200) {
+                skipped++;
+                continue;
+            }
+
+            QuizImportItem cleaned = new QuizImportItem();
+            cleaned.setQuestion(question);
+            cleaned.setOptions(List.of(a, b, c, d));
+            cleaned.setAnswer(answer);
+
+            QuizImportItem duplicate = unique.get(normalized);
+            if (duplicate != null) {
+                // 同一文件内重复：保留第一条；如果第一条没答案、后一条有答案，则补上
+                if (!StringUtils.hasText(duplicate.getAnswer()) && StringUtils.hasText(answer)) {
+                    duplicate.setAnswer(answer);
+                }
+                skipped++;
+                continue;
+            }
+            unique.put(normalized, cleaned);
+        }
+
+        int imported = 0;
+        int updated = 0;
+        for (Map.Entry<String, QuizImportItem> entry : unique.entrySet()) {
+            String normalized = entry.getKey();
+            QuizImportItem item = entry.getValue();
+            QuizQuestion existing = questionRepository.selectOne(new LambdaQueryWrapper<QuizQuestion>()
+                    .eq(QuizQuestion::getNormalizedQuestion, normalized)
+                    .last("LIMIT 1"));
+            if (existing != null) {
+                // 题库已有该题：只在原答案为空时补全，避免覆盖人工确认的答案
+                if (!StringUtils.hasText(existing.getAnswer())
+                        && StringUtils.hasText(item.getAnswer())) {
+                    existing.setAnswer(item.getAnswer());
+                    questionRepository.updateById(existing);
+                    updated++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+
+            List<String> options = item.getOptions();
+            QuizQuestion question = QuizQuestion.builder()
+                    .question(item.getQuestion())
+                    .normalizedQuestion(normalized)
+                    .optionA(options.get(0))
+                    .optionB(options.get(1))
+                    .optionC(options.get(2))
+                    .optionD(options.get(3))
+                    .answer(item.getAnswer() == null ? "" : item.getAnswer())
+                    .status(STATUS_APPROVED)
+                    .deleted(0)
+                    .build();
+            questionRepository.insert(question);
             imported++;
         }
-        log.info("测验题目导入: imported={}, skipped={}", imported, skipped);
-        return QuizImportResponse.builder().imported(imported).skipped(skipped).build();
+
+        log.info("测验题目 JSON 导入: imported={}, updated={}, skipped={}",
+                imported, updated, skipped);
+        return QuizImportResponse.builder()
+                .imported(imported)
+                .updated(updated)
+                .skipped(skipped)
+                .build();
     }
+
 
     // ==================== 我的提交 ====================
 
@@ -318,8 +508,9 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
                 .optionB(request.getOptionB().trim())
                 .optionC(request.getOptionC().trim())
                 .optionD(request.getOptionD().trim())
-                .answer(request.getAnswer().trim())
+                .answer(safeTrim(request.getAnswer()))
                 .status(status)
+
                 .deleted(0)
                 .build();
     }
@@ -331,11 +522,54 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         q.setOptionB(request.getOptionB().trim());
         q.setOptionC(request.getOptionC().trim());
         q.setOptionD(request.getOptionD().trim());
-        q.setAnswer(request.getAnswer().trim());
+        q.setAnswer(safeTrim(request.getAnswer()));
+    }
+
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private Map<Long, String> myVotes(Long userId) {
+        if (userId == null) {
+            return Map.of();
+        }
+        return voteRepository.selectList(new LambdaQueryWrapper<QuizAnswerVote>()
+                        .eq(QuizAnswerVote::getUserId, userId)).stream()
+                .collect(Collectors.toMap(
+                        QuizAnswerVote::getQuestionId,
+                        QuizAnswerVote::getAnswer,
+                        (first, ignored) -> first));
+    }
+
+    /** 接受选项文本或 A/B/C/D，统一存选项文本 */
+    private String resolveVoteAnswer(QuizQuestion question, String raw) {
+        String value = safeTrim(raw);
+        if (value.isEmpty()) {
+            throw new BusinessException("请选择一个答案");
+        }
+        String mapped = switch (value.toUpperCase(Locale.ROOT)) {
+            case "A" -> question.getOptionA();
+            case "B" -> question.getOptionB();
+            case "C" -> question.getOptionC();
+            case "D" -> question.getOptionD();
+            default -> null;
+        };
+        if (StringUtils.hasText(mapped)) {
+            value = mapped;
+        }
+        if (value.equals(question.getOptionA())
+                || value.equals(question.getOptionB())
+                || value.equals(question.getOptionC())
+                || value.equals(question.getOptionD())) {
+            return value;
+        }
+        throw new BusinessException("请选择有效选项");
     }
 
     /** 去标点/空白/全角转半角、转小写，仅保留中文/字母/数字 */
     private String normalize(String s) {
+
         if (s == null) {
             return "";
         }
@@ -383,44 +617,8 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         return dp[a.length()][b.length()];
     }
 
-    private List<QuizQuestionRequest> parseExcel(MultipartFile file) {
-        List<QuizQuestionRequest> rows = new ArrayList<>();
-        try (InputStream in = file.getInputStream()) {
-            ExcelReader reader = ExcelUtil.getReader(in);
-            List<Map<String, Object>> maps = reader.readAll();
-            for (Map<String, Object> map : maps) {
-                QuizQuestionRequest req = new QuizQuestionRequest();
-                req.setQuestion(str(map.get("问题")));
-                req.setOptionA(str(map.get("选项A")));
-                req.setOptionB(str(map.get("选项B")));
-                req.setOptionC(str(map.get("选项C")));
-                req.setOptionD(str(map.get("选项D")));
-                req.setAnswer(str(map.get("答案")));
-                rows.add(req);
-            }
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Excel 解析失败: {}", e.getMessage(), e);
-            throw new BusinessException("Excel 格式不正确，请使用参考格式（第一行：问题/选项A/选项B/选项C/选项D/答案）");
-        }
-        return rows;
-    }
-
-    private String str(Object o) {
-        if (o == null) {
-            return "";
-        }
-        if (o instanceof Number n) {
-            // 整数去掉 .0
-            return n.doubleValue() == Math.floor(n.doubleValue()) && !Double.isInfinite(n.doubleValue())
-                    ? String.valueOf(n.longValue())
-                    : String.valueOf(n.doubleValue());
-        }
-        return String.valueOf(o).trim();
-    }
-
     private Page<QuizQuestion> newPage(int page, int size) {
         return new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
     }
 }
+

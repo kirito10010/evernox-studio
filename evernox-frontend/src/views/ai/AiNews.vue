@@ -61,10 +61,13 @@
     <div v-if="total > 0" class="pager">
       <el-pagination
         v-model:current-page="page"
-        :page-size="size"
+        v-model:page-size="size"
+        :page-sizes="[10, 20, 50]"
         :total="total"
-        layout="prev, pager, next, total"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="load"
+        @size-change="reload"
       />
     </div>
   </div>

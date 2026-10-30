@@ -78,12 +78,15 @@
     </el-table>
 
     <!-- 前端分页：一个组织一周可能有上百名成员，这里只渲染当前页 -->
-    <div v-if="filteredRecords.length > PAGE_SIZE" class="table-footer">
+    <div v-if="filteredRecords.length > pageSize" class="table-footer">
       <el-pagination
         v-model:current-page="page"
-        :page-size="PAGE_SIZE"
+        v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 100]"
         :total="filteredRecords.length"
-        layout="total, prev, pager, next, jumper"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        @size-change="page = 1"
       />
     </div>
 
@@ -156,8 +159,8 @@ const filteredRecords = computed(() => {
   return records.value.filter((r) => r.memberName.toLowerCase().includes(kw))
 })
 
-/** 每页行数：一个组织一周可能有上百名成员，分页后一次只渲染 50 行 */
-const PAGE_SIZE = 50
+/** 每页行数：一个组织一周可能有上百名成员，分页后只渲染当前页 */
+const pageSize = ref(50)
 const page = ref(1)
 
 /**
@@ -186,8 +189,8 @@ const sortedRecords = computed(() => {
 })
 
 const pagedRecords = computed(() => {
-  const start = (page.value - 1) * PAGE_SIZE
-  return sortedRecords.value.slice(start, start + PAGE_SIZE)
+  const start = (page.value - 1) * pageSize.value
+  return sortedRecords.value.slice(start, start + pageSize.value)
 })
 
 const onSortChange = ({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) => {

@@ -1,11 +1,30 @@
 import { get, post, put, del } from '@/utils/request'
 import type { Result } from '@/types/user'
-import type { QuizQuestion, QuizQuestionRequest } from '@/types/quiz'
+import type {
+  QuizPendingResult,
+  QuizQuestion,
+  QuizQuestionRequest,
+  QuizVoteRequest,
+  QuizVoteResult,
+} from '@/types/quiz'
+
 
 /** 模糊搜索已通过题目 */
 export const searchQuiz = (keyword: string): Promise<Result<QuizQuestion[]>> => {
   return get(`/quiz/search?keyword=${encodeURIComponent(keyword)}`)
 }
+
+/** 待确认题目面板：总数量 + 当前用户还能作答的题目 */
+export const getUnansweredQuiz = (limit = 2): Promise<Result<QuizPendingResult>> => {
+  return get(`/quiz/unanswered?limit=${limit}`)
+}
+
+
+/** 对无答案题目投票 */
+export const voteQuiz = (data: QuizVoteRequest): Promise<Result<QuizVoteResult>> => {
+  return post('/quiz/vote', data)
+}
+
 
 /** 用户提交题目（待审批） */
 export const submitQuiz = (data: QuizQuestionRequest): Promise<Result<QuizQuestion>> => {

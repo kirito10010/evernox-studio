@@ -90,9 +90,9 @@ const iconMap = {
     inset: 0;
     background: linear-gradient(
       160deg,
-      rgba(47, 124, 246, 0.1) 0%,
-      rgba(79, 195, 232, 0.07) 50%,
-      rgba(165, 228, 242, 0.12) 100%
+      rgba(var(--ev-primary-rgb), 0.1) 0%,
+      rgba(var(--ev-aqua-rgb), 0.07) 50%,
+      rgba(var(--ev-aqua-soft-rgb), 0.12) 100%
     );
     z-index: 1;
   }
@@ -107,8 +107,8 @@ const iconMap = {
     background: linear-gradient(
       180deg,
       transparent,
-      rgba(47, 124, 246, 0.22),
-      rgba(79, 195, 232, 0.22),
+      rgba(var(--ev-primary-rgb), 0.22),
+      rgba(var(--ev-aqua-rgb), 0.22),
       transparent
     );
   }
@@ -116,9 +116,9 @@ const iconMap = {
   &.variant-aqua::before {
     background: linear-gradient(
       160deg,
-      rgba(79, 195, 232, 0.1) 0%,
-      rgba(47, 124, 246, 0.07) 50%,
-      rgba(165, 228, 242, 0.12) 100%
+      rgba(var(--ev-aqua-rgb), 0.1) 0%,
+      rgba(var(--ev-primary-rgb), 0.07) 50%,
+      rgba(var(--ev-aqua-soft-rgb), 0.12) 100%
     );
   }
 }
@@ -133,7 +133,7 @@ const iconMap = {
   &.line-1 {
     width: 92px;
     height: 2px;
-    background: linear-gradient(90deg, transparent, #2f7cf6, transparent);
+    background: linear-gradient(90deg, transparent, var(--ev-primary), transparent);
     top: 32%;
     left: -56px;
   }
@@ -141,7 +141,7 @@ const iconMap = {
   &.line-2 {
     width: 92px;
     height: 2px;
-    background: linear-gradient(90deg, transparent, #4fc3e8, transparent);
+    background: linear-gradient(90deg, transparent, var(--ev-aqua), transparent);
     top: 46%;
     right: -56px;
   }
@@ -165,7 +165,7 @@ const iconMap = {
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(47, 124, 246, 0.16), rgba(79, 195, 232, 0.16));
+  background: linear-gradient(135deg, rgba(var(--ev-primary-rgb), 0.16), rgba(var(--ev-aqua-rgb), 0.16));
   border: 1px solid var(--ev-border-default);
   display: flex;
   align-items: center;
@@ -192,7 +192,7 @@ const iconMap = {
     height: 6px;
     border-radius: 50%;
     background: var(--ev-aqua);
-    box-shadow: 0 0 10px rgba(79, 195, 232, 0.7);
+    box-shadow: 0 0 10px rgba(var(--ev-aqua-rgb), 0.7);
   }
 }
 
@@ -217,7 +217,7 @@ const iconMap = {
 }
 
 .aurora-text {
-  background: linear-gradient(135deg, #2f7cf6 0%, #4fc3e8 100%);
+  background: linear-gradient(135deg, var(--ev-primary) 0%, var(--ev-aqua) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -249,7 +249,7 @@ const iconMap = {
     width: 28px;
     height: 28px;
     border-radius: 8px;
-    background: linear-gradient(135deg, rgba(47, 124, 246, 0.14), rgba(79, 195, 232, 0.14));
+    background: linear-gradient(135deg, rgba(var(--ev-primary-rgb), 0.14), rgba(var(--ev-aqua-rgb), 0.14));
     color: var(--ev-primary);
   }
 }

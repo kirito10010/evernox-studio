@@ -106,14 +106,16 @@
         <el-empty v-if="!listLoading && !records.length" description="还没有绩效记录" />
       </div>
 
-      <div v-if="recordsTotal > PAGE_SIZE" class="pagination-wrap">
+      <div v-if="recordsTotal > recordsSize" class="pagination-wrap">
         <el-pagination
           v-model:current-page="recordsPage"
-          :page-size="PAGE_SIZE"
+          v-model:page-size="recordsSize"
+          :page-sizes="[10, 20, 50]"
           :total="recordsTotal"
-          layout="prev, pager, next, total"
+          layout="total, sizes, prev, pager, next, jumper"
           background
           @current-change="loadRecordsPage"
+          @size-change="onRecordsSizeChange"
         />
       </div>
     </el-dialog>
@@ -223,14 +225,16 @@
         <el-empty v-if="!overtimeLoading && !overtimeList.length" description="还没有加班记录" />
       </div>
 
-      <div v-if="overtimeTotal > PAGE_SIZE" class="pagination-wrap">
+      <div v-if="overtimeTotal > overtimeSize" class="pagination-wrap">
         <el-pagination
           v-model:current-page="overtimePage"
-          :page-size="PAGE_SIZE"
+          v-model:page-size="overtimeSize"
+          :page-sizes="[10, 20, 50]"
           :total="overtimeTotal"
-          layout="prev, pager, next, total"
+          layout="total, sizes, prev, pager, next, jumper"
           background
           @current-change="loadOvertimePage"
+          @size-change="onOvertimeSizeChange"
         />
       </div>
     </el-dialog>
@@ -299,14 +303,16 @@
         <el-empty v-if="!lateLoading && !lateList.length" description="还没有迟到记录" />
       </div>
 
-      <div v-if="lateTotal > PAGE_SIZE" class="pagination-wrap">
+      <div v-if="lateTotal > lateSize" class="pagination-wrap">
         <el-pagination
           v-model:current-page="latePage"
-          :page-size="PAGE_SIZE"
+          v-model:page-size="lateSize"
+          :page-sizes="[10, 20, 50]"
           :total="lateTotal"
-          layout="prev, pager, next, total"
+          layout="total, sizes, prev, pager, next, jumper"
           background
           @current-change="loadLatePage"
+          @size-change="onLateSizeChange"
         />
       </div>
     </el-dialog>
@@ -375,7 +381,7 @@ import AuthRequired from '@/components/auth/AuthRequired.vue'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const PAGE_SIZE = 10
+const DEFAULT_PAGE_SIZE = 10
 
 // ---------- 数据 ----------
 const projects = ref<PerformanceProject[]>([])
@@ -393,6 +399,7 @@ const reportsVisible = ref(false)
 const records = ref<PerformanceRecord[]>([])
 const recordsTotal = ref(0)
 const recordsPage = ref(1)
+const recordsSize = ref(DEFAULT_PAGE_SIZE)
 const listLoading = ref(false)
 const recordFilter = reactive({
   projectId: null as number | null,
@@ -422,6 +429,7 @@ const overtimeVisible = ref(false)
 const overtimeList = ref<OvertimeRecord[]>([])
 const overtimeTotal = ref(0)
 const overtimePage = ref(1)
+const overtimeSize = ref(DEFAULT_PAGE_SIZE)
 const overtimeLoading = ref(false)
 const overtimeSelection = ref<number[]>([])
 const overtimeFilter = reactive({ dateRange: null as [string, string] | null })
@@ -435,6 +443,7 @@ const lateVisible = ref(false)
 const lateList = ref<LateRecord[]>([])
 const lateTotal = ref(0)
 const latePage = ref(1)
+const lateSize = ref(DEFAULT_PAGE_SIZE)
 const lateLoading = ref(false)
 const lateSelection = ref<number[]>([])
 const lateFilter = reactive({ dateRange: null as [string, string] | null })
@@ -619,7 +628,7 @@ const loadRecordsPage = async (page: number) => {
   try {
     const res = await listRecords({
       page,
-      size: PAGE_SIZE,
+      size: recordsSize.value,
       projectId: recordFilter.projectId,
       startDate: recordFilter.dateRange?.[0] ?? null,
       endDate: recordFilter.dateRange?.[1] ?? null,
@@ -632,6 +641,11 @@ const loadRecordsPage = async (page: number) => {
   } finally {
     listLoading.value = false
   }
+}
+
+const onRecordsSizeChange = () => {
+  recordsPage.value = 1
+  void loadRecordsPage(1)
 }
 
 const reloadRecords = () => {
@@ -744,7 +758,7 @@ const loadOvertimePage = async (page: number) => {
   try {
     const res = await listOvertime({
       page,
-      size: PAGE_SIZE,
+      size: overtimeSize.value,
       startDate: overtimeFilter.dateRange?.[0] ?? null,
       endDate: overtimeFilter.dateRange?.[1] ?? null,
     })
@@ -756,6 +770,11 @@ const loadOvertimePage = async (page: number) => {
   } finally {
     overtimeLoading.value = false
   }
+}
+
+const onOvertimeSizeChange = () => {
+  overtimePage.value = 1
+  void loadOvertimePage(1)
 }
 
 const reloadOvertime = () => {
@@ -866,7 +885,7 @@ const loadLatePage = async (page: number) => {
   try {
     const res = await listLate({
       page,
-      size: PAGE_SIZE,
+      size: lateSize.value,
       startDate: lateFilter.dateRange?.[0] ?? null,
       endDate: lateFilter.dateRange?.[1] ?? null,
     })
@@ -878,6 +897,11 @@ const loadLatePage = async (page: number) => {
   } finally {
     lateLoading.value = false
   }
+}
+
+const onLateSizeChange = () => {
+  latePage.value = 1
+  void loadLatePage(1)
 }
 
 const reloadLate = () => {

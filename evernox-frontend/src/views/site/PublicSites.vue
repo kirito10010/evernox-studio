@@ -56,10 +56,13 @@
     <div v-if="total > pageSize" class="pagination-wrap">
       <el-pagination
         v-model:current-page="currentPage"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
+        :page-sizes="[12, 24, 48]"
         :total="total"
-        layout="total, prev, pager, next, jumper"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="loadSites"
+        @size-change="applyFilters"
       />
     </div>
   </div>
@@ -81,7 +84,7 @@ const selectedTagIds = ref<number[]>([])
 const keyword = ref('')
 const loading = ref(false)
 const currentPage = ref(1)
-const pageSize = 12
+const pageSize = ref(12)
 const total = ref(0)
 
 // ---------- 标签栏：按站点数排序 + 默认只占一行 ----------
@@ -126,7 +129,7 @@ const loadSites = async () => {
   try {
     const res = await getPublicSites({
       page: currentPage.value,
-      size: pageSize,
+      size: pageSize.value,
       keyword: keyword.value.trim() || undefined,
       tagIds: selectedTagIds.value.length ? selectedTagIds.value.join(',') : undefined,
     })

@@ -30,7 +30,7 @@ public class QuizQuestionRequest {
     @Size(max = 200, message = "选项D不能超过200字")
     private String optionD;
 
-    @NotBlank(message = "答案不能为空")
     @Size(max = 200, message = "答案不能超过200字")
     private String answer;
+
 }

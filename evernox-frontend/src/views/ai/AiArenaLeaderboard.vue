@@ -168,13 +168,16 @@
     </div>
 
     <!-- 前端分页：接口一次返回整类榜单（可能数百行），这里只渲染当前页，避免挂载时同步渲染大量 DOM -->
-    <div v-if="total > PAGE_SIZE" class="table-footer">
+    <div v-if="total > pageSize" class="table-footer">
       <el-pagination
         v-model:current-page="page"
-        :page-size="PAGE_SIZE"
+        v-model:page-size="pageSize"
+        :page-sizes="[20, 50, 100]"
         :total="total"
-        layout="total, prev, pager, next, jumper"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
         @current-change="onPageChange"
+        @size-change="onPageSizeChange"
       />
     </div>
   </div>
@@ -228,8 +231,8 @@ const QUICK_RANGES: QuickRange[] = [
 ]
 
 const categories = ref<ArenaCategoryOption[]>([])
-/** 每页行数：整类榜单可能有数百行，分页后一次只渲染 50 行 */
-const PAGE_SIZE = 50
+/** 每页行数：整类榜单可能有数百行，分页后只渲染当前页 */
+const pageSize = ref(50)
 
 /**
  * 展示行：把每行的显示字符串在**数据加载时算一次**。
@@ -356,11 +359,16 @@ const toRow = (r: ArenaRankItem): ArenaRow => ({
 
 /** 按当前页码切出要渲染的那一页 */
 const slicePage = () => {
-  const start = (page.value - 1) * PAGE_SIZE
-  items.value = allRows.slice(start, start + PAGE_SIZE).map(toRow)
+  const start = (page.value - 1) * pageSize.value
+  items.value = allRows.slice(start, start + pageSize.value).map(toRow)
 }
 
 const onPageChange = () => {
+  slicePage()
+}
+
+const onPageSizeChange = () => {
+  page.value = 1
   slicePage()
 }
 
@@ -388,7 +396,7 @@ const loadItems = async () => {
     allRows = res.data ?? []
     total.value = allRows.length
     // 换了筛选条件后结果变少，当前页可能已越界 → 回到第 1 页
-    if ((page.value - 1) * PAGE_SIZE >= total.value) {
+    if ((page.value - 1) * pageSize.value >= total.value) {
       page.value = 1
     }
     slicePage()

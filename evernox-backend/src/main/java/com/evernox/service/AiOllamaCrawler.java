@@ -4,6 +4,7 @@ import com.evernox.dto.OllamaModelDto;
 import com.evernox.dto.OllamaTagDto;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
+import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -262,7 +263,55 @@ public class AiOllamaCrawler {
         return tags;
     }
 
-    // ===== 列表页解析 =====
+    /**
+     * 模型详情页快照（下载量）。
+     *
+     * @param pulls       解析后的下载量，页面没有该字段时为 null
+     * @param pullsText   原始文本（如 8.1M）
+     * @param gone        true = 官网返回 404/410，判定模型已下架
+     */
+    public record ModelSnapshot(Long pulls, String pullsText, boolean gone) {
+    }
+
+    /**
+     * 抓取模型详情页的下载量，用于「更新模型」。
+     *
+     * 返回值语义：
+     *  - gone=true：官网 404/410（模型已下架），调用方可以删除；
+     *  - null：网络异常等本次失败，调用方必须保留旧数据；
+     *  - 其余：正常快照（pulls 可能为 null，表示页面上没解析到下载量）。
+     */
+    public ModelSnapshot fetchModelSnapshot(String detailUrl) {
+        if (detailUrl == null || detailUrl.isBlank()) {
+            return null;
+        }
+        try {
+            Document doc = Jsoup.connect(detailUrl)
+                    .userAgent(UA)
+                    .header("Accept-Language", ACCEPT_LANGUAGE)
+                    .timeout(REQUEST_TIMEOUT_MS)
+                    .maxBodySize(0)
+                    .get();
+            Element downloads = doc.selectFirst("span[title$=downloads]");
+            if (downloads == null) {
+                return new ModelSnapshot(null, null, false);
+            }
+            Long pulls = parseExactPulls(downloads.attr("title"));
+            Element valueEl = downloads.selectFirst("span");
+            String pullsText = valueEl == null ? null : blankToNull(valueEl.text());
+            return new ModelSnapshot(pulls, pullsText, false);
+        } catch (HttpStatusException e) {
+            if (e.getStatusCode() == 404 || e.getStatusCode() == 410) {
+                log.info("Ollama 模型已下架（{}）：{}", e.getStatusCode(), detailUrl);
+                return new ModelSnapshot(null, null, true);
+            }
+            log.warn("Ollama 详情页抓取失败 {}：{}", detailUrl, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.warn("Ollama 详情页抓取失败 {}：{}", detailUrl, e.getMessage());
+            return null;
+        }
+    }
 
     private List<OllamaModelDto> parseModelList(Document doc, boolean forceAbliterated) {
         List<OllamaModelDto> models = new ArrayList<>();

@@ -86,6 +86,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/hyol/announcement/list", "/hyol/ninja/list").permitAll()
                 .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/hyol/announcement/\\d+")).permitAll()
                 .requestMatchers(HttpMethod.GET, "/quiz/search", "/quiz/unanswered").permitAll()
+                // 喵问答：搜题、待确认面板与题图都是匿名可读
+                .requestMatchers(HttpMethod.GET, "/miao/search", "/miao/unanswered").permitAll()
+                .requestMatchers("/miao/image/**").permitAll()
 
                 .requestMatchers(HttpMethod.GET, "/org/points/organizations").permitAll()
 
@@ -152,6 +155,8 @@ public class SecurityConfig {
                 // 必须写在 anyRequest() 之前，Spring Security 先命中先生效
                 // 组织积分管理开放给 admin + super_member
                 .requestMatchers("/admin/org/**").hasAnyRole("admin", "super_member")
+                // 项目管理 / 版本发布：超级会员与管理员都能用（数据仍按账号隔离）
+                .requestMatchers("/admin/release/**").hasAnyRole("admin", "super_member")
                 .requestMatchers("/admin/**").hasRole("admin")
 
                 // 其他请求需要认证

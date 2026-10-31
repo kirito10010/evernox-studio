@@ -587,7 +587,8 @@ watch(
 
 .chart-row {
   display: grid;
-  grid-template-columns: 2.4fr 1fr;
+  /* 右侧饼图卡片固定窄一点，把空间让给左边的趋势图 */
+  grid-template-columns: minmax(0, 1fr) 220px;
   gap: 14px;
   align-items: stretch;
 

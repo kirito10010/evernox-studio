@@ -512,6 +512,41 @@ CREATE TABLE IF NOT EXISTS `quiz_answer_vote` (
     KEY `idx_question_answer` (`question_id`, `answer`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='测验待确认答案投票';
 
+-- 喵问答题库：支持看图题（image）与游戏内已排除选项（removed_options，JSON 数组，最多 3 个）
+CREATE TABLE IF NOT EXISTS `miao_question` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '题目ID',
+    `question` VARCHAR(500) NOT NULL COMMENT '问题',
+    `normalized_question` VARCHAR(500) NULL COMMENT '归一化问题(去标点/空白/小写，用于查重)',
+    `option_a` VARCHAR(200) NOT NULL COMMENT '选项A',
+    `option_b` VARCHAR(200) NOT NULL COMMENT '选项B',
+    `option_c` VARCHAR(200) NOT NULL COMMENT '选项C',
+    `option_d` VARCHAR(200) NOT NULL COMMENT '选项D',
+    `answer` VARCHAR(200) NOT NULL DEFAULT '' COMMENT '正确答案(选项文本)',
+    `removed_options` VARCHAR(1000) NULL COMMENT '已排除选项(JSON 数组，最多3个)',
+    `image` VARCHAR(120) NULL COMMENT '题目图片文件名(data/miao/images 下)',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 0待审批/1已通过/2已驳回',
+    `created_by` BIGINT NULL COMMENT '提交者用户ID(管理员导入为NULL)',
+    `deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_miao_status` (`status`),
+    KEY `idx_miao_normalized` (`normalized_question`),
+    KEY `idx_miao_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='火影忍者OL喵问答题库';
+
+-- 喵问答待确认题目的用户答案投票
+CREATE TABLE IF NOT EXISTS `miao_answer_vote` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '投票ID',
+    `question_id` BIGINT NOT NULL COMMENT '题目ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `answer` VARCHAR(200) NOT NULL COMMENT '选择的答案文本',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '投票时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_miao_question_user` (`question_id`, `user_id`),
+    KEY `idx_miao_question_answer` (`question_id`, `answer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='喵问答待确认答案投票';
+
 
 -- 火影忍者OL官方公告（抓取缓存，source_url 唯一键做 upsert）
 CREATE TABLE IF NOT EXISTS `hyol_announcement` (
@@ -834,6 +869,7 @@ CREATE TABLE IF NOT EXISTS `ai_ollama_model` (
     `source_updated_at` DATETIME NULL COMMENT '官网更新时间(UTC)',
     `synced_at`         DATETIME NULL COMMENT '最近一次同步时间',
     `tags_synced_at`    DATETIME NULL COMMENT '变体最近一次成功抓取时间',
+    `last_updated_at`   DATETIME NULL COMMENT '数据最后一次更新时间（获取/更新作业写入）',
     `created_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -842,7 +878,8 @@ CREATE TABLE IF NOT EXISTS `ai_ollama_model` (
     KEY `idx_category` (`category`),
     KEY `idx_abliterated` (`is_abliterated`),
     KEY `idx_pulls` (`pulls`),
-    KEY `idx_source_updated` (`source_updated_at`)
+    KEY `idx_source_updated` (`source_updated_at`),
+    KEY `idx_last_updated` (`last_updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Ollama模型库(模型族)';
 
 

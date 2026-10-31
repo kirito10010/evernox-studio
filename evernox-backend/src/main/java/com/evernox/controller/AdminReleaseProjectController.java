@@ -27,7 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/release/project")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('admin')")
+@PreAuthorize("hasAnyRole('admin', 'super_member')")
 public class AdminReleaseProjectController {
 
     private final ReleaseProjectService projectService;

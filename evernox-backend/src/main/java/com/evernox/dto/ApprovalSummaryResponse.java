@@ -23,10 +23,14 @@ public class ApprovalSummaryResponse {
     /** 忍者测验题目待审批条数 */
     private Long quizPending;
 
+    /** 喵问答题目待审批条数 */
+    private Long miaoPending;
+
     /** 待审批总数 */
     public long getTotal() {
         return (sitePending == null ? 0 : sitePending)
                 + (notePending == null ? 0 : notePending)
-                + (quizPending == null ? 0 : quizPending);
+                + (quizPending == null ? 0 : quizPending)
+                + (miaoPending == null ? 0 : miaoPending);
     }
 }

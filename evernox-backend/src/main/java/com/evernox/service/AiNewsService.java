@@ -13,8 +13,10 @@ public interface AiNewsService {
     /** 采集一次并入库，返回新增条数 */
     int crawlAll();
 
-    /** 分页查询列表，支持来源/标签/关键词过滤，sort=time|score */
-    IPage<AiNewsItemResponse> listItems(String source, String tag, String keyword, String sort, int page, int size, Long userId);
+    /** 分页查询列表，支持来源/标签/关键词/发布日期区间过滤，sort=time|score */
+    IPage<AiNewsItemResponse> listItems(String source, String tag, String keyword,
+                                        String startDate, String endDate,
+                                        String sort, int page, int size, Long userId);
 
     /** 标签列表 */
     List<String> tags();

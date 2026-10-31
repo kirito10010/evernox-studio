@@ -95,6 +95,9 @@ public class AiOllamaModel {
     /** 变体最近一次成功抓取时间 */
     private LocalDateTime tagsSyncedAt;
 
+    /** 数据最后一次更新时间（获取/更新作业写入，用于轮换最久未更新的模型） */
+    private LocalDateTime lastUpdatedAt;
+
     /** 创建时间 */
     private LocalDateTime createdAt;
 

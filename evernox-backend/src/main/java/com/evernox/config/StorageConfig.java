@@ -38,6 +38,7 @@ public class StorageConfig {
     private static final String NOTE_IMAGE_DIR = "notes";
     private static final String ANNOUNCEMENT_DIR = "announcements";
     private static final String TOPIC_DIR = "topics";
+    private static final String MIAO_IMAGE_DIR = "miao/images";
     private static final String RELEASE_DIR = "releases";
     private static final String RELEASE_UPLOAD_DIR = "releases/.uploads";
 
@@ -76,6 +77,8 @@ public class StorageConfig {
             Files.createDirectories(basePath.resolve(ANNOUNCEMENT_DIR));
             // 话题帖子插图同理：只服务于话题帖子
             Files.createDirectories(basePath.resolve(TOPIC_DIR));
+            // 喵问答：看图题的截图，按内容哈希命名
+            Files.createDirectories(basePath.resolve(MIAO_IMAGE_DIR));
             // 版本发布：正式附件与分片临时目录分开
             Files.createDirectories(basePath.resolve(RELEASE_DIR));
             Files.createDirectories(basePath.resolve(RELEASE_UPLOAD_DIR));
@@ -148,6 +151,11 @@ public class StorageConfig {
     /** 版本发布附件根目录 */
     public Path getReleaseRoot() {
         return getDataPath().resolve(RELEASE_DIR);
+    }
+
+    /** 喵问答题图目录 */
+    public Path getMiaoImagePath() {
+        return getDataPath().resolve(MIAO_IMAGE_DIR);
     }
 
     /** 分片上传临时根目录 */

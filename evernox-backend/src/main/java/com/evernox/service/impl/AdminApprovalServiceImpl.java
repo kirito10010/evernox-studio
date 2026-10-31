@@ -6,9 +6,11 @@ import com.evernox.common.SiteStatus;
 import com.evernox.common.UserRole;
 import com.evernox.dto.ApprovalSummaryResponse;
 import com.evernox.entity.Note;
+import com.evernox.entity.MiaoQuestion;
 import com.evernox.entity.QuizQuestion;
 import com.evernox.entity.SiteLink;
 import com.evernox.entity.User;
+import com.evernox.repository.MiaoQuestionRepository;
 import com.evernox.repository.NoteRepository;
 import com.evernox.repository.QuizQuestionRepository;
 import com.evernox.repository.SiteLinkRepository;
@@ -37,6 +39,7 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
     private final SiteLinkRepository siteLinkRepository;
     private final NoteRepository noteRepository;
     private final QuizQuestionRepository quizQuestionRepository;
+    private final MiaoQuestionRepository miaoQuestionRepository;
     private final UserRepository userRepository;
     private final JavaMailSender mailSender;
 
@@ -51,10 +54,13 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                 .eq(Note::getStatus, NoteStatus.PENDING));
         Long quiz = quizQuestionRepository.selectCount(new LambdaQueryWrapper<QuizQuestion>()
                 .eq(QuizQuestion::getStatus, QuizQuestionServiceImpl.STATUS_PENDING));
+        Long miao = miaoQuestionRepository.selectCount(new LambdaQueryWrapper<MiaoQuestion>()
+                .eq(MiaoQuestion::getStatus, MiaoQuestionServiceImpl.STATUS_PENDING));
         return ApprovalSummaryResponse.builder()
                 .sitePending(site)
                 .notePending(note)
                 .quizPending(quiz)
+                .miaoPending(miao)
                 .build();
     }
 

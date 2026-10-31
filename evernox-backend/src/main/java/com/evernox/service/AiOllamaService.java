@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.evernox.dto.OllamaFilterOptions;
 import com.evernox.dto.OllamaModelResponse;
 import com.evernox.dto.OllamaSyncStatus;
+import com.evernox.dto.OllamaTaskStatus;
+import com.evernox.dto.OllamaUpdateCandidate;
+import com.evernox.dto.OllamaUpdateRequest;
 
 /**
  * Ollama 模型库服务
@@ -39,4 +42,18 @@ public interface AiOllamaService {
      * 只能按关键词抓回来。关键词为空/过长/已有同步在跑时同步抛业务异常。
      */
     void triggerBackfillAsync(String keyword);
+
+    /** 获取新模型：只入库库里没有的模型并抓取它们的变体（异步） */
+    OllamaTaskStatus startDiscover(java.util.List<String> keywords);
+
+    /** 更新模型：按范围或「最久未更新的 N 条」更新下载量 / 变体（异步） */
+    OllamaTaskStatus startUpdate(OllamaUpdateRequest request);
+
+    /** 「更新模型」候选列表：按筛选条件列出模型，供管理员勾选 */
+    java.util.List<OllamaUpdateCandidate> listUpdateCandidates(String keyword, String category, String vendor,
+                                                               String size, Boolean abliterated,
+                                                               String capability, int limit);
+
+    /** 当前/最近一次作业状态 */
+    OllamaTaskStatus getTaskStatus();
 }

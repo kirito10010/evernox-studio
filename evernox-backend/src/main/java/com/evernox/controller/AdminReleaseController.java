@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/release")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('admin')")
+@PreAuthorize("hasAnyRole('admin', 'super_member')")
 public class AdminReleaseController {
 
     private final ReleaseService releaseService;

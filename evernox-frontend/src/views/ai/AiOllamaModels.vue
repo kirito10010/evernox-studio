@@ -21,8 +21,16 @@
           <span class="stat-num">{{ syncText }}</span>
           <span class="stat-label">最近同步</span>
         </div>
-        <el-button v-if="userStore.isAdmin" type="primary" :loading="status.running" @click="handleSync">
-          {{ status.running ? '同步中…' : '立即同步' }}
+        <el-button v-if="userStore.isAdmin" :disabled="!!task?.running" @click="openDiscover">
+          获取新模型
+        </el-button>
+        <el-button
+          v-if="userStore.isAdmin"
+          type="primary"
+          :disabled="!!task?.running"
+          @click="openUpdate"
+        >
+          更新模型
         </el-button>
       </div>
     </div>
@@ -64,18 +72,9 @@
         <el-option label="按参数量" value="size" />
       </el-select>
       <!--
-        按需补全：官网默认列表页只返回官方库、社区模型无法枚举，
-        所以任何关键词（无论本地有没有结果）都允许从官网补回来。只增不删。
-        无关键词时置灰而非隐藏，避免布局跳动并提示「先输关键词」。
+        获取新模型 / 更新模型改由页面右上角两个按钮触发：
+        获取时在弹窗里单独填关键词（不用占用这里的列表筛选），更新时在弹窗里选范围。
       -->
-      <el-button
-        v-if="userStore.isAdmin"
-        :loading="backfilling"
-        :disabled="!filters.keyword.trim() || status.running"
-        @click="handleBackfill"
-      >
-        {{ status.running ? '补全中…' : '从官网补全' }}
-      </el-button>
       <el-button @click="resetFilters">重置</el-button>
     </div>
 
@@ -128,6 +127,9 @@
         </el-table-column>
         <el-table-column label="官网更新" width="120" align="center">
           <template #default="{ row }">{{ formatDate(row.sourceUpdatedAt, '-') }}</template>
+        </el-table-column>
+        <el-table-column label="数据更新" width="120" align="center">
+          <template #default="{ row }">{{ formatDate(row.lastUpdatedAt, '-') }}</template>
         </el-table-column>
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
@@ -223,26 +225,51 @@
         </el-table>
       </div>
     </el-drawer>
+
+    <OllamaDiscoverDialog
+      :key="discoverSession"
+      v-model="discoverVisible"
+      :task="task"
+      :busy="taskStarting"
+      @start="onDiscoverStart"
+      @close="onTaskDialogClose"
+    />
+
+    <OllamaUpdateDialog
+      :key="updateSession"
+      v-model="updateVisible"
+      :task="task"
+      :busy="taskStarting"
+      :options="options"
+      @start="onUpdateStart"
+      @retry="onUpdateRetry"
+      @close="onTaskDialogClose"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onDeactivated, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useClipboard } from '@/composables/useClipboard'
 import { formatDate } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 import {
-  backfillOllamaModels,
   getOllamaFilters,
   getOllamaModelDetail,
   getOllamaModels,
   getOllamaSyncStatus,
-  triggerOllamaSync,
+  getOllamaTaskStatus,
+  startOllamaDiscover,
+  startOllamaUpdate,
   type OllamaFilterOptions,
   type OllamaModel,
   type OllamaSyncStatus,
+  type OllamaTaskStatus,
+  type OllamaUpdateRequest,
 } from '@/api/ollamaModel'
+import OllamaDiscoverDialog from '@/components/ollama/OllamaDiscoverDialog.vue'
+import OllamaUpdateDialog from '@/components/ollama/OllamaUpdateDialog.vue'
 
 // 显式声明组件名：MainLayout 的 <keep-alive :include="..."> 按组件名匹配缓存。
 defineOptions({ name: 'AiOllamaModels' })
@@ -281,7 +308,6 @@ interface OllamaRow extends OllamaModel {
 
 const models = ref<OllamaRow[]>([])
 const loading = ref(false)
-const backfilling = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -316,7 +342,17 @@ const drawerVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<OllamaModel | null>(null)
 
-let pollTimer: number | null = null
+// ---------- 获取新模型 / 更新模型（后台作业） ----------
+const task = ref<OllamaTaskStatus | null>(null)
+const discoverVisible = ref(false)
+const updateVisible = ref(false)
+const taskStarting = ref(false)
+/** 上次手动关闭过的 finishedAt：相同则不重复弹出结果弹窗 */
+const closedFinishedAt = ref<string | null>(null)
+/** 每次打开弹窗换 key，重置弹窗内部状态 */
+const discoverSession = ref(0)
+const updateSession = ref(0)
+let taskTimer: number | null = null
 
 const capabilityLabel = (c: string) => CAPABILITY_LABELS[c] ?? c
 
@@ -395,6 +431,19 @@ const loadStatus = async () => {
   return status.value
 }
 
+/** 拉取单个模型的详情（含变体列表） */
+const loadDetail = async (id: number) => {
+  detailLoading.value = true
+  try {
+    const res = await getOllamaModelDetail(id)
+    detail.value = res.data ?? null
+  } catch {
+    detail.value = null
+  } finally {
+    detailLoading.value = false
+  }
+}
+
 /** 打开详情抽屉；行类型来自 el-table 插槽，收窄成 OllamaModel */
 const onRowClick = async (row: unknown) => {
   const model = row as OllamaModel
@@ -402,15 +451,7 @@ const onRowClick = async (row: unknown) => {
     return
   }
   drawerVisible.value = true
-  detailLoading.value = true
-  try {
-    const res = await getOllamaModelDetail(model.id)
-    detail.value = res.data ?? null
-  } catch {
-    detail.value = null
-  } finally {
-    detailLoading.value = false
-  }
+  await loadDetail(model.id)
 }
 
 const { copy } = useClipboard()
@@ -420,76 +461,124 @@ const copyCommand = async (text: string | null | undefined) => {
   await copy(text, `已复制：${text}`)
 }
 
-const stopPolling = () => {
-  if (pollTimer !== null) {
-    window.clearInterval(pollTimer)
-    pollTimer = null
+const stopTaskPolling = () => {
+  if (taskTimer !== null) {
+    window.clearInterval(taskTimer)
+    taskTimer = null
   }
 }
 
-const startPolling = () => {
-  stopPolling()
-  // 首跑要逐个抓变体页（200+ 个模型），耗时可能十几分钟，这里给足轮询窗口
-  const maxTicks = 240
-  let ticks = 0
-  pollTimer = window.setInterval(async () => {
-    ticks++
-    const s = await loadStatus().catch(() => null)
-    if (!s) return
-    if (!s.running || ticks >= maxTicks) {
-      stopPolling()
-      if (s.message) {
-        if (s.lastSuccess) {
-          ElMessage.success(s.message)
-        } else {
-          ElMessage.warning(s.message)
-        }
-      }
-      await Promise.all([load(), loadOptions()])
+/** 拉一次作业状态，并按结果打开对应弹窗（运行中 / 新的结果） */
+const loadTask = async () => {
+  const res = await getOllamaTaskStatus().catch(() => null)
+  const st = res?.data
+  if (!st) return
+  task.value = st
+  if (!st.type) return
+  if (st.running) {
+    if (st.type === 'DISCOVER') discoverVisible.value = true
+    else updateVisible.value = true
+    startTaskPolling()
+    return
+  }
+  stopTaskPolling()
+  if (st.finishedAt && st.finishedAt !== closedFinishedAt.value) {
+    if (st.type === 'DISCOVER') discoverVisible.value = true
+    else updateVisible.value = true
+  }
+}
+
+const refreshAfterTask = async () => {
+  await Promise.all([load(), loadOptions(), loadStatus()])
+  if (drawerVisible.value && detail.value?.id) {
+    await loadDetail(detail.value.id)
+  }
+}
+
+const startTaskPolling = () => {
+  stopTaskPolling()
+  taskTimer = window.setInterval(async () => {
+    const res = await getOllamaTaskStatus().catch(() => null)
+    const st = res?.data
+    if (!st) return
+    task.value = st
+    if (st.running) return
+    stopTaskPolling()
+    if (st.message) {
+      ElMessage.success(st.message)
     }
-  }, 5000)
+    await refreshAfterTask()
+  }, 1500)
 }
 
-const handleSync = async () => {
-  try {
-    await triggerOllamaSync()
-    ElMessage.success('已开始同步，请稍候查看结果')
-    await loadStatus()
-    startPolling()
-  } catch {
-    /* 提示已在请求层 */
-  }
+const openDiscover = () => {
+  discoverSession.value += 1
+  // 手动打开时先清掉旧状态，弹窗展示「配置」而不是上次的结果
+  task.value = null
+  discoverVisible.value = true
 }
 
-/** 搜不到时从官网按需补全：复用既有的 startPolling 流程，不另写轮询 */
-const handleBackfill = async () => {
-  const kw = filters.keyword.trim()
-  if (!kw) return
-  backfilling.value = true
+const openUpdate = () => {
+  updateSession.value += 1
+  task.value = null
+  updateVisible.value = true
+}
+
+const onDiscoverStart = async (keywords: string[]) => {
+  taskStarting.value = true
   try {
-    await backfillOllamaModels(kw)
-    ElMessage.success(`已开始从官网补全「${kw}」，完成后会自动刷新`)
-    await loadStatus()
-    startPolling()
+    const res = await startOllamaDiscover(keywords)
+    if (res.data) task.value = res.data
+    startTaskPolling()
   } catch {
     /* 提示已在请求层 */
   } finally {
-    backfilling.value = false
+    taskStarting.value = false
   }
+}
+
+const runUpdate = async (request: OllamaUpdateRequest) => {
+  taskStarting.value = true
+  try {
+    const res = await startOllamaUpdate(request)
+    if (res.data) task.value = res.data
+    if (res.data?.running) {
+      startTaskPolling()
+    } else {
+      await refreshAfterTask()
+    }
+  } catch {
+    /* 提示已在请求层 */
+  } finally {
+    taskStarting.value = false
+  }
+}
+
+const onUpdateStart = (request: OllamaUpdateRequest) => void runUpdate(request)
+
+/** 只重试失败的模型：父组件把 id 列表交给后端，进度/结果弹窗会自动切回运行态 */
+const onUpdateRetry = (ids: number[]) => void runUpdate({ ids })
+
+/** 结果弹窗关闭：记下 finishedAt，切菜单回来不再重复弹出 */
+const onTaskDialogClose = () => {
+  closedFinishedAt.value = task.value?.finishedAt ?? null
 }
 
 onMounted(async () => {
   await Promise.all([loadOptions(), load()])
   await loadStatus()
-  if (status.value.running) {
-    startPolling()
-  }
+  await loadTask()
 })
 
-// 本页被 keep-alive 缓存后，切走只会触发 onDeactivated（不会 onUnmounted），
-// 轮询必须在这里一起停掉，否则会在后台空转到结束。
-onDeactivated(stopPolling)
-onUnmounted(stopPolling)
+onActivated(async () => {
+  // 切菜单回来：立即同步一次作业状态（运行中的进度弹窗会继续保持打开）
+  await loadTask()
+})
+
+// 页面被 keep-alive 缓存后切走只会触发 onDeactivated：
+// 停止前端轮询（服务端作业继续跑），回来时 onActivated 立即拉最新进度。
+onDeactivated(stopTaskPolling)
+onUnmounted(stopTaskPolling)
 </script>
 
 <style scoped lang="scss">

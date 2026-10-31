@@ -95,16 +95,22 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '公告' },
       },
       {
-        path: 'naruto/ninja',
-        name: 'NinjaGuide',
-        component: () => import('@/views/naruto/NinjaGuide.vue'),
-        meta: { title: '忍者图鉴' },
+        path: 'naruto/miao',
+        name: 'MiaoQuiz',
+        component: () => import('@/views/naruto/MiaoQuiz.vue'),
+        meta: { title: '喵问答' },
       },
       {
         path: 'naruto/quiz',
         name: 'Quiz',
         component: () => import('@/views/naruto/Quiz.vue'),
         meta: { title: '忍者测验' },
+      },
+      {
+        path: 'naruto/ninja',
+        name: 'NinjaGuide',
+        component: () => import('@/views/naruto/NinjaGuide.vue'),
+        meta: { title: '忍者图鉴' },
       },
       {
         path: 'naruto/org-points',
@@ -149,18 +155,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/workspace/Salary.vue'),
         meta: { title: '记录工资', requiresAuth: true },
       },
-      // 个人项目发布：数据按管理员账号隔离，入口放在个人区
+      // 项目管理：管理员与超级会员都可用，数据按账号隔离（入口在「超级会员」菜单）
       {
         path: 'workspace/projects',
         name: 'AdminProjects',
         component: () => import('@/views/admin/AdminProjects.vue'),
-        meta: { title: '项目管理', requiresAdmin: true },
+        meta: { title: '项目管理', requiresOrgManage: true },
       },
       {
         path: 'workspace/projects/:id/releases',
         name: 'AdminProjectReleases',
         component: () => import('@/views/admin/AdminProjectReleases.vue'),
-        meta: { title: '版本发布', requiresAdmin: true },
+        meta: { title: '版本发布', requiresOrgManage: true },
       },
       // 兼容旧地址
       {
@@ -280,6 +286,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminTopic',
         component: () => import('@/views/admin/AdminTopic.vue'),
         meta: { title: '话题集中营管理', requiresAdmin: true },
+      },
+      {
+        path: 'admin/miao',
+        name: 'AdminMiaoQuiz',
+        component: () => import('@/views/admin/AdminMiaoQuiz.vue'),
+        meta: { title: '喵问答题库', requiresAdmin: true },
       },
       {
         path: 'admin/quiz',

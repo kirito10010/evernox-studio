@@ -12,6 +12,18 @@
           <el-option label="最新" value="time" />
           <el-option label="热度" value="score" />
         </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          range-separator="~"
+          start-placeholder="发布起"
+          end-placeholder="止"
+          :disabled="onlyFav"
+          :clearable="true"
+          style="width: 250px"
+          @change="reload"
+        />
         <el-input
           v-model="keyword"
           placeholder="搜索标题关键词"
@@ -94,6 +106,7 @@ const filterSource = ref('')
 const filterTag = ref('')
 const keyword = ref('')
 const sort = ref('time')
+const dateRange = ref<[string, string] | null>(null)
 const onlyFav = ref(false)
 
 const sourceOptions = [{ label: 'HN', value: 'hackernews' }]
@@ -148,6 +161,8 @@ const load = async () => {
           source: filterSource.value || undefined,
           tag: filterTag.value || undefined,
           keyword: keyword.value || undefined,
+          startDate: dateRange.value?.[0],
+          endDate: dateRange.value?.[1],
           sort: sort.value,
           page: page.value,
           size: size.value,
@@ -191,6 +206,8 @@ const onOnlyFavChange = (value: string | number | boolean) => {
   }
   const ok = authDialog.requireAuth(() => {
     onlyFav.value = true
+    // 收藏列表按收藏时间排序，不支持发布日期区间；切换时清掉避免误解
+    dateRange.value = null
     reload()
   })
   if (!ok) onlyFav.value = false

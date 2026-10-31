@@ -100,13 +100,17 @@
               <el-icon><Bell /></el-icon>
               <template #title>公告</template>
             </el-menu-item>
-            <el-menu-item index="/naruto/ninja">
-              <el-icon><UserFilled /></el-icon>
-              <template #title>忍者图鉴</template>
+            <el-menu-item index="/naruto/miao">
+              <el-icon><ChatDotRound /></el-icon>
+              <template #title>喵问答</template>
             </el-menu-item>
             <el-menu-item index="/naruto/quiz">
               <el-icon><QuestionFilled /></el-icon>
               <template #title>忍者测验</template>
+            </el-menu-item>
+            <el-menu-item index="/naruto/ninja">
+              <el-icon><UserFilled /></el-icon>
+              <template #title>忍者图鉴</template>
             </el-menu-item>
             <el-menu-item index="/naruto/org-points">
               <el-icon><DataAnalysis /></el-icon>
@@ -191,12 +195,6 @@
             </el-menu-item>
           </el-sub-menu>
 
-          <!-- 个人项目发布：按管理员账号隔离，放在个人区而不是共享管理员菜单 -->
-          <el-menu-item v-if="userStore.isAdmin" index="/workspace/projects">
-            <el-icon><Box /></el-icon>
-            <template #title>项目管理</template>
-          </el-menu-item>
-
           <!-- 4. 会员与管理：管理员固定最后，超级会员紧挨其上方 -->
 
           <el-sub-menu index="super-member">
@@ -210,6 +208,14 @@
             <el-menu-item index="/super-member/org">
               <el-icon><DataAnalysis /></el-icon>
               <template #title>组织管理</template>
+            </el-menu-item>
+            <!-- 项目发布：数据按账号隔离，超级会员 / 管理员都可用 -->
+            <el-menu-item
+              v-if="userStore.isAdmin || userStore.isSuperMember"
+              index="/workspace/projects"
+            >
+              <el-icon><Box /></el-icon>
+              <template #title>项目管理</template>
             </el-menu-item>
           </el-sub-menu>
 
@@ -260,6 +266,15 @@
             <el-menu-item index="/admin/support-board">
               <el-icon><Brush /></el-icon>
               <template #title>应援板</template>
+            </el-menu-item>
+            <el-menu-item index="/admin/miao">
+              <el-icon><ChatDotRound /></el-icon>
+              <template #title>
+                <span class="admin-menu-title">
+                  <span>喵问答题库</span>
+                  <span v-if="approval.miaoPending > 0" class="menu-count">{{ approval.miaoPending }}</span>
+                </span>
+              </template>
             </el-menu-item>
             <el-menu-item index="/admin/quiz">
               <el-icon><QuestionFilled /></el-icon>
@@ -490,13 +505,16 @@ const handleCommand = (command: string) => {
     approval.sitePending = 0
     approval.notePending = 0
     approval.quizPending = 0
+    approval.miaoPending = 0
     orgPending.value = 0
   }
 }
 
 // ---------- 管理员待审批红点 ----------
-const approval = reactive<ApprovalSummary>({ sitePending: 0, notePending: 0, quizPending: 0 })
-const approvalTotal = computed(() => approval.sitePending + approval.notePending + approval.quizPending)
+const approval = reactive<ApprovalSummary>({ sitePending: 0, notePending: 0, quizPending: 0, miaoPending: 0 })
+const approvalTotal = computed(() =>
+  approval.sitePending + approval.notePending + approval.quizPending + approval.miaoPending
+)
 const orgPending = ref(0)
 let approvalTimer: number | undefined
 
@@ -508,6 +526,7 @@ const loadApproval = async () => {
     approval.sitePending = d?.sitePending ?? 0
     approval.notePending = d?.notePending ?? 0
     approval.quizPending = d?.quizPending ?? 0
+    approval.miaoPending = d?.miaoPending ?? 0
   } catch {
     /* 忽略 */
   }

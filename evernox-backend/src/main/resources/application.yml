@@ -65,7 +65,9 @@ spring:
   servlet:
     multipart:
       max-file-size: 8MB
-      max-request-size: 9MB
+      # 喵问答按整个文件夹导入（questions.json + 多张截图），单文件仍限制 8MB，
+      # 这里只放宽「单次请求总量」，否则一整个文件夹会直接 413
+      max-request-size: 64MB
 
 
 mybatis-plus:

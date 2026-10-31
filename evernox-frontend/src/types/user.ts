@@ -156,5 +156,6 @@ export interface ApprovalSummary {
   sitePending: number
   notePending: number
   quizPending: number
+  miaoPending: number
   total?: number
 }

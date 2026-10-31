@@ -33,11 +33,14 @@ public class AiNewsController {
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String tag,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @RequestParam(defaultValue = "time") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
-        return Result.success(aiNewsService.listItems(source, tag, keyword, sort, page, size, getUserId(request)));
+        return Result.success(aiNewsService.listItems(
+                source, tag, keyword, startDate, endDate, sort, page, size, getUserId(request)));
     }
 
     @GetMapping("/tags")

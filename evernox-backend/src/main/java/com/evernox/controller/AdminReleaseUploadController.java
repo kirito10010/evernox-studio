@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/admin/release")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('admin')")
+@PreAuthorize("hasAnyRole('admin', 'super_member')")
 public class AdminReleaseUploadController {
 
     private final ReleaseStorageService storageService;

@@ -30,22 +30,14 @@
               {{ q.question }}
             </div>
 
-            <template v-if="q.answer">
-              <div class="quiz-options">
-                <div class="option">A. {{ q.optionA }}</div>
-                <div class="option">B. {{ q.optionB }}</div>
-                <div class="option">C. {{ q.optionC }}</div>
-                <div class="option">D. {{ q.optionD }}</div>
-              </div>
-              <div class="quiz-answer">答案：<span class="answer">{{ q.answer }}</span></div>
-            </template>
-            <template v-else>
-              <QuizVoteOptions
-                :question="q"
-                :disabled="votingId === q.id"
-                @vote="(option) => vote(q, option)"
-              />
-            </template>
+            <div class="quiz-options">
+              <div class="option">A. {{ q.optionA }}</div>
+              <div class="option">B. {{ q.optionB }}</div>
+              <div class="option">C. {{ q.optionC }}</div>
+              <div class="option">D. {{ q.optionD }}</div>
+            </div>
+            <div v-if="q.answer" class="quiz-answer">答案：<span class="answer">{{ q.answer }}</span></div>
+            <div v-else class="quiz-hint">答案未确认，请到右侧「待确认题目」中作答</div>
           </div>
 
           <el-empty v-if="!loading && keyword && !results.length" description="没有找到相似题目" />
@@ -82,7 +74,7 @@
           </div>
           <div class="pending-actions">
             <span>共 {{ pendingTotal }} 道待确认</span>
-            <el-button text size="small" :loading="pendingLoading" @click="loadPending">刷新</el-button>
+            <el-button text size="small" :loading="rotateLoading" @click="nextBatch">换一批</el-button>
           </div>
         </section>
 
@@ -182,6 +174,7 @@ const loading = ref(false)
 const pendingTotal = ref(0)
 const pendingPool = ref<QuizQuestion[]>([])
 const pendingLoading = ref(false)
+const rotateLoading = ref(false)
 const votingId = ref<number | null>(null)
 
 const pendingSlots = computed(() => [
@@ -233,7 +226,7 @@ const clearSearch = () => {
 const loadPending = async () => {
   pendingLoading.value = true
   try {
-    const res = await getUnansweredQuiz(8)
+    const res = await getUnansweredQuiz(30)
     pendingTotal.value = res.data?.total ?? 0
     pendingPool.value = res.data?.items ?? []
   } catch {
@@ -241,6 +234,38 @@ const loadPending = async () => {
   } finally {
     pendingLoading.value = false
   }
+}
+
+/** 队列不足 2 道时从服务端补，保留当前顺序，不打断已经轮换过的批次 */
+const ensureSlots = async () => {
+  if (pendingPool.value.length >= 2) return
+  try {
+    const res = await getUnansweredQuiz(30)
+    pendingTotal.value = res.data?.total ?? 0
+    const seen = new Set(pendingPool.value.map((item) => item.id))
+    const extra = (res.data?.items ?? []).filter((item) => !seen.has(item.id))
+    pendingPool.value = [...pendingPool.value, ...extra]
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+/** 换一批：把当前两道挪到队尾；队里没有别的就先补一批，实在没有就提示 */
+const nextBatch = async () => {
+  if (pendingPool.value.length <= 2) {
+    rotateLoading.value = true
+    try {
+      await ensureSlots()
+    } finally {
+      rotateLoading.value = false
+    }
+    if (pendingPool.value.length <= 2) {
+      ElMessage.info('暂时没有更多待确认题目')
+      return
+    }
+  }
+  const head = pendingPool.value.splice(0, 2)
+  pendingPool.value.push(...head)
 }
 
 const applyVote = (id: number, myVote: string, answer?: string) => {
@@ -279,11 +304,11 @@ const doVote = async (q: QuizQuestion, option: string) => {
           ? `答案已确认：${answer}，连续 3 位用户各获得 ${data.points} 积分`
           : `答案已确认：${answer}`
       )
-      if (pendingPool.value.length < 2) await loadPending()
+      if (pendingPool.value.length < 2) await ensureSlots()
     } else {
       applyVote(q.id, option)
       ElMessage.success(data.message || '已记录你的选择')
-      if (pendingPool.value.length < 2) await loadPending()
+      if (pendingPool.value.length < 2) await ensureSlots()
     }
   } catch {
     // 可能已被其他用户确认或自己已投过，刷新状态
@@ -524,10 +549,18 @@ watch(
         color: var(--ev-success);
       }
     }
+
+    .quiz-hint {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--ev-border-subtle);
+      font-size: 12px;
+      color: var(--ev-text-muted);
+    }
   }
 
   .quiz-aside {
-    width: 320px;
+    width: 420px;
     flex-shrink: 0;
 
     .aside-title {

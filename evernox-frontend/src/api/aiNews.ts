@@ -22,6 +22,9 @@ export const getAiNewsList = (params: {
   source?: string
   tag?: string
   keyword?: string
+  /** 发布日期区间，yyyy-MM-dd；结束日期包含当天 */
+  startDate?: string
+  endDate?: string
   sort?: string
   page?: number
   size?: number

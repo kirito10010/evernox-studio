@@ -43,6 +43,9 @@ public class OllamaModelResponse {
     private LocalDateTime sourceUpdatedAt;
     private LocalDateTime syncedAt;
 
+    /** 数据最后一次更新时间（获取/更新作业写入） */
+    private LocalDateTime lastUpdatedAt;
+
     /** 变体列表（仅详情接口返回） */
     private List<OllamaTagResponse> tags;
 
@@ -72,6 +75,7 @@ public class OllamaModelResponse {
                 .defaultCommand(m.getDefaultCommand())
                 .sourceUpdatedAt(m.getSourceUpdatedAt())
                 .syncedAt(m.getSyncedAt())
+                .lastUpdatedAt(m.getLastUpdatedAt())
                 .build();
     }
 }

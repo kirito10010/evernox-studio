@@ -71,7 +71,31 @@ public class SchemaMigration implements ApplicationRunner {
         addColumnIfMissing("project_release", "download_count",
                 "BIGINT NOT NULL DEFAULT 0 COMMENT '完整下载次数'");
         backfillReleaseDownloadCount();
+
+        // Ollama 模型库：数据最后一次更新时间（获取/更新作业用来轮换最久未更新的模型）
+        addColumnIfMissing("ai_ollama_model", "last_updated_at",
+                "DATETIME NULL COMMENT '数据最后一次更新时间（获取/更新作业写入）'");
+        addIndexIfMissing("ai_ollama_model", "idx_last_updated", "`last_updated_at`");
+        backfillOllamaLastUpdatedAt();
         // ===== 上面是登记区 =====
+    }
+
+    /**
+     * 老数据没有 last_updated_at：用已有时间近似回填，保证「最久未更新」排序可用。
+     */
+    private void backfillOllamaLastUpdatedAt() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE ai_ollama_model SET last_updated_at = " +
+                    "COALESCE(synced_at, updated_at, created_at, NOW()) " +
+                    "WHERE last_updated_at IS NULL");
+            if (updated > 0) {
+                log.info("自动迁移完成：{} 个 Ollama 模型已回填 last_updated_at", updated);
+            }
+        } catch (Exception e) {
+            log.error("自动迁移失败：回填 ai_ollama_model.last_updated_at 失败，请手动执行 UPDATE：{}",
+                    e.getMessage());
+        }
     }
 
     /**

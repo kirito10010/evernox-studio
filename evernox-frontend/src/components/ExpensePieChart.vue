@@ -65,9 +65,16 @@ const render = () => {
   const option: echarts.EChartsCoreOption = {
     tooltip: {
       trigger: 'item',
+      // 图表容器只有 300px 高、又嵌在卡片里，tooltip 画在容器内会被裁掉；
+      // 挂到 body 上后可以盖到卡片外面，不会被 overflow/尺寸限制截断
+      appendTo: 'body',
+      confine: false,
       backgroundColor: 'rgba(255,255,255,0.94)',
       borderColor: 'rgba(47,124,246,0.18)',
       borderWidth: 1,
+      padding: [6, 10],
+      // 分类名较长时换行，而不是被压成一条看不见的窄条
+      extraCssText: 'max-width: 260px; white-space: normal; line-height: 1.5; z-index: 3000;',
       textStyle: { color: '#12304f', fontSize: 12 },
       formatter: (params: unknown) => {
         const p = params as { name: string; value: number; percent: number }
@@ -95,9 +102,12 @@ const render = () => {
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
         itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+        // 只在鼠标跟随的 tooltip 里展示信息；扇区旁的文字标签全部关掉，避免窄卡片里挤出界
         label: { show: false },
+        labelLine: { show: false },
         emphasis: {
-          label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#12304f' },
+          label: { show: false },
+          labelLine: { show: false },
         },
         data: aggregate(),
       },

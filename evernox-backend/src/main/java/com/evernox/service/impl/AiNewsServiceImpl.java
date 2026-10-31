@@ -3,9 +3,11 @@ package com.evernox.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.evernox.common.ResultCode;
 import com.evernox.dto.AiNewsItemResponse;
 import com.evernox.entity.AiNewsFavorite;
 import com.evernox.entity.AiNewsItem;
+import com.evernox.exception.BusinessException;
 import com.evernox.repository.AiNewsFavoriteRepository;
 import com.evernox.repository.AiNewsItemRepository;
 import com.evernox.service.AiNewsCrawler;
@@ -16,7 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -158,7 +162,9 @@ public class AiNewsServiceImpl implements AiNewsService {
     }
 
     @Override
-    public IPage<AiNewsItemResponse> listItems(String source, String tag, String keyword, String sort, int page, int size, Long userId) {
+    public IPage<AiNewsItemResponse> listItems(String source, String tag, String keyword,
+                                               String startDate, String endDate,
+                                               String sort, int page, int size, Long userId) {
         Page<AiNewsItem> p = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
         LambdaQueryWrapper<AiNewsItem> wrapper = new LambdaQueryWrapper<>();
         if (source != null && !source.isBlank()) {
@@ -169,6 +175,15 @@ public class AiNewsServiceImpl implements AiNewsService {
         }
         if (keyword != null && !keyword.isBlank()) {
             wrapper.like(AiNewsItem::getTitle, keyword.trim());
+        }
+        LocalDate start = parseDate(startDate);
+        if (start != null) {
+            wrapper.ge(AiNewsItem::getPublishedAt, start.atStartOfDay());
+        }
+        LocalDate end = parseDate(endDate);
+        if (end != null) {
+            // 结束日期包含当天：< 次日 0 点
+            wrapper.lt(AiNewsItem::getPublishedAt, end.plusDays(1).atStartOfDay());
         }
         if ("score".equals(sort)) {
             wrapper.orderByDesc(AiNewsItem::getScore).orderByDesc(AiNewsItem::getPublishedAt);
@@ -187,6 +202,18 @@ public class AiNewsServiceImpl implements AiNewsService {
     @Override
     public List<String> tags() {
         return TAGS;
+    }
+
+    /** 解析 yyyy-MM-dd；空值返回 null，格式错误提示 */
+    private LocalDate parseDate(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ResultCode.PARAM_ERROR, "日期格式应为 yyyy-MM-dd");
+        }
     }
 
     @Override

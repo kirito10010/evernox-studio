@@ -66,6 +66,7 @@ export {
   Plus,
   Pointer,
   Position,
+  Present,
   Promotion,
   QuestionFilled,
   Reading,

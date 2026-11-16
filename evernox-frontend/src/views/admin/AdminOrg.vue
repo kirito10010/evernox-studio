@@ -27,10 +27,34 @@
           >
             导入成员
           </el-button>
+          <el-select v-model="memberFilterOrgId" placeholder="全部组织" clearable style="width: 160px">
+            <el-option v-for="o in organizations" :key="o.id" :label="o.name" :value="o.id" />
+          </el-select>
+          <el-select v-model="memberFilterStatus" placeholder="全部状态" clearable style="width: 120px">
+            <el-option label="在组织" :value="1" />
+            <el-option label="已离开" :value="0" />
+          </el-select>
           <el-input v-model="memberKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
           <el-button link type="primary" @click="importHelpVisible = true">导入说明</el-button>
         </div>
-        <el-table :data="filteredMembers" border stripe>
+        <div v-if="selectedMembers.length" class="batch-bar">
+          <span class="batch-count">已选 {{ selectedMembers.length }} 人</span>
+          <el-button size="small" @click="openBatchPosition">批量设置职务</el-button>
+          <el-button size="small" @click="openBatchMove">批量移入组织</el-button>
+          <el-button size="small" :loading="batchLoading" @click="batchSetStatus(1)">批量恢复</el-button>
+          <el-button size="small" :loading="batchLoading" @click="batchSetStatus(0)">批量离开</el-button>
+          <el-button size="small" type="danger" :loading="batchLoading" @click="batchDelete">批量删除</el-button>
+          <el-button size="small" link @click="clearMemberSelection">取消选择</el-button>
+        </div>
+        <el-table
+          ref="memberTableRef"
+          :data="filteredMembers"
+          border
+          stripe
+          row-key="id"
+          @selection-change="onMemberSelectionChange"
+        >
+          <el-table-column type="selection" width="46" fixed="left" :reserve-selection="true" />
           <el-table-column prop="name" label="玩家名" min-width="130" />
           <el-table-column prop="organizationName" label="所属组织" min-width="120" />
           <el-table-column prop="position" label="职务" min-width="110" />
@@ -286,6 +310,39 @@
       </template>
     </el-dialog>
 
+    <!-- 批量设置职务弹窗 -->
+    <el-dialog v-model="batchPositionVisible" title="批量设置职务" width="420px">
+      <el-form label-width="80px">
+        <el-form-item label="职务">
+          <el-input
+            v-model="batchPosition"
+            maxlength="50"
+            show-word-limit
+            placeholder="留空表示清空职务"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchPositionVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchLoading" @click="submitBatchPosition">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量移入组织弹窗 -->
+    <el-dialog v-model="batchMoveVisible" title="批量移入组织" width="420px">
+      <el-form label-width="80px">
+        <el-form-item label="目标组织" required>
+          <el-select v-model="batchTargetOrgId" placeholder="请选择组织" style="width: 100%">
+            <el-option v-for="o in organizations" :key="o.id" :label="o.name" :value="o.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchMoveVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchLoading" @click="submitBatchMove">移动</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 组织编辑弹窗 -->
     <el-dialog v-model="orgDialogVisible" :title="editingOrgId ? '编辑组织' : '添加组织'" width="420px">
       <el-form label-width="80px">
@@ -302,11 +359,25 @@
     <!-- 组织管理弹窗 -->
     <el-dialog v-model="orgManageVisible" title="管理组织" width="520px">
       <el-table :data="organizations" border stripe>
-        <el-table-column prop="name" label="组织名称" min-width="160" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column prop="name" label="组织名称" min-width="150" />
+        <el-table-column label="成员数" width="80">
+          <template #default="{ row }">{{ row.memberCount ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openOrgDialog(row as OrgOrganization)">编辑</el-button>
-            <el-button link type="danger" @click="deleteOrg(row as OrgOrganization)">删除</el-button>
+            <el-button
+              link
+              type="warning"
+              :disabled="!row.memberCount"
+              @click="clearOrgMembers(row as OrgOrganization)"
+            >清空成员</el-button>
+            <el-button
+              link
+              type="danger"
+              :disabled="row.memberCount > 0"
+              @click="deleteOrg(row as OrgOrganization)"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -579,6 +650,11 @@ import {
   createOrgMember,
   updateOrgMember,
   updateOrgMemberStatus,
+  batchUpdateOrgMemberStatus,
+  batchMoveOrgMembers,
+  batchUpdateOrgMemberPosition,
+  batchDeleteOrgMembers,
+  clearOrgMembers as clearOrgMembersApi,
   getOrgPointsConfig,
   saveOrgPointsConfig,
   getOrgPackages,
@@ -674,18 +750,35 @@ const deleteOrg = async (row: OrgOrganization) => {
     ElMessage.success('删除成功')
     if (selectedOrgId.value === row.id) selectedOrgId.value = null
     await loadOrganizations()
-  } catch (e) {
-    // 后端会提示「仍有成员无法删除」
+  } catch {
+    // 后端会提示剩余成员数，引导用户先在「成员管理」批量删除
   }
 }
 
 // ==================== 成员 ====================
 const members = ref<OrgMember[]>([])
 const memberKeyword = ref('')
+const memberFilterOrgId = ref<number | null>(null)
+const memberFilterStatus = ref<number | null>(null)
+// el-select 清空后可能回填 ''，用布尔量判断筛选是否生效，避免把 0（已离开）当成未筛选
+const hasMemberStatusFilter = computed(
+  () => memberFilterStatus.value === 0 || memberFilterStatus.value === 1
+)
+const memberTableRef = ref<{ clearSelection: () => void } | null>(null)
+const selectedMembers = ref<OrgMember[]>([])
+const batchLoading = ref(false)
+const batchPositionVisible = ref(false)
+const batchPosition = ref('')
+const batchMoveVisible = ref(false)
+const batchTargetOrgId = ref<number | null>(null)
 const filteredMembers = computed(() => {
   const kw = memberKeyword.value.trim().toLowerCase()
-  if (!kw) return members.value
-  return members.value.filter((m) => m.name.toLowerCase().includes(kw))
+  return members.value.filter((m) => {
+    if (kw && !m.name.toLowerCase().includes(kw)) return false
+    if (memberFilterOrgId.value && m.organizationId !== memberFilterOrgId.value) return false
+    if (hasMemberStatusFilter.value && m.status !== memberFilterStatus.value) return false
+    return true
+  })
 })
 const memberDialogVisible = ref(false)
 const editingMemberId = ref<number | null>(null)
@@ -733,6 +826,130 @@ const toggleStatus = async (row: OrgMember) => {
   await updateOrgMemberStatus(row.id, target)
   ElMessage.success('操作成功')
   await loadMembers()
+}
+
+// ==================== 成员批量管理 ====================
+
+const onMemberSelectionChange = (rows: OrgMember[]) => {
+  selectedMembers.value = rows
+}
+const clearMemberSelection = () => {
+  memberTableRef.value?.clearSelection()
+  selectedMembers.value = []
+}
+const selectedMemberIds = () => selectedMembers.value.map((m) => m.id)
+/** 批量操作后统一收尾：清空选择、刷新成员与组织（组织成员数用于删除判断） */
+const afterBatch = async () => {
+  clearMemberSelection()
+  await loadMembers()
+  await loadOrganizations()
+}
+
+const batchSetStatus = async (status: number) => {
+  if (!selectedMembers.value.length) return
+  const action = status === 1 ? '恢复加入' : '设为已离开'
+  try {
+    await ElMessageBox.confirm(
+      `确定将选中的 ${selectedMembers.value.length} 名成员${action}？`,
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  batchLoading.value = true
+  try {
+    const res = await batchUpdateOrgMemberStatus(selectedMemberIds(), status)
+    ElMessage.success(`已处理 ${res.data.affected} 人`)
+    await afterBatch()
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+const batchDelete = async () => {
+  if (!selectedMembers.value.length) return
+  const total = selectedMembers.value.length
+  const active = selectedMembers.value.filter((m) => m.status === 1).length
+  const tip = active > 0
+    ? `选中的 ${total} 人中有 ${active} 人仍在组织。删除会移除成员关系（历史周记录保留玩家名快照），确定删除？`
+    : `确定彻底删除选中的 ${total} 名成员？删除后不可恢复。`
+  try {
+    await ElMessageBox.confirm(tip, '批量删除', { type: 'warning' })
+  } catch {
+    return
+  }
+  batchLoading.value = true
+  try {
+    const res = await batchDeleteOrgMembers(selectedMemberIds())
+    ElMessage.success(`已删除 ${res.data.affected} 人`)
+    await afterBatch()
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+const openBatchPosition = () => {
+  batchPosition.value = ''
+  batchPositionVisible.value = true
+}
+const submitBatchPosition = async () => {
+  if (!selectedMembers.value.length) return
+  batchLoading.value = true
+  try {
+    const res = await batchUpdateOrgMemberPosition(selectedMemberIds(), batchPosition.value.trim())
+    ElMessage.success(`已更新 ${res.data.affected} 人的职务`)
+    batchPositionVisible.value = false
+    await afterBatch()
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+const openBatchMove = () => {
+  batchTargetOrgId.value = null
+  batchMoveVisible.value = true
+}
+const submitBatchMove = async () => {
+  if (!selectedMembers.value.length) return
+  if (!batchTargetOrgId.value) {
+    ElMessage.warning('请选择目标组织')
+    return
+  }
+  batchLoading.value = true
+  try {
+    const res = await batchMoveOrgMembers(selectedMemberIds(), batchTargetOrgId.value)
+    ElMessage.success(`已移动 ${res.data.affected} 人`)
+    batchMoveVisible.value = false
+    await afterBatch()
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+/** 管理组织弹窗：一键清空某组织全部成员，便于随后删除组织 */
+const clearOrgMembers = async (row: OrgOrganization) => {
+  const count = row.memberCount ?? 0
+  if (!count) return
+  try {
+    await ElMessageBox.confirm(
+      `确定清空组织「${row.name}」的全部 ${count} 名成员？清空后不可恢复。`,
+      '清空成员',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  batchLoading.value = true
+  try {
+    const res = await clearOrgMembersApi(row.id)
+    ElMessage.success(`已清空 ${res.data.affected} 人`)
+    clearMemberSelection()
+    await loadMembers()
+    await loadOrganizations()
+  } finally {
+    batchLoading.value = false
+  }
 }
 
 // ==================== 成员导入 ====================
@@ -1304,6 +1521,24 @@ onMounted(async () => {
     .toolbar-label {
       font-size: 13px;
       color: var(--ev-text-secondary);
+    }
+  }
+
+  .batch-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--ev-border-subtle);
+    border-radius: 8px;
+    background: var(--ev-bg-glass);
+
+    .batch-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ev-primary);
     }
   }
 

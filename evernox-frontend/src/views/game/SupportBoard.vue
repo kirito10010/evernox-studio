@@ -204,6 +204,7 @@ import {
   unlockSupportPixels,
 } from '@/api/supportBoard'
 import type { SupportBoardView, SupportPixelChangeEvent } from '@/api/supportBoard'
+import { getUserInfo } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 import { useAuthDialogStore } from '@/stores/authDialog'
 
@@ -381,6 +382,9 @@ const load = async () => {
     renderBoard()
     renderGuideOverlay()
     fitBoard()
+  } catch {
+    // 二进制画板较大，弱网/超时会走到这里；提示用户重试而不是静默空白
+    ElMessage.error('画板加载超时，请刷新页面重试')
   } finally {
     loading.value = false
   }
@@ -1076,12 +1080,75 @@ const onFullscreenChange = () => {
   setTimeout(fitBoard, 150)
 }
 
-const connectStream = () => {
+let streamRetryTimer: number | null = null
+let streamRetryDelay = 3000
+/** 并发 connectStream 时只让最后一次生效，避免同时开两条流 */
+let streamSeq = 0
+
+const stopStream = () => {
+  if (streamRetryTimer !== null) {
+    window.clearTimeout(streamRetryTimer)
+    streamRetryTimer = null
+  }
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
+/** 本地解 JWT 判断是否快过期（不校验签名，只用来决定要不要先刷新） */
+const tokenExpiringSoon = (token: string) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now() + 10_000
+  } catch {
+    return false
+  }
+}
+
+/**
+ * SSE 的 token 放在 query 里、无法带 Authorization 头，所以没法复用 axios 的 401 刷新。
+ * 重新连接前先调用一次普通接口：token 过期时 request 拦截器会自动刷新（单飞），
+ * 刷新失败会弹登录框，用户重新登录后页面恢复。
+ */
+const ensureFreshToken = async (): Promise<boolean> => {
+  const token = localStorage.getItem('accessToken')
+  if (!token) return false
+  if (!tokenExpiringSoon(token)) return true
+  try {
+    await getUserInfo()
+  } catch {
+    /* 刷新失败时下面再看本地 token */
+  }
+  const next = localStorage.getItem('accessToken')
+  return !!next && !tokenExpiringSoon(next)
+}
+
+const scheduleStreamReconnect = () => {
+  if (streamRetryTimer !== null || !userStore.isLoggedIn) return
+  streamRetryTimer = window.setTimeout(() => {
+    streamRetryTimer = null
+    void connectStream()
+  }, streamRetryDelay)
+  streamRetryDelay = Math.min(streamRetryDelay * 2, 30_000)
+}
+
+const connectStream = async () => {
+  const seq = ++streamSeq
+  stopStream()
+  if (!userStore.isLoggedIn) return
+  if (!(await ensureFreshToken())) {
+    // 拿不到有效 token：通常刷新令牌也过期了，等用户重新登录后由 watch 重连，
+    // 不再用过期 token 反复建连刷 401
+    return
+  }
+  if (seq !== streamSeq) return
   const token = localStorage.getItem('accessToken')
   if (!token) return
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
-  eventSource = new EventSource(`${base}/support-board/stream?token=${encodeURIComponent(token)}`)
-  eventSource.addEventListener('pixel-changed', (e) => {
+  const es = new EventSource(`${base}/support-board/stream?token=${encodeURIComponent(token)}`)
+  eventSource = es
+  es.addEventListener('pixel-changed', (e) => {
     try {
       const data = JSON.parse((e as MessageEvent).data) as SupportPixelChangeEvent
       if (board.value && data.boardId === board.value.id) {
@@ -1091,13 +1158,26 @@ const connectStream = () => {
       /* 忽略 */
     }
   })
+  es.onopen = () => {
+    streamRetryDelay = 3000
+  }
+  es.onerror = () => {
+    // 401（token 过期）/ 网络中断：EventSource 自己会拿同一个过期 token 无限重试，
+    // 这里主动关掉，刷新 token 后按退避重连
+    es.close()
+    if (eventSource === es) eventSource = null
+    void (async () => {
+      await ensureFreshToken()
+      scheduleStreamReconnect()
+    })()
+  }
 }
 
 const onResize = () => fitBoard()
 
 onMounted(() => {
   load()
-  connectStream()
+  void connectStream()
   window.addEventListener('resize', onResize)
   document.addEventListener('fullscreenchange', onFullscreenChange)
 })
@@ -1106,12 +1186,16 @@ onMounted(() => {
 watch(
   () => userStore.isLoggedIn,
   (loggedIn) => {
-    if (loggedIn) connectStream()
+    if (loggedIn) {
+      void connectStream()
+    } else {
+      stopStream()
+    }
   }
 )
 
 onBeforeUnmount(() => {
-  if (eventSource) eventSource.close()
+  stopStream()
   if (rafId !== null) cancelAnimationFrame(rafId)
   window.removeEventListener('resize', onResize)
   document.removeEventListener('fullscreenchange', onFullscreenChange)

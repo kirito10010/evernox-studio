@@ -1,46 +1,91 @@
 <template>
   <div class="org-points">
-    <div v-if="isAdmin || !!joinedMembership" class="toolbar">
+    <div class="toolbar">
       <span class="toolbar-label">组织：</span>
-      <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 200px">
-        <el-option v-for="o in viewableOrganizations" :key="o.id" :label="o.name" :value="o.id" />
+      <el-select v-model="selectedOrgId" placeholder="选择组织" style="width: 220px">
+        <el-option v-for="o in organizations" :key="o.id" :label="orgLabel(o)" :value="o.id" />
       </el-select>
       <span class="toolbar-label">周（周日）：</span>
-      <el-select v-model="selectedWeek" placeholder="选择周" clearable style="width: 180px" @change="loadRecords">
+      <el-select
+        v-model="selectedWeek"
+        placeholder="选择周"
+        clearable
+        style="width: 180px"
+        :disabled="!isMemberOfSelected"
+        @change="loadRecords"
+      >
         <el-option v-for="w in weeks" :key="w" :label="w" :value="w" />
       </el-select>
-      <el-button v-if="!isAdmin && joinedMembership" type="danger" plain size="small" @click="confirmLeave">
+      <el-button
+        v-if="selectedMembership?.status === 1 && !isOwnerOfSelected"
+        type="danger"
+        plain
+        size="small"
+        @click="confirmLeave"
+      >
         退出组织
       </el-button>
-      <el-input v-model="recordKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
+      <el-button
+        v-else-if="selectedOrg && userStore.isLoggedIn"
+        type="primary"
+        plain
+        size="small"
+        :disabled="selectedMembership?.status === 0"
+        @click="openApply(selectedOrg.id)"
+      >
+        {{ applyButtonText }}
+      </el-button>
+      <el-input
+        v-if="isMemberOfSelected"
+        v-model="recordKeyword"
+        placeholder="搜索玩家名"
+        clearable
+        style="width: 180px"
+      />
     </div>
 
-    <div v-if="!isAdmin && !joinedMembership" class="membership-gate">
+    <!-- 未加入当前组织：显示该组织的申请状态；其它组织可继续申请（支持同时申请多个） -->
+    <div v-if="selectedOrg && !isMemberOfSelected" class="membership-gate">
       <el-alert
-        v-if="pendingMembership"
+        v-if="selectedMembership?.status === 0"
         type="info"
         :closable="false"
-        :title="`你已申请加入「${pendingMembership.organizationName}」，请等待管理员审批。`"
+        :title="`你已申请加入「${selectedOrg.name}」，请等待管理员审批。`"
       />
       <el-alert
-        v-else-if="rejectedMembership"
+        v-else-if="selectedMembership?.status === 2"
         type="warning"
         :closable="false"
-        :title="`你申请加入「${rejectedMembership.organizationName}」已被拒绝。`"
+        :title="`你申请加入「${selectedOrg.name}」已被拒绝。`"
       />
-      <div v-if="!pendingMembership" class="membership-gate-actions">
-        <el-empty :description="rejectedMembership ? '申请被拒绝' : '你尚未加入任何组织'" :image-size="80" />
-        <el-button type="primary" @click="openApply">{{ rejectedMembership ? '重新申请' : '申请加入组织' }}</el-button>
+      <div class="membership-gate-actions">
+        <el-empty
+          :description="selectedMembership?.status === 2 ? '申请被拒绝' : '你尚未加入该组织'"
+          :image-size="80"
+        />
+        <div v-if="!userStore.isLoggedIn" class="gate-actions">
+          <el-button type="primary" @click="authDialog.open('login')">登录后申请</el-button>
+        </div>
+        <div v-else class="gate-actions">
+          <el-button
+            v-if="selectedMembership?.status !== 0"
+            type="primary"
+            @click="openApply(selectedOrg.id)"
+          >
+            {{ selectedMembership?.status === 2 ? '重新申请' : '申请加入该组织' }}
+          </el-button>
+          <el-button @click="openApply()">申请其它组织</el-button>
+        </div>
       </div>
     </div>
 
-    <div v-if="(isAdmin || !!joinedMembership) && records.length > 0" class="chart-card" @click="chartDialogVisible = true">
+    <div v-if="isMemberOfSelected && records.length > 0" class="chart-card" @click="chartDialogVisible = true">
       <div ref="chartEl" class="chart-body"></div>
       <div class="chart-expand-hint">查看完整图表（共 {{ records.length }} 人）</div>
     </div>
 
     <el-table
-      v-if="isAdmin || !!joinedMembership"
+      v-if="isMemberOfSelected"
       :data="pagedRecords"
       border
       stripe
@@ -90,7 +135,7 @@
       />
     </div>
 
-    <el-empty v-if="!loading && records.length === 0 && (isAdmin || !!joinedMembership)" description="暂无该周数据" />
+    <el-empty v-if="!loading && records.length === 0 && isMemberOfSelected" description="暂无该周数据" />
 
     <el-dialog
       v-model="chartDialogVisible"
@@ -208,29 +253,45 @@ const pointsConfig = ref<OrgPointsConfig | null>(null)
 
 const userStore = useUserStore()
 const authDialog = useAuthDialogStore()
-const isAdmin = computed(() => userStore.isAdmin)
 
 const memberships = ref<OrgMembership[]>([])
 const applyDialogVisible = ref(false)
 const applyOrgId = ref<number | null>(null)
 const applying = ref(false)
 
-const joinedMembership = computed(() => memberships.value.find((m) => m.status === 1) ?? null)
-const pendingMembership = computed(() => memberships.value.find((m) => m.status === 0) ?? null)
-const rejectedMembership = computed(
+const selectedOrg = computed(
+  () => organizations.value.find((o) => o.id === selectedOrgId.value) ?? null
+)
+const selectedMembership = computed(
+  () => memberships.value.find((m) => m.organizationId === selectedOrgId.value) ?? null
+)
+const currentUserId = computed(() => userStore.userInfo?.id ?? null)
+/** 自己创建的组织：直接有查看权限，不需要申请 */
+const isOwnerOfSelected = computed(
   () =>
-    [...memberships.value]
-      .filter((m) => m.status === 2)
-      .sort((a, b) => b.id - a.id)[0] ?? null
+    !!selectedOrg.value &&
+    selectedOrg.value.ownerId != null &&
+    selectedOrg.value.ownerId === currentUserId.value
 )
-const joinedOrgIds = computed(
-  () => new Set(memberships.value.filter((m) => m.status === 1).map((m) => m.organizationId))
+const isMemberOfSelected = computed(
+  () => isOwnerOfSelected.value || selectedMembership.value?.status === 1
 )
-const viewableOrganizations = computed(() =>
-  isAdmin.value ? organizations.value : organizations.value.filter((o) => joinedOrgIds.value.has(o.id))
-)
+const applyButtonText = computed(() => {
+  const status = selectedMembership.value?.status
+  if (status === 0) return '等待审批'
+  if (status === 2) return '重新申请'
+  return '申请加入'
+})
+const orgLabel = (o: OrgOrganization): string => {
+  if (o.ownerId != null && o.ownerId === currentUserId.value) return `${o.name}（我创建的）`
+  const m = memberships.value.find((x) => x.organizationId === o.id)
+  if (m?.status === 1) return `${o.name}（已加入）`
+  if (m?.status === 0) return `${o.name}（审批中）`
+  return o.name
+}
 const applyableOrganizations = computed(() =>
   organizations.value.filter((o) => {
+    if (o.ownerId != null && o.ownerId === currentUserId.value) return false
     const m = memberships.value.find((x) => x.organizationId === o.id)
     return !m || m.status === 2
   })
@@ -260,18 +321,22 @@ const loadMemberships = async () => {
 }
 
 const selectDefaultOrg = () => {
-  const list = viewableOrganizations.value
+  const list = organizations.value
   if (list.length === 0) {
     selectedOrgId.value = null
     return
   }
-  if (!selectedOrgId.value || !list.some((o) => o.id === selectedOrgId.value)) {
-    selectedOrgId.value = list[0].id
+  if (selectedOrgId.value && list.some((o) => o.id === selectedOrgId.value)) {
+    return
   }
+  // 优先落到已加入的组织，其次自己创建的组织，最后第一个
+  const joined = memberships.value.find((m) => m.status === 1)
+  const owned = list.find((o) => o.ownerId != null && o.ownerId === currentUserId.value)
+  selectedOrgId.value = joined?.organizationId ?? owned?.id ?? list[0].id
 }
 
 const loadWeeks = async () => {
-  if (!selectedOrgId.value) {
+  if (!selectedOrgId.value || !isMemberOfSelected.value) {
     weeks.value = []
     selectedWeek.value = ''
     records.value = []
@@ -283,7 +348,7 @@ const loadWeeks = async () => {
 }
 
 const loadRecords = async () => {
-  if (!selectedOrgId.value || !selectedWeek.value) {
+  if (!selectedOrgId.value || !selectedWeek.value || !isMemberOfSelected.value) {
     records.value = []
     return
   }
@@ -299,7 +364,7 @@ const loadRecords = async () => {
 }
 
 const loadConfig = async () => {
-  if (!selectedOrgId.value) {
+  if (!selectedOrgId.value || !isMemberOfSelected.value) {
     pointsConfig.value = null
     return
   }
@@ -307,9 +372,9 @@ const loadConfig = async () => {
   pointsConfig.value = res.data
 }
 
-const openApply = () => {
+const openApply = (orgId?: number) => {
   authDialog.requireAuth(() => {
-    applyOrgId.value = null
+    applyOrgId.value = orgId ?? null
     applyDialogVisible.value = true
   })
 }
@@ -331,13 +396,13 @@ const submitApply = async () => {
 }
 
 const confirmLeave = async () => {
-  if (!joinedMembership.value) return
+  if (!selectedMembership.value || !selectedOrg.value) return
   await ElMessageBox.confirm(
-    `确定退出组织「${joinedMembership.value.organizationName}」？`,
+    `确定退出组织「${selectedOrg.value.name}」？`,
     '提示',
     { type: 'warning' }
   )
-  await leaveOrgMembership(joinedMembership.value.organizationId)
+  await leaveOrgMembership(selectedMembership.value.organizationId)
   ElMessage.success('已退出组织')
   await loadMemberships()
   selectDefaultOrg()
@@ -429,14 +494,20 @@ const buildOption = (sorted: OrgWeekRecord[]): echarts.EChartsCoreOption => {
 }
 
 const renderChart = () => {
-  if (!chartEl.value || records.value.length === 0) {
+  const el = chartEl.value
+  if (!el || records.value.length === 0) {
     disposeChart()
     return
   }
+  // 切换组织时 records 先被清空，chart-card 的 v-if 会销毁旧 DOM；
+  // 重新赋值后 el 是新建的元素，必须丢掉旧实例（旧实例挂在已移除的节点上，画不出来）
+  if (chart && chart.getDom() !== el) {
+    disposeChart()
+  }
   if (!chart) {
-    chart = echarts.init(chartEl.value)
+    chart = echarts.init(el)
     resizeObserver = new ResizeObserver(() => chart?.resize())
-    resizeObserver.observe(chartEl.value)
+    resizeObserver.observe(el)
   }
   const sorted = [...records.value].sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0))
   chart.setOption(buildOption(sorted.slice(0, 10)), true)
@@ -505,7 +576,9 @@ watch(selectedOrgId, async () => {
   await loadRecords()
 })
 
-watch(records, renderChart)
+// flush: 'post' —— records 变化后 chart-card 的 v-if 才会渲染出 chart-body，
+// 默认的 pre 时机取到的 chartEl 还是 null（切换组织后图表空白的原因）
+watch(records, renderChart, { flush: 'post' })
 
 let membershipTimer: ReturnType<typeof setInterval> | null = null
 
@@ -516,13 +589,16 @@ const stopMembershipPolling = () => {
   }
 }
 
+const hasPendingMembership = computed(() => memberships.value.some((m) => m.status === 0))
+
 const startMembershipPolling = () => {
   stopMembershipPolling()
   membershipTimer = setInterval(async () => {
     await loadMemberships()
-    if (joinedMembership.value) {
-      stopMembershipPolling()
-      selectDefaultOrg()
+    if (hasPendingMembership.value) return
+    stopMembershipPolling()
+    // 申请状态有结果：如果当前选中的组织已通过，直接加载数据
+    if (isMemberOfSelected.value) {
       await loadConfig()
       await loadWeeks()
       await loadRecords()
@@ -532,7 +608,7 @@ const startMembershipPolling = () => {
 }
 
 watch(
-  pendingMembership,
+  hasPendingMembership,
   (val) => {
     if (val) {
       startMembershipPolling()

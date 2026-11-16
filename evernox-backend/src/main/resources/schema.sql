@@ -629,7 +629,8 @@ CREATE TABLE IF NOT EXISTS `org_organization` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_name` (`name`)
+    UNIQUE KEY `uk_name` (`name`),
+    KEY `idx_owner` (`owner_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='组织';
 
 -- 组织成员关系（平台用户 ↔ 组织，用于看板可见性与加入审批）
@@ -1004,5 +1005,70 @@ CREATE TABLE IF NOT EXISTS `release_asset` (
     KEY `idx_project_staged` (`project_id`, `release_id`),
     KEY `idx_file_name` (`file_name`, `deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='版本附件表';
+
+-- ==================== 火影活动时间轴 ====================
+
+-- 从官网「停机更新公告」正文【限时热点】解析出来的活动记录
+CREATE TABLE IF NOT EXISTS `hyol_activity` (
+    `id`            BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `name`          VARCHAR(128) NOT NULL COMMENT '活动名，如「仙人の宝库」',
+    `category`      VARCHAR(32)  NOT NULL DEFAULT '其他' COMMENT '活动类型：返利/团购/宝库/总动员/签到/抽奖/礼包/折扣/其他',
+    `start_time`    DATETIME     NULL COMMENT '活动开始时间',
+    `end_time`      DATETIME     NULL COMMENT '活动结束时间',
+    `announce_date` DATE         NULL COMMENT '来源公告发布日期',
+    `source_title`  VARCHAR(255) NULL COMMENT '来源公告标题',
+    `source_url`    VARCHAR(512) NOT NULL COMMENT '来源公告链接',
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_source_name` (`source_url`(255), `name`),
+    KEY `idx_start_time` (`start_time`),
+    KEY `idx_category` (`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='火影忍者OL活动时间轴';
+
+-- ==================== 火影活动详情 · 商城特惠 ====================
+
+-- 商城特惠「期」：一期 = 周四 05:00 ~ 下周三 23:59:59
+CREATE TABLE IF NOT EXISTS `hyol_mall_period` (
+    `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `activity_id` BIGINT   NULL COMMENT '游戏活动ID',
+    `shop_id`     BIGINT   NULL COMMENT '商店ID',
+    `name`        VARCHAR(64) NOT NULL DEFAULT '商城特惠' COMMENT '活动名（保持官网原文）',
+    `start_time`  DATETIME NOT NULL COMMENT '本期开始（周四 05:00）',
+    `end_time`    DATETIME NOT NULL COMMENT '本期结束（下周三 23:59:59）',
+    `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_start_time` (`start_time`),
+    KEY `idx_start_time` (`start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商城特惠周期';
+
+-- 商城特惠商品：一天一批，按 (期, 日) 覆盖
+CREATE TABLE IF NOT EXISTS `hyol_mall_item` (
+    `id`          BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `period_id`   BIGINT NOT NULL COMMENT '所属期 hyol_mall_period.id',
+    `day_date`    DATE   NOT NULL COMMENT '归属日（当日窗口开始日期）',
+    `slot`        INT    NOT NULL DEFAULT 0 COMMENT '游戏内槽位',
+    `item_id`     BIGINT NOT NULL COMMENT '物品ID',
+    `name`        VARCHAR(128) NOT NULL COMMENT '物品名称',
+    `description` VARCHAR(512) NULL COMMENT '物品说明',
+    `icon_id`     BIGINT NULL COMMENT '图标ID',
+    `price`       INT    NOT NULL DEFAULT 0 COMMENT '折扣价',
+    `currency`    VARCHAR(16) NOT NULL DEFAULT '点券' COMMENT '货币',
+    `daily_limit` INT    NOT NULL DEFAULT 0 COMMENT '每日限购',
+    `start_time`  DATETIME NULL COMMENT '当日窗口开始',
+    `end_time`    DATETIME NULL COMMENT '当日窗口结束',
+    `image`       VARCHAR(128) NULL COMMENT '图标文件名，如 20400446.png',
+    `detail_type` VARCHAR(16)  NULL COMMENT '详情类型: ninja=忍者技能 / drops=礼包掉落',
+    `ninja_id`    BIGINT       NULL COMMENT '忍者ID（detail_type=ninja 时有值）',
+    `detail_json` LONGTEXT     NULL COMMENT '详情原始 JSON（保持导出结构，不改写字段名）',
+    `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_period_day_item` (`period_id`, `day_date`, `item_id`),
+    KEY `idx_period_day` (`period_id`, `day_date`),
+    KEY `idx_item` (`item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商城特惠每日商品';
+
 
 

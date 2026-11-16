@@ -10,11 +10,17 @@ import java.util.List;
  */
 public interface OrgOrganizationService {
 
-    List<OrgOrganizationResponse> list();
+    /** 管理端：只返回当前账号创建的组织 */
+    List<OrgOrganizationResponse> list(Long ownerId);
+
+    /** 公开看板：所有组织（用户用来申请加入） */
+    List<OrgOrganizationResponse> listAll();
 
     OrgOrganizationResponse create(OrgOrganizationRequest request, Long ownerId);
 
-    OrgOrganizationResponse update(Long id, OrgOrganizationRequest request);
+    /** 仅组织创建者可改 */
+    OrgOrganizationResponse update(Long id, OrgOrganizationRequest request, Long ownerId);
 
-    void delete(Long id);
+    /** 仅组织创建者可删 */
+    void delete(Long id, Long ownerId);
 }

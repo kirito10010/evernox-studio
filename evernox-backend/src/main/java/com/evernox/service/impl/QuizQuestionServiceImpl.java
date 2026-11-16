@@ -21,6 +21,7 @@ import com.evernox.repository.QuizQuestionRepository;
 import com.evernox.service.AdminApprovalService;
 import com.evernox.service.PointsService;
 import com.evernox.service.QuizQuestionService;
+import com.evernox.util.QuizSearchUtils;
 import com.evernox.util.SortColumnResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,7 +87,7 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
         }
 
         return all.stream()
-                .map(item -> new Scored(item, similarity(query, normalize(item.getQuestion()))))
+                .map(item -> new Scored(item, QuizSearchUtils.similarity(query, normalize(item.getQuestion()))))
                 .filter(s -> s.score() >= MIN_SCORE)
                 // 没有答案的题目置顶，其余按相似度
                 .sorted(Comparator
@@ -569,53 +570,9 @@ public class QuizQuestionServiceImpl implements QuizQuestionService {
 
     /** 去标点/空白/全角转半角、转小写，仅保留中文/字母/数字 */
     private String normalize(String s) {
-
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c >= 0xFF01 && c <= 0xFF5E) {
-                c = (char) (c - 0xFEE0);
-            }
-            if (Character.isLetterOrDigit(c)) {
-                sb.append(Character.toLowerCase(c));
-            }
-        }
-        return sb.toString();
+        return QuizSearchUtils.normalize(s);
     }
 
-    private double similarity(String a, String b) {
-        if (a.equals(b)) {
-            return 1.0;
-        }
-        if (a.isEmpty() || b.isEmpty()) {
-            return 0.0;
-        }
-        if (a.contains(b) || b.contains(a)) {
-            return 1.0;
-        }
-        int dist = levenshtein(a, b);
-        return 1.0 - (double) dist / Math.max(a.length(), b.length());
-    }
-
-    private int levenshtein(String a, String b) {
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-        for (int i = 0; i <= a.length(); i++) {
-            dp[i][0] = i;
-        }
-        for (int j = 0; j <= b.length(); j++) {
-            dp[0][j] = j;
-        }
-        for (int i = 1; i <= a.length(); i++) {
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
-            }
-        }
-        return dp[a.length()][b.length()];
-    }
 
     private Page<QuizQuestion> newPage(int page, int size) {
         return new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));

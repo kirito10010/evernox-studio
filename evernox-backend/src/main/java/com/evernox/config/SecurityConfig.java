@@ -85,6 +85,14 @@ public class SecurityConfig {
                 // 公开接口 - 火影资料
                 .requestMatchers(HttpMethod.GET, "/hyol/announcement/list", "/hyol/ninja/list").permitAll()
                 .requestMatchers(RegexRequestMatcher.regexMatcher(HttpMethod.GET, "/hyol/announcement/\\d+")).permitAll()
+                // 活动时间轴：只读接口公开，触发同步仍需 admin
+                .requestMatchers(HttpMethod.GET, "/hyol/activity/timeline", "/hyol/activity/sync/status").permitAll()
+                // 活动详情 · 商城特惠：只读接口与商品图标公开，导入仍需 admin
+                .requestMatchers(HttpMethod.GET, "/hyol/mall/periods", "/hyol/mall/items").permitAll()
+                .requestMatchers("/hyol/mall/image/**").permitAll()
+                // 商城特惠写操作（导入 / 删除）只给管理员：与控制器 @PreAuthorize 形成纵深
+                .requestMatchers(HttpMethod.POST, "/hyol/mall/import").hasRole("admin")
+                .requestMatchers(HttpMethod.DELETE, "/hyol/mall/**").hasRole("admin")
                 .requestMatchers(HttpMethod.GET, "/quiz/search", "/quiz/unanswered").permitAll()
                 // 喵问答：搜题、待确认面板与题图都是匿名可读
                 .requestMatchers(HttpMethod.GET, "/miao/search", "/miao/unanswered").permitAll()
@@ -134,6 +142,12 @@ public class SecurityConfig {
 
                 // 忍者图鉴本地图片：头像/技能图标 <img src> 直接引用，无鉴权头，需公开
                 .requestMatchers("/hyol/ninja/image/**").permitAll()
+
+                // 忍者图鉴 v2：抓包导入后的数据集、元信息与立绘公开，导入 / 清空仅管理员
+                .requestMatchers(HttpMethod.GET, "/hyol/codex/dataset", "/hyol/codex/meta").permitAll()
+                .requestMatchers("/hyol/codex/image/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/hyol/codex/import").hasRole("admin")
+                .requestMatchers(HttpMethod.DELETE, "/hyol/codex/**").hasRole("admin")
 
                 // 公开接口 - 版本发布（启动器更新源，不鉴权）
                 .requestMatchers("/release/public/**").permitAll()

@@ -33,13 +33,16 @@ export interface SupportBoardItem {
 }
 
 export const getActiveSupportBoard = (): Promise<Result<SupportBoardView>> => {
-  return get('/support-board/active')
+  // 1600×900 的完整像素 JSON 可能几十 MB，默认 10s 很容易超时
+  return get('/support-board/active', { timeout: 60_000 })
 }
 
 /** 拉取画板紧凑二进制（8 字节头 + 每像素 [R,G,B,flags]），用于快速加载渲染 */
 export const getActiveSupportBoardBinary = async (): Promise<ArrayBuffer> => {
   const res = await request.get('/support-board/active-binary', {
     responseType: 'arraybuffer',
+    // 画板二进制约 5~6MB，弱网下 10s 不够，单独放宽
+    timeout: 60_000,
     // 走 fetch 而非 XHR：部分浏览器扩展会 hook XMLHttpRequest 并无条件读
     // responseText，遇到二进制响应必抛 InvalidStateError，刷满控制台
     adapter: 'fetch',

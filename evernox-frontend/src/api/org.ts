@@ -6,6 +6,7 @@ import type {
   OrgDistributionRunResult,
   OrgImportResult,
   OrgMember,
+  OrgMemberBatchResult,
   OrgMemberImportApplyRequest,
   OrgMemberImportApplyResult,
   OrgMemberImportPreviewResult,
@@ -58,6 +59,37 @@ export const updateOrgMember = (id: number, data: OrgMemberRequest): Promise<Res
 
 export const updateOrgMemberStatus = (id: number, status: number): Promise<Result<void>> => {
   return put(`/admin/org/members/${id}/status?status=${status}`)
+}
+
+// ==================== 成员批量操作 ====================
+
+export const batchUpdateOrgMemberStatus = (
+  ids: number[],
+  status: number
+): Promise<Result<OrgMemberBatchResult>> => {
+  return put(`/admin/org/members/batch/status?status=${status}`, { ids })
+}
+
+export const batchMoveOrgMembers = (
+  ids: number[],
+  organizationId: number
+): Promise<Result<OrgMemberBatchResult>> => {
+  return put('/admin/org/members/batch/organization', { ids, organizationId })
+}
+
+export const batchUpdateOrgMemberPosition = (
+  ids: number[],
+  position: string
+): Promise<Result<OrgMemberBatchResult>> => {
+  return put('/admin/org/members/batch/position', { ids, position })
+}
+
+export const batchDeleteOrgMembers = (ids: number[]): Promise<Result<OrgMemberBatchResult>> => {
+  return del('/admin/org/members/batch', { data: { ids } })
+}
+
+export const clearOrgMembers = (id: number): Promise<Result<OrgMemberBatchResult>> => {
+  return del(`/admin/org/organizations/${id}/members`)
 }
 
 export const previewOrgMembers = (

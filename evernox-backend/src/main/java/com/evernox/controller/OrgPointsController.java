@@ -37,7 +37,8 @@ public class OrgPointsController {
 
     @GetMapping("/organizations")
     public Result<List<OrgOrganizationResponse>> organizations() {
-        return Result.success(organizationService.list());
+        // 公开看板需要列出所有组织供用户申请加入；能不能看数据由 requireView 控制
+        return Result.success(organizationService.listAll());
     }
 
     @GetMapping("/weeks")

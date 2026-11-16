@@ -18,7 +18,7 @@
 
 - **图床管理**：图片 / 相册，公开与私密可见性可切换，服务端加密落盘，自动生成缩略图，支持相册封面裁剪
 - **网站分享**：友链导航、标签分类、管理员审批
-- **火影忍者OL**：游戏公告、喵问答（带图题库，按文件夹导入，游戏内已排除的选项划线不可选）、忍者图鉴（离线数据集，含技能信息）、忍者测验（JSON 批量导入；答案留空的题目由用户投票确认，连续 3 人选择一致即写入答案并各得 10 积分）、组织积分（周积分、奖励礼包、Excel 导入）
+- **火影忍者OL**：游戏公告、活动时间轴（官网公告解析，按活动全名多选、按年份对比）、活动详情（商城特惠：按周 / 按天切换，导入抓取文件夹即入库）、喵问答（带图题库，按文件夹导入，游戏内已排除的选项划线不可选）、忍者图鉴（离线数据集，含技能信息）、忍者测验（JSON 批量导入；答案留空的题目由用户投票确认，连续 3 人选择一致即写入答案并各得 10 积分）、组织积分（周积分、奖励礼包、Excel 导入）
 - **项目版本发布**：每个项目独立的版本列表、发布说明、附件与公开下载地址，自动生成 `latest.yml`，可作为桌面启动器的更新镜像使用
 - **个人工作台**：记事本（富文本 + 图片，可公开）、待办、记账、绩效（项目 / 加班 / 迟到）、工资
 - **话题集中营**：圈子、帖子、评论、点赞、收藏
@@ -92,8 +92,12 @@ npm run build
 ```
 
 > 如果用 IDE 打开后端并依赖它的编译输出（`target/classes`），打包时可加 `-Dbuild.dir=target-package` 输出到独立目录，避免 `clean` 删掉 IDE 的编译缓存；产物路径相应变为 `target-package/`。
+>
+> `npm run build` 会自动从 `dist/ninja/` 剔除 `heads`、`portraits`、`skills` 三个图片目录（仅保留 `ninjas.json`），图片由 Nginx 从独立静态目录提供，见下一节。
 
 ### 4. 配置 Nginx
+
+首次部署时需把忍者图鉴图片放到 Nginx 目录下的 `static/ninja/`（与 `nginx.exe` 同级）；Nginx 用相对路径 `root static;` 读取，整个 `nginx-1.30.4` 目录换机器也不用改路径。之后每次只上传 `dist`，不必再传图片。
 
 ```nginx
 server {
@@ -106,6 +110,27 @@ server {
     # 版本发布为 4MB 分片上传、喵问答为整文件夹导入，Nginx 默认 1MB 会返回 413
     client_max_body_size 64m;
 
+    # 忍者图鉴图片：常驻 nginx 目录下的 static（相对 nginx.exe），不打进 dist
+    # 目录结构：nginx-1.30.4/static/ninja/{heads,portraits,skills}/xxx.png
+    location ^~ /ninja/heads/ {
+        root static;
+        expires 30d;
+        access_log off;
+    }
+
+    location ^~ /ninja/portraits/ {
+        root static;
+        expires 30d;
+        access_log off;
+    }
+
+    location ^~ /ninja/skills/ {
+        root static;
+        expires 30d;
+        access_log off;
+    }
+
+    # 图鉴数据集仍随前端产物发布（/ninja/ninjas.json）
     location / {
         try_files $uri $uri/ /index.html;
     }

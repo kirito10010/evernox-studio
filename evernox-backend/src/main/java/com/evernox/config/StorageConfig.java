@@ -39,6 +39,10 @@ public class StorageConfig {
     private static final String ANNOUNCEMENT_DIR = "announcements";
     private static final String TOPIC_DIR = "topics";
     private static final String MIAO_IMAGE_DIR = "miao/images";
+    private static final String MALL_IMAGE_DIR = "hyol-mall/images";
+    private static final String CODEX_DIR = "hyol-codex";
+    private static final String CODEX_PORTRAIT_DIR = "hyol-codex/images/portraits";
+    private static final String CODEX_HEAD_DIR = "hyol-codex/images/heads";
     private static final String RELEASE_DIR = "releases";
     private static final String RELEASE_UPLOAD_DIR = "releases/.uploads";
 
@@ -79,6 +83,12 @@ public class StorageConfig {
             Files.createDirectories(basePath.resolve(TOPIC_DIR));
             // 喵问答：看图题的截图，按内容哈希命名
             Files.createDirectories(basePath.resolve(MIAO_IMAGE_DIR));
+            // 商城特惠：商品图标，按物品ID命名
+            Files.createDirectories(basePath.resolve(MALL_IMAGE_DIR));
+            // 忍者图鉴：抓包导入后的数据集与立绘
+            Files.createDirectories(basePath.resolve(CODEX_DIR));
+            Files.createDirectories(basePath.resolve(CODEX_PORTRAIT_DIR));
+            Files.createDirectories(basePath.resolve(CODEX_HEAD_DIR));
             // 版本发布：正式附件与分片临时目录分开
             Files.createDirectories(basePath.resolve(RELEASE_DIR));
             Files.createDirectories(basePath.resolve(RELEASE_UPLOAD_DIR));
@@ -156,6 +166,26 @@ public class StorageConfig {
     /** 喵问答题图目录 */
     public Path getMiaoImagePath() {
         return getDataPath().resolve(MIAO_IMAGE_DIR);
+    }
+
+    /** 商城特惠商品图标目录（文件名即物品ID.png） */
+    public Path getMallImagePath() {
+        return getDataPath().resolve(MALL_IMAGE_DIR);
+    }
+
+    /** 忍者图鉴数据目录（ninjas.json / meta.json / images） */
+    public Path getCodexPath() {
+        return getDataPath().resolve(CODEX_DIR);
+    }
+
+    /** 忍者图鉴立绘目录 */
+    public Path getCodexPortraitPath() {
+        return getDataPath().resolve(CODEX_PORTRAIT_DIR);
+    }
+
+    /** 忍者图鉴头像目录 */
+    public Path getCodexHeadPath() {
+        return getDataPath().resolve(CODEX_HEAD_DIR);
     }
 
     /** 分片上传临时根目录 */

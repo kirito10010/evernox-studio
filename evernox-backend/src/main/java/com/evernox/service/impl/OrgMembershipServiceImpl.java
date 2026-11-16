@@ -81,6 +81,10 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
         if (org == null) {
             throw new BusinessException("组织不存在");
         }
+        if (userId.equals(org.getOwnerId())) {
+            // 自己创建的组织本身就有查看/管理权限，不需要走加入申请
+            throw new BusinessException("这是你自己创建的组织，无需申请加入");
+        }
         OrgUserMember existing = memberRepository.selectOne(new LambdaQueryWrapper<OrgUserMember>()
                 .eq(OrgUserMember::getOrganizationId, organizationId)
                 .eq(OrgUserMember::getUserId, userId));
@@ -92,14 +96,8 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
                 throw new BusinessException("已提交申请，请等待审批");
             }
         }
-        // 一个用户同时只能有一个待审批或已加入的组织
-        Long others = memberRepository.selectCount(new LambdaQueryWrapper<OrgUserMember>()
-                .eq(OrgUserMember::getUserId, userId)
-                .in(OrgUserMember::getStatus, 0, 1)
-                .ne(OrgUserMember::getOrganizationId, organizationId));
-        if (others != null && others > 0) {
-            throw new BusinessException("你已申请或已加入其他组织");
-        }
+        // 允许同时申请多个组织：只限制「同一组织」的重复申请（上面已处理）
+
 
         LocalDateTime now = LocalDateTime.now();
         if (existing != null) {
@@ -142,8 +140,10 @@ public class OrgMembershipServiceImpl implements OrgMembershipService {
         if (userId == null || organizationId == null) {
             return false;
         }
-        User user = userRepository.selectById(userId);
-        if (user != null && "admin".equals(user.getRole())) {
+        // 组织创建者可以看自己的组织；其他人必须是已加入成员。
+        // 不再给 admin 开全局后门：管理员也是普通账号，组织数据按账号隔离。
+        OrgOrganization org = organizationRepository.selectById(organizationId);
+        if (org != null && userId.equals(org.getOwnerId())) {
             return true;
         }
         Long count = memberRepository.selectCount(new LambdaQueryWrapper<OrgUserMember>()

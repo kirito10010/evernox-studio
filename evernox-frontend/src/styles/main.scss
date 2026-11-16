@@ -14,8 +14,11 @@
   --ev-bg-glass:        rgba(255, 255, 255, 0.66);
   --ev-bg-glass-strong: rgba(255, 255, 255, 0.82);
   --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
-  /* 弹窗底色：接近不透明，避免透过背景文字影响阅读 */
-  --ev-bg-dialog:       rgba(255, 255, 255, 0.97);
+  /* 浮层底色：不透明。下拉 / 提示 / 浮窗都压在内容之上，一旦半透明就会透出
+     背后的文字和图片，读起来很脏，所以这一层单独给一个实色令牌。 */
+  --ev-bg-overlay:      #ffffff;
+  /* 弹窗底色：不透明，避免透过背景文字影响阅读 */
+  --ev-bg-dialog:       #ffffff;
   --ev-bg-tint:         rgba(var(--ev-primary-rgb), 0.05);
   --ev-bg-tint-strong:  rgba(var(--ev-primary-rgb), 0.10);
 
@@ -128,8 +131,9 @@
   --ev-bg-glass:        rgba(26, 36, 52, 0.66);
   --ev-bg-glass-strong: rgba(30, 42, 60, 0.85);
   --ev-bg-glass-light:  rgba(26, 36, 52, 0.45);
-  /* 深色下弹窗同样压重，避免背景内容透出干扰阅读 */
-  --ev-bg-dialog:       rgba(24, 34, 49, 0.98);
+  /* 浮层 / 弹窗：深色下同样压成实色，避免背景内容透出干扰阅读 */
+  --ev-bg-overlay:      #1e2a3c;
+  --ev-bg-dialog:       #18222f;
   --ev-bg-tint:         rgba(var(--ev-primary-rgb), 0.10);
   --ev-bg-tint-strong:  rgba(var(--ev-primary-rgb), 0.16);
   --ev-primary-rgb: 47, 124, 246;
@@ -184,7 +188,8 @@
   --ev-bg-glass:        rgba(255, 255, 255, 0.66);
   --ev-bg-glass-strong: rgba(255, 255, 255, 0.84);
   --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
-  --ev-bg-dialog:       rgba(255, 255, 255, 0.975);
+  --ev-bg-overlay:      #ffffff;
+  --ev-bg-dialog:       #ffffff;
   --ev-bg-tint:         rgba(61, 156, 138, 0.06);
   --ev-bg-tint-strong:  rgba(61, 156, 138, 0.12);
 
@@ -262,7 +267,8 @@
   --ev-bg-glass:        rgba(255, 255, 255, 0.66);
   --ev-bg-glass-strong: rgba(255, 255, 255, 0.84);
   --ev-bg-glass-light:  rgba(255, 255, 255, 0.45);
-  --ev-bg-dialog:       rgba(255, 255, 255, 0.975);
+  --ev-bg-overlay:      #ffffff;
+  --ev-bg-dialog:       #ffffff;
   --ev-bg-tint:         rgba(150, 119, 173, 0.06);
   --ev-bg-tint-strong:  rgba(150, 119, 173, 0.12);
 
@@ -558,7 +564,7 @@ textarea:focus-visible,
 /* --- Input / Textarea --- */
 .el-input__wrapper,
 .el-textarea__inner {
-  background-color: var(--ev-bg-glass-strong) !important;
+  background-color: var(--ev-bg-elevated) !important;
   box-shadow:
     0 0 0 1px var(--ev-border-default) inset,
     var(--ev-inset-gloss),
@@ -625,7 +631,7 @@ textarea:focus-visible,
 .el-form-item.is-error {
   .el-input__wrapper,
   .el-textarea__inner {
-    background-color: var(--ev-bg-glass-strong) !important;
+    background-color: var(--ev-bg-elevated) !important;
     box-shadow: 0 0 0 1.5px var(--ev-danger) inset !important;
   }
 }
@@ -660,7 +666,7 @@ textarea:focus-visible,
 
 /* --- Select --- */
 .el-select__wrapper {
-  background-color: var(--ev-bg-glass-light) !important;
+  background-color: var(--ev-bg-elevated) !important;
   box-shadow: 0 0 0 1px var(--ev-border-default) inset !important;
   border-radius: var(--ev-radius-md) !important;
   color: var(--ev-text-primary) !important;
@@ -787,7 +793,8 @@ textarea:focus-visible,
 .el-card {
   @include ev-glass(0.66, var(--ev-radius-lg));
   color: var(--ev-text-primary) !important;
-  background: var(--ev-bg-glass) !important;
+  /* 内容卡片用实色：卡片里都是正文，透出背后的渐变会让文字发灰 */
+  background: var(--ev-bg-elevated) !important;
   border: 1px solid var(--ev-border-subtle) !important;
   transition: all 0.3s var(--ev-ease-out) !important;
 
@@ -855,29 +862,29 @@ textarea:focus-visible,
   }
 }
 
-/* --- Popper / Tooltip --- */
+/* --- Popper / Tooltip（含 el-select 下拉、日期面板）--- */
 .el-popper.is-light,
 .el-popper.is-dark {
-  background: var(--ev-bg-glass-strong) !important;
+  background: var(--ev-bg-overlay) !important;
   color: var(--ev-text-primary) !important;
   border: 1px solid var(--ev-border-default) !important;
   border-radius: var(--ev-radius-md) !important;
-  backdrop-filter: var(--ev-blur-md);
-  -webkit-backdrop-filter: var(--ev-blur-md);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: var(--ev-shadow-lg) !important;
 
   .el-popper__arrow::before {
-    background: var(--ev-bg-glass-strong) !important;
+    background: var(--ev-bg-overlay) !important;
     border-color: var(--ev-border-default) !important;
   }
 }
 
 /* --- Dropdown --- */
 .el-dropdown-menu {
-  background: var(--ev-bg-glass-strong) !important;
+  background: var(--ev-bg-overlay) !important;
   border: 1px solid var(--ev-border-subtle) !important;
-  backdrop-filter: var(--ev-blur-md) !important;
-  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border-radius: var(--ev-radius-md) !important;
   padding: 6px !important;
   box-shadow: var(--ev-shadow-lg) !important;
@@ -903,10 +910,10 @@ textarea:focus-visible,
 /* --- Message / MessageBox / Notification --- */
 .el-message,
 .el-notification {
-  background: var(--ev-bg-glass-strong) !important;
+  background: var(--ev-bg-overlay) !important;
   border: 1px solid var(--ev-border-subtle) !important;
-  backdrop-filter: var(--ev-blur-md) !important;
-  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border-radius: var(--ev-radius-md) !important;
   box-shadow: var(--ev-shadow-lg) !important;
 
@@ -977,11 +984,11 @@ textarea:focus-visible,
 }
 
 .el-menu--popup {
-  background: var(--ev-bg-glass-strong) !important;
+  background: var(--ev-bg-overlay) !important;
   border: 1px solid var(--ev-border-subtle) !important;
   border-radius: var(--ev-radius-md) !important;
-  backdrop-filter: var(--ev-blur-md) !important;
-  -webkit-backdrop-filter: var(--ev-blur-md) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   padding: 6px !important;
   min-width: 160px !important;
   box-shadow: var(--ev-shadow-lg) !important;
@@ -1096,7 +1103,7 @@ textarea:focus-visible,
 
 /* --- Upload --- */
 .el-upload-dragger {
-  background: var(--ev-bg-glass-light) !important;
+  background: var(--ev-bg-surface) !important;
   border: 1.5px dashed var(--ev-border-hover) !important;
   border-radius: var(--ev-radius-lg) !important;
   color: var(--ev-text-secondary) !important;

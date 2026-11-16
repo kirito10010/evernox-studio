@@ -95,6 +95,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '公告' },
       },
       {
+        path: 'naruto/activity-timeline',
+        name: 'ActivityTimeline',
+        component: () => import('@/views/naruto/ActivityTimeline.vue'),
+        meta: { title: '活动时间轴' },
+      },
+      {
+        path: 'naruto/activity-detail',
+        name: 'ActivityDetail',
+        component: () => import('@/views/naruto/ActivityDetail.vue'),
+        meta: { title: '活动详情' },
+      },
+      {
         path: 'naruto/miao',
         name: 'MiaoQuiz',
         component: () => import('@/views/naruto/MiaoQuiz.vue'),
@@ -304,6 +316,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminOrg',
         component: () => import('@/views/admin/AdminOrg.vue'),
         meta: { title: '组织积分', requiresOrgManage: true },
+      },
+      {
+        path: 'admin/org-overview',
+        name: 'AdminOrgOverview',
+        component: () => import('@/views/admin/AdminOrgOverview.vue'),
+        meta: { title: '组织总览', requiresAdmin: true },
       },
       {
         path: 'admin/points',

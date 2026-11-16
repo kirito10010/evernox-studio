@@ -1,6 +1,10 @@
 export interface OrgOrganization {
   id: number
   name: string
+  /** 创建者用户ID；自己创建的组织无需申请加入 */
+  ownerId?: number | null
+  /** 成员数量（含已离开），由后端统计 */
+  memberCount?: number
   createdAt: string
 }
 
@@ -22,6 +26,25 @@ export interface OrgMemberRequest {
   organizationId: number
   name: string
   position?: string
+}
+
+export interface OrgMemberIdsRequest {
+  ids: number[]
+}
+
+export interface OrgMemberBatchMoveRequest {
+  ids: number[]
+  organizationId: number
+}
+
+export interface OrgMemberBatchPositionRequest {
+  ids: number[]
+  position: string
+}
+
+export interface OrgMemberBatchResult {
+  affected: number
+  names: string[]
 }
 
 export interface OrgRewardPackage {

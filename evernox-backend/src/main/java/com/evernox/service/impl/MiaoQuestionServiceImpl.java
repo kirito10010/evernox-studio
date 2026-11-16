@@ -22,6 +22,7 @@ import com.evernox.service.AdminApprovalService;
 import com.evernox.service.MiaoQuestionService;
 import com.evernox.service.PointsService;
 import com.evernox.util.ImageTypeValidator;
+import com.evernox.util.QuizSearchUtils;
 import com.evernox.util.SortColumnResolver;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +50,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -105,7 +107,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         }
 
         return all.stream()
-                .map(item -> new Scored(item, similarity(query, normalize(item.getQuestion()))))
+                .map(item -> new Scored(item, QuizSearchUtils.similarity(query, normalize(item.getQuestion()))))
                 .filter(s -> s.score() >= MIN_SCORE)
                 // 没有答案的题目置顶，其余按相似度
                 .sorted(Comparator
@@ -426,11 +428,10 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
             if (!answer.isEmpty() && !options.contains(answer)) {
                 answer = "";
             }
-            List<String> removed = new ArrayList<>();
-            String removedRaw = safeTrim(raw.getRemoved());
-            if (!removedRaw.isEmpty() && options.contains(removedRaw)) {
-                removed.add(removedRaw);
-            }
+            // removed 现在是数组（可能多个），旧格式单字符串也能解析
+            List<String> removedCandidates = raw.getRemoved() == null ? List.of()
+                    : raw.getRemoved().stream().map(this::safeTrim).toList();
+            Resolved resolved = resolveOptions(options, removedCandidates, answer);
             String image = "";
             String imageRef = safeTrim(raw.getImage());
             if (!imageRef.isEmpty()) {
@@ -442,8 +443,8 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
                 }
             }
 
-            Cleaned cleaned = new Cleaned(question, new ArrayList<>(options), answer,
-                    sanitizeRemoved(removed, options), image);
+            Cleaned cleaned = new Cleaned(question, new ArrayList<>(options), resolved.answer(),
+                    resolved.removed(), image);
             Cleaned duplicate = unique.get(normalized);
             if (duplicate != null) {
                 duplicate.merge(cleaned);
@@ -464,14 +465,20 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
                     .last("LIMIT 1"));
             if (existing != null) {
                 boolean changed = false;
-                if (!StringUtils.hasText(existing.getAnswer()) && StringUtils.hasText(item.answer)) {
-                    existing.setAnswer(item.answer);
+                List<String> existRemoved = parseRemoved(existing.getRemovedOptions());
+                List<String> mergedRemovedCandidates = new ArrayList<>(existRemoved);
+                mergedRemovedCandidates.addAll(item.removed);
+                String baseAnswer = StringUtils.hasText(existing.getAnswer())
+                        ? existing.getAnswer() : item.answer;
+                // 排除项取并集后统一校正答案：答案被排除就清掉；凑齐 3 个排除项则反推答案
+                Resolved resolved = resolveOptions(item.options, mergedRemovedCandidates, baseAnswer);
+                if (!resolved.removed().equals(existRemoved)) {
+                    existing.setRemovedOptions(serializeRemoved(resolved.removed()));
                     changed = true;
                 }
-                List<String> existRemoved = parseRemoved(existing.getRemovedOptions());
-                List<String> mergedRemoved = mergeRemoved(existRemoved, item.removed, item.options);
-                if (!mergedRemoved.equals(existRemoved)) {
-                    existing.setRemovedOptions(serializeRemoved(mergedRemoved));
+                String oldAnswer = existing.getAnswer() == null ? "" : existing.getAnswer();
+                if (!Objects.equals(resolved.answer(), oldAnswer)) {
+                    existing.setAnswer(resolved.answer());
                     changed = true;
                 }
                 if (!StringUtils.hasText(existing.getImage()) && StringUtils.hasText(item.image)) {
@@ -595,15 +602,17 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
     }
 
     private MiaoQuestion build(MiaoQuestionRequest request, String normalized, int status) {
+        List<String> options = optionsOf(request);
+        Resolved resolved = resolveOptions(options, removedOf(request), safeTrim(request.getAnswer()));
         return MiaoQuestion.builder()
                 .question(request.getQuestion().trim())
                 .normalizedQuestion(normalized)
-                .optionA(request.getOptionA().trim())
-                .optionB(request.getOptionB().trim())
-                .optionC(request.getOptionC().trim())
-                .optionD(request.getOptionD().trim())
-                .answer(safeTrim(request.getAnswer()))
-                .removedOptions(serializeRemoved(normalizeRequestRemoved(request)))
+                .optionA(options.get(0))
+                .optionB(options.get(1))
+                .optionC(options.get(2))
+                .optionD(options.get(3))
+                .answer(resolved.answer())
+                .removedOptions(serializeRemoved(resolved.removed()))
                 .image(normalizeImageName(request.getImage()))
                 .status(status)
                 .deleted(0)
@@ -611,46 +620,32 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
     }
 
     private void apply(MiaoQuestion q, MiaoQuestionRequest request, String normalized) {
+        List<String> options = optionsOf(request);
+        Resolved resolved = resolveOptions(options, removedOf(request), safeTrim(request.getAnswer()));
         q.setQuestion(request.getQuestion().trim());
         q.setNormalizedQuestion(normalized);
-        q.setOptionA(request.getOptionA().trim());
-        q.setOptionB(request.getOptionB().trim());
-        q.setOptionC(request.getOptionC().trim());
-        q.setOptionD(request.getOptionD().trim());
-        q.setAnswer(safeTrim(request.getAnswer()));
-        q.setRemovedOptions(serializeRemoved(normalizeRequestRemoved(request)));
+        q.setOptionA(options.get(0));
+        q.setOptionB(options.get(1));
+        q.setOptionC(options.get(2));
+        q.setOptionD(options.get(3));
+        q.setAnswer(resolved.answer());
+        q.setRemovedOptions(serializeRemoved(resolved.removed()));
         q.setImage(normalizeImageName(request.getImage()));
     }
 
-    /** 请求里的排除项：只保留属于四个选项的值，去重并限制 3 个 */
-    private List<String> normalizeRequestRemoved(MiaoQuestionRequest request) {
-        List<String> options = List.of(
+    private List<String> optionsOf(MiaoQuestionRequest request) {
+        return List.of(
                 safeTrim(request.getOptionA()),
                 safeTrim(request.getOptionB()),
                 safeTrim(request.getOptionC()),
                 safeTrim(request.getOptionD()));
-        List<String> source = request.getRemovedOptions() == null ? List.of() : request.getRemovedOptions();
-        return sanitizeRemoved(source.stream().map(this::safeTrim).toList(), options);
     }
 
-    private List<String> sanitizeRemoved(List<String> source, List<String> options) {
-        LinkedHashSet<String> result = new LinkedHashSet<>();
-        for (String value : source) {
-            if (result.size() >= MAX_REMOVED_OPTIONS) {
-                break;
-            }
-            if (StringUtils.hasText(value) && options.contains(value)) {
-                result.add(value);
-            }
-        }
-        return new ArrayList<>(result);
+    private List<String> removedOf(MiaoQuestionRequest request) {
+        return request.getRemovedOptions() == null ? List.of()
+                : request.getRemovedOptions().stream().map(this::safeTrim).toList();
     }
 
-    private List<String> mergeRemoved(List<String> existing, List<String> incoming, List<String> options) {
-        List<String> merged = new ArrayList<>(existing);
-        merged.addAll(incoming);
-        return sanitizeRemoved(merged, options);
-    }
 
     private String normalizeImageName(String raw) {
         String value = safeTrim(raw);
@@ -728,52 +723,51 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
 
     /** 去标点/空白/全角转半角、转小写，仅保留中文/字母/数字 */
     private String normalize(String s) {
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c >= 0xFF01 && c <= 0xFF5E) {
-                c = (char) (c - 0xFEE0);
-            }
-            if (Character.isLetterOrDigit(c)) {
-                sb.append(Character.toLowerCase(c));
-            }
-        }
-        return sb.toString();
+        return QuizSearchUtils.normalize(s);
     }
 
-    private double similarity(String a, String b) {
-        if (a.equals(b)) {
-            return 1.0;
-        }
-        if (a.isEmpty() || b.isEmpty()) {
-            return 0.0;
-        }
-        if (a.contains(b) || b.contains(a)) {
-            return 1.0;
-        }
-        int dist = levenshtein(a, b);
-        return 1.0 - (double) dist / Math.max(a.length(), b.length());
+    /** 校正后的答案与排除项 */
+    private record Resolved(List<String> removed, String answer) {
     }
 
-    private int levenshtein(String a, String b) {
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-        for (int i = 0; i <= a.length(); i++) {
-            dp[i][0] = i;
+    /**
+     * 排除项与答案的统一校正规则：
+     *  - 排除项只保留属于四个选项的值，去重，最多 3 个；
+     *  - 答案如果落在排除项里，一定错了 → 清空；
+     *  - 没有答案但排除项已有 3 个 → 剩下那个一定是答案，自动补上。
+     */
+    private static Resolved resolveOptions(List<String> options, List<String> removedCandidates,
+                                           String answerCandidate) {
+        List<String> removed = sanitizeRemoved(options, removedCandidates);
+        String answer = answerCandidate == null ? "" : answerCandidate.trim();
+        if (!answer.isEmpty() && !options.contains(answer)) {
+            answer = "";
         }
-        for (int j = 0; j <= b.length(); j++) {
-            dp[0][j] = j;
+        if (!answer.isEmpty() && removed.contains(answer)) {
+            answer = "";
         }
-        for (int i = 1; i <= a.length(); i++) {
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
+        if (answer.isEmpty() && removed.size() >= MAX_REMOVED_OPTIONS) {
+            answer = options.stream().filter(o -> !removed.contains(o)).findFirst().orElse("");
+        }
+        return new Resolved(removed, answer);
+    }
+
+    /** 过滤非法值、去重、最多保留 3 个排除项 */
+    private static List<String> sanitizeRemoved(List<String> options, List<String> source) {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        if (source != null) {
+            for (String value : source) {
+                if (result.size() >= MAX_REMOVED_OPTIONS) {
+                    break;
+                }
+                if (StringUtils.hasText(value) && options.contains(value)) {
+                    result.add(value);
+                }
             }
         }
-        return dp[a.length()][b.length()];
+        return new ArrayList<>(result);
     }
+
 
     private Page<MiaoQuestion> newPage(int page, int size) {
         return new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
@@ -847,22 +841,16 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
             if (!StringUtils.hasText(answer) && StringUtils.hasText(other.answer)) {
                 answer = other.answer;
             }
-            LinkedHashSet<String> mergedRemoved = new LinkedHashSet<>(removed);
+            List<String> mergedRemoved = new ArrayList<>(removed);
             mergedRemoved.addAll(other.removed);
-            // 单题最多 3 个排除项，保留至少一个可选项
-            List<String> limited = new ArrayList<>();
-            for (String value : mergedRemoved) {
-                if (limited.size() >= MAX_REMOVED_OPTIONS) {
-                    break;
-                }
-                if (options.contains(value)) {
-                    limited.add(value);
-                }
-            }
-            removed = limited;
+            removed = mergedRemoved;
             if (!StringUtils.hasText(image) && StringUtils.hasText(other.image)) {
                 image = other.image;
             }
+            // 合并后再按「答案不能被排除 / 3 个排除项反推答案」校正一次
+            Resolved resolved = resolveOptions(options, removed, answer);
+            removed = resolved.removed();
+            answer = resolved.answer();
         }
     }
 }

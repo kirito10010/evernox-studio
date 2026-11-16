@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 组织服务实现
@@ -36,10 +38,42 @@ public class OrgOrganizationServiceImpl implements OrgOrganizationService {
 
     @Override
     @SuppressWarnings("null")
-    public List<OrgOrganizationResponse> list() {
+    public List<OrgOrganizationResponse> list(Long ownerId) {
+        if (ownerId == null) {
+            return List.of();
+        }
+        // 组织数据按账号隔离：超级会员 / 管理员都只能看到自己创建的组织
+        List<OrgOrganization> orgs = organizationRepository.selectList(
+                new LambdaQueryWrapper<OrgOrganization>()
+                        .eq(OrgOrganization::getOwnerId, ownerId)
+                        .orderByAsc(OrgOrganization::getId));
+        return withMemberCounts(orgs);
+    }
+
+    @Override
+    @SuppressWarnings("null")
+    public List<OrgOrganizationResponse> listAll() {
         List<OrgOrganization> orgs = organizationRepository.selectList(
                 new LambdaQueryWrapper<OrgOrganization>().orderByAsc(OrgOrganization::getId));
-        return orgs.stream().map(OrgOrganizationResponse::from).toList();
+        return withMemberCounts(orgs);
+    }
+
+    /** 批量统计成员数（含已离开），供前端展示与删除前置判断 */
+    @SuppressWarnings("null")
+    private List<OrgOrganizationResponse> withMemberCounts(List<OrgOrganization> orgs) {
+        if (orgs.isEmpty()) {
+            return List.of();
+        }
+        List<Long> orgIds = orgs.stream().map(OrgOrganization::getId).toList();
+        Map<Long, Long> counts = memberRepository.selectList(new LambdaQueryWrapper<OrgMember>()
+                        .in(OrgMember::getOrganizationId, orgIds))
+                .stream()
+                .collect(Collectors.groupingBy(OrgMember::getOrganizationId, Collectors.counting()));
+        return orgs.stream().map(o -> {
+            OrgOrganizationResponse resp = OrgOrganizationResponse.from(o);
+            resp.setMemberCount(counts.getOrDefault(o.getId(), 0L));
+            return resp;
+        }).toList();
     }
 
     @Override
@@ -58,32 +92,43 @@ public class OrgOrganizationServiceImpl implements OrgOrganizationService {
 
     @Override
     @Transactional
-    public OrgOrganizationResponse update(Long id, OrgOrganizationRequest request) {
-        OrgOrganization org = organizationRepository.selectById(id);
-        if (org == null) {
-            throw new BusinessException("组织不存在");
-        }
+    public OrgOrganizationResponse update(Long id, OrgOrganizationRequest request, Long ownerId) {
+        OrgOrganization org = requireOwned(id, ownerId);
         String name = request.getName().trim();
         if (existsByName(name, id)) {
             throw new BusinessException("组织名称已存在: " + name);
         }
         org.setName(name);
         organizationRepository.updateById(org);
-        log.info("更新组织: id={}, name={}", id, name);
+        log.info("更新组织: id={}, name={}, ownerId={}", id, name, ownerId);
         return OrgOrganizationResponse.from(org);
     }
 
     @Override
     @Transactional
     @SuppressWarnings("null")
-    public void delete(Long id) {
+    public void delete(Long id, Long ownerId) {
+        requireOwned(id, ownerId);
         Long memberCount = memberRepository.selectCount(
                 new LambdaQueryWrapper<OrgMember>().eq(OrgMember::getOrganizationId, id));
         if (memberCount != null && memberCount > 0) {
-            throw new BusinessException("该组织下仍有成员，无法删除");
+            throw new BusinessException("该组织下仍有 " + memberCount
+                    + " 名成员（含已离开），请先在「成员管理」批量删除后再试");
         }
         organizationRepository.deleteById(id);
-        log.info("删除组织: id={}", id);
+        log.info("删除组织: id={}, ownerId={}", id, ownerId);
+    }
+
+    /** 组织必须存在且属于当前账号 */
+    private OrgOrganization requireOwned(Long id, Long ownerId) {
+        OrgOrganization org = organizationRepository.selectById(id);
+        if (org == null) {
+            throw new BusinessException("组织不存在");
+        }
+        if (ownerId == null || !ownerId.equals(org.getOwnerId())) {
+            throw new BusinessException(403, "无权操作该组织");
+        }
+        return org;
     }
 
     /** 创建组织时初始化默认换算比与三个默认礼包 */

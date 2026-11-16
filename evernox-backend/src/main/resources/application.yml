@@ -64,10 +64,10 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 8MB
-      # 喵问答按整个文件夹导入（questions.json + 多张截图），单文件仍限制 8MB，
-      # 这里只放宽「单次请求总量」，否则一整个文件夹会直接 413
-      max-request-size: 64MB
+      # 忍者图鉴抓包单个 http-*.jsonl 可达 60MB，单文件上限放宽到 64MB
+      max-file-size: 64MB
+      # 喵问答 / 商城特惠按整个文件夹导入，画册附录按需放宽「单次请求总量」
+      max-request-size: 200MB
 
 
 mybatis-plus:
@@ -92,6 +92,9 @@ jwt:
 
 evernox:
   data-dir: ./data
+  # 活动时间轴：从哪一年开始抓官网公告（官网列表可回溯到 2013 年）
+  hyol-activity:
+    start-year: 2024
   thumbnail:
     max-width: 400
     quality: 0.7

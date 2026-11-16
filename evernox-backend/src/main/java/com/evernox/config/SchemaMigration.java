@@ -72,12 +72,45 @@ public class SchemaMigration implements ApplicationRunner {
                 "BIGINT NOT NULL DEFAULT 0 COMMENT '完整下载次数'");
         backfillReleaseDownloadCount();
 
+        // 组织数据按账号隔离：老数据没有 owner_id 时归到第一个管理员，避免升级后组织「消失」
+        addColumnIfMissing("org_organization", "owner_id",
+                "BIGINT NULL COMMENT '创建者管理员ID(user.id)'");
+        addIndexIfMissing("org_organization", "idx_owner", "`owner_id`");
+        backfillOrgOwner();
+
         // Ollama 模型库：数据最后一次更新时间（获取/更新作业用来轮换最久未更新的模型）
         addColumnIfMissing("ai_ollama_model", "last_updated_at",
                 "DATETIME NULL COMMENT '数据最后一次更新时间（获取/更新作业写入）'");
         addIndexIfMissing("ai_ollama_model", "idx_last_updated", "`last_updated_at`");
         backfillOllamaLastUpdatedAt();
+
+        // 商城特惠 v2：商品详情（忍者技能 / 礼包掉落）。
+        // detail_json 存导出工具的原始 JSON，不做字段改名，后续导出加字段不用再改表。
+        addColumnIfMissing("hyol_mall_item", "detail_type",
+                "VARCHAR(16) NULL COMMENT '详情类型: ninja=忍者技能 / drops=礼包掉落'");
+        addColumnIfMissing("hyol_mall_item", "ninja_id",
+                "BIGINT NULL COMMENT '忍者ID（detail_type=ninja 时有值）'");
+        addColumnIfMissing("hyol_mall_item", "detail_json",
+                "LONGTEXT NULL COMMENT '详情原始 JSON（保持导出结构，不改写字段名）'");
         // ===== 上面是登记区 =====
+    }
+
+    /**
+     * 老组织没有 owner_id：归到第一个管理员，避免升级后管理端看不到原有组织。
+     */
+    private void backfillOrgOwner() {
+        try {
+            int updated = jdbcTemplate.update(
+                    "UPDATE org_organization SET owner_id = " +
+                    "(SELECT id FROM user WHERE role = 'admin' ORDER BY id LIMIT 1) " +
+                    "WHERE owner_id IS NULL AND deleted = 0");
+            if (updated > 0) {
+                log.info("自动迁移完成：{} 个组织已归属第一个管理员", updated);
+            }
+        } catch (Exception e) {
+            log.error("自动迁移失败：回填 org_organization.owner_id 失败，请手动执行 UPDATE：{}",
+                    e.getMessage());
+        }
     }
 
     /**

@@ -12,15 +12,15 @@
       <button
         type="button"
         class="skill-icon"
-        :class="[`size-${size}`, typeClass, { 'is-empty': !iconUrl || failed }]"
+        :class="[`size-${size}`, typeClass, { 'is-empty': !currentUrl }]"
         :aria-label="`${skill.type} ${skill.name || ''}`"
       >
         <img
-          v-if="iconUrl && !failed"
-          :src="iconUrl"
+          v-if="currentUrl"
+          :src="currentUrl"
           :alt="skill.name || skill.type"
           loading="lazy"
-          @error="failed = true"
+          @error="failedIndex += 1"
         />
         <span v-else class="fallback">{{ typeShort }}</span>
         <span v-if="badge" class="badge" :class="badgeClass">{{ badge }}</span>
@@ -82,6 +82,8 @@ interface NinjaSkill {
   desc: string
   type: string
   icon: string
+  /** 图标兜底链（客户端没有打包部分技能图标） */
+  iconFallback?: string[]
   cd: number
   enterCd: number
   mp: number
@@ -94,18 +96,23 @@ interface NinjaSkill {
 const props = withDefaults(defineProps<{
   skill: NinjaSkill | null
   iconUrl?: string
+  iconFallbacks?: string[]
   badge?: string
   size?: 'sm' | 'md'
   baseSkill?: NinjaSkill | null
 }>(), {
   iconUrl: '',
+  iconFallbacks: () => [],
   badge: '',
   size: 'md',
   baseSkill: null,
 })
 
-const failed = ref(false)
-watch(() => props.iconUrl, () => { failed.value = false })
+/** 图标按「主图标 → 兜底链」依次尝试，全部 404 才显示角色色块 */
+const failedIndex = ref(0)
+const candidates = computed(() => [props.iconUrl, ...props.iconFallbacks].filter(Boolean))
+const currentUrl = computed(() => candidates.value[failedIndex.value] || '')
+watch(candidates, () => { failedIndex.value = 0 })
 
 const TYPE_CLASS: Record<string, string> = {
   奥义: 'ultimate',

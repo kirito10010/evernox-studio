@@ -100,6 +100,14 @@
               <el-icon><Bell /></el-icon>
               <template #title>公告</template>
             </el-menu-item>
+            <el-menu-item index="/naruto/activity-timeline">
+              <el-icon><Calendar /></el-icon>
+              <template #title>活动时间轴</template>
+            </el-menu-item>
+            <el-menu-item index="/naruto/activity-detail">
+              <el-icon><Present /></el-icon>
+              <template #title>活动详情</template>
+            </el-menu-item>
             <el-menu-item index="/naruto/miao">
               <el-icon><ChatDotRound /></el-icon>
               <template #title>喵问答</template>
@@ -231,6 +239,12 @@
               <el-icon><UserFilled /></el-icon>
               <template #title>用户管理</template>
             </el-menu-item>
+
+            <el-menu-item index="/admin/org-overview">
+              <el-icon><StarFilled /></el-icon>
+              <template #title>组织总览</template>
+            </el-menu-item>
+
 
             <el-menu-item index="/admin/assets">
 

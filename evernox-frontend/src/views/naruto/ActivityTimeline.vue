@@ -530,7 +530,7 @@ onBeforeUnmount(stopPoll)
 .header-text h2 {
   margin: 0 0 6px;
   font-size: 20px;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .header-text p {
@@ -538,7 +538,7 @@ onBeforeUnmount(stopPoll)
   max-width: 760px;
   font-size: 13px;
   line-height: 1.6;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .header-actions {
@@ -549,7 +549,7 @@ onBeforeUnmount(stopPoll)
 
 .sync-time {
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .sync-bar {
@@ -558,11 +558,11 @@ onBeforeUnmount(stopPoll)
   gap: 12px;
   padding: 10px 14px;
   margin-bottom: 14px;
-  background: rgba(47, 124, 246, 0.06);
-  border: 1px solid rgba(47, 124, 246, 0.15);
+  background: var(--ev-bg-tint);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 8px;
   font-size: 13px;
-  color: #2f7cf6;
+  color: var(--ev-primary);
 }
 
 .sync-progress {
@@ -571,7 +571,7 @@ onBeforeUnmount(stopPoll)
 
 .sync-count {
   font-variant-numeric: tabular-nums;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .toolbar {
@@ -583,7 +583,7 @@ onBeforeUnmount(stopPoll)
 
 .toolbar-hint {
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .filter-bar {
@@ -593,8 +593,8 @@ onBeforeUnmount(stopPoll)
   gap: 10px;
   padding: 12px 14px;
   margin-bottom: 18px;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 10px;
 }
 
@@ -611,8 +611,8 @@ onBeforeUnmount(stopPoll)
 .picker-panel {
   padding: 12px 14px;
   margin-bottom: 18px;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 10px;
 }
 
@@ -631,7 +631,7 @@ onBeforeUnmount(stopPoll)
 .picker-summary {
   margin-left: auto;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .picker-grid {
@@ -642,7 +642,7 @@ onBeforeUnmount(stopPoll)
   overflow-y: auto;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px solid rgba(47, 124, 246, 0.08);
+  border-top: 1px solid var(--ev-border-subtle);
 }
 
 .picker-item {
@@ -652,21 +652,21 @@ onBeforeUnmount(stopPoll)
   padding: 5px 8px;
   border-radius: 6px;
   font-size: 12px;
-  color: #12304f;
+  color: var(--ev-text-primary);
   cursor: pointer;
 }
 
 .picker-item:hover {
-  background: rgba(47, 124, 246, 0.06);
+  background: var(--ev-bg-tint);
 }
 
 .picker-item.checked {
-  background: rgba(47, 124, 246, 0.1);
+  background: var(--ev-bg-tint-strong);
 }
 
 .picker-item input[type='checkbox'] {
   margin: 0;
-  accent-color: #2f7cf6;
+  accent-color: var(--ev-primary);
   flex: 0 0 auto;
 }
 
@@ -682,7 +682,7 @@ onBeforeUnmount(stopPoll)
   flex: 0 0 34px;
   text-align: right;
   font-size: 11px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -690,7 +690,7 @@ onBeforeUnmount(stopPoll)
   grid-column: 1 / -1;
   padding: 12px;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   text-align: center;
 }
 
@@ -701,8 +701,8 @@ onBeforeUnmount(stopPoll)
 .year-panel {
   margin-bottom: 18px;
   padding: 14px 16px 18px;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 10px;
 }
 
@@ -721,12 +721,12 @@ onBeforeUnmount(stopPoll)
 .year-head h3 {
   margin: 0;
   font-size: 17px;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .year-head span {
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .tl-scroll {
@@ -757,7 +757,7 @@ onBeforeUnmount(stopPoll)
   position: absolute;
   bottom: 2px;
   font-size: 11px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   transform: translateX(2px);
 }
 
@@ -782,7 +782,7 @@ onBeforeUnmount(stopPoll)
   gap: 6px;
   padding-right: 10px;
   font-size: 12px;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .row-name {
@@ -794,7 +794,7 @@ onBeforeUnmount(stopPoll)
 .row-count {
   margin-left: auto;
   font-size: 11px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -809,7 +809,7 @@ onBeforeUnmount(stopPoll)
   top: 3px;
   bottom: 3px;
   width: 1px;
-  background: rgba(47, 124, 246, 0.1);
+  background: var(--ev-bg-tint-strong);
 }
 
 .tl-today-line {
@@ -839,7 +839,7 @@ onBeforeUnmount(stopPoll)
 .timeline-foot {
   margin: 0;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .year-group {
@@ -848,7 +848,7 @@ onBeforeUnmount(stopPoll)
 
 .year-arrow {
   margin-left: auto;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   transition: transform 0.2s;
 }
 
@@ -870,7 +870,7 @@ onBeforeUnmount(stopPoll)
 .date-col {
   padding-top: 12px;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -888,7 +888,7 @@ onBeforeUnmount(stopPoll)
   top: 0;
   bottom: 0;
   width: 2px;
-  background: rgba(47, 124, 246, 0.16);
+  background: var(--ev-bg-tint-strong);
 }
 
 .dot {
@@ -907,15 +907,15 @@ onBeforeUnmount(stopPoll)
 .card {
   margin-bottom: 10px;
   padding: 10px 14px;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 8px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
-  border-color: rgba(47, 124, 246, 0.4);
-  box-shadow: 0 4px 14px rgba(47, 124, 246, 0.1);
+  border-color: var(--ev-border-hover);
+  box-shadow: 0 4px 14px rgba(var(--ev-primary-rgb), 0.12);
 }
 
 .card-head {
@@ -927,7 +927,7 @@ onBeforeUnmount(stopPoll)
 .name {
   font-size: 14px;
   font-weight: 600;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .loose {
@@ -944,7 +944,7 @@ onBeforeUnmount(stopPoll)
   gap: 12px;
   margin-top: 6px;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .source {
@@ -955,7 +955,7 @@ onBeforeUnmount(stopPoll)
 
 .link {
   margin-left: auto;
-  color: #2f7cf6;
+  color: var(--ev-primary);
   text-decoration: none;
   white-space: nowrap;
 }

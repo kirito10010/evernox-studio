@@ -1,7 +1,7 @@
 <template>
   <div class="activity-detail">
     <div class="page-header">
-      <h2>活动详情</h2>
+      <h2>{{ activeName }}</h2>
       <el-select v-model="activeActivity" class="activity-select" placeholder="选择活动">
         <el-option
           v-for="activity in activities"
@@ -68,7 +68,7 @@ const activeName = computed(
 .page-header h2 {
   margin: 0;
   font-size: 19px;
-  color: #12304f;
+  color: var(--ev-text-primary);
   white-space: nowrap;
 }
 

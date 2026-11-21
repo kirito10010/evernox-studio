@@ -242,6 +242,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/utility/Weather.vue'),
         meta: { title: '天气查询' },
       },
+      {
+        path: 'utility/work-calendar',
+        name: 'UtilityWorkCalendar',
+        component: () => import('@/views/utility/WorkCalendar.vue'),
+        meta: { title: '工作日历' },
+      },
+      {
+        path: 'utility/phrase-check',
+        name: 'UtilityPhraseCheck',
+        component: () => import('@/views/utility/PhraseCheck.vue'),
+        meta: { title: '老话辨正' },
+      },
       // AI 资讯
       {
         path: 'ai/news',

@@ -169,6 +169,14 @@
               <el-icon><PartlyCloudy /></el-icon>
               <template #title>天气查询</template>
             </el-menu-item>
+            <el-menu-item index="/utility/work-calendar">
+              <el-icon><Calendar /></el-icon>
+              <template #title>工作日历</template>
+            </el-menu-item>
+            <el-menu-item index="/utility/phrase-check">
+              <el-icon><Reading /></el-icon>
+              <template #title>老话辨正</template>
+            </el-menu-item>
           </el-sub-menu>
 
           <!-- 3. 个人效率 -->

@@ -388,8 +388,8 @@ const onDeletePeriod = async () => {
   gap: 10px;
   padding: 8px 12px;
   margin-bottom: 14px;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 10px;
 }
 
@@ -409,7 +409,7 @@ const onDeletePeriod = async () => {
   font-family: inherit;
   font-size: 15px;
   line-height: 1;
-  color: #2f7cf6;
+  color: var(--ev-primary);
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -417,11 +417,11 @@ const onDeletePeriod = async () => {
 }
 
 .arrow:hover:not(:disabled) {
-  background: rgba(47, 124, 246, 0.1);
+  background: var(--ev-bg-tint-strong);
 }
 
 .arrow:disabled {
-  color: #c8d6e5;
+  color: var(--ev-text-muted);
   cursor: not-allowed;
 }
 
@@ -431,7 +431,7 @@ const onDeletePeriod = async () => {
   gap: 6px;
   padding: 3px 6px;
   font-size: 13px;
-  color: #12304f;
+  color: var(--ev-text-primary);
   border-radius: 6px;
   cursor: pointer;
   outline: none;
@@ -439,17 +439,17 @@ const onDeletePeriod = async () => {
 }
 
 .period-label:hover {
-  background: rgba(47, 124, 246, 0.08);
+  background: var(--ev-bg-tint);
 }
 
 .period-meta {
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .caret {
   font-size: 10px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 /* ===== 七天胶囊 ===== */
@@ -468,8 +468,8 @@ const onDeletePeriod = async () => {
   padding: 4px 9px;
   font-family: inherit;
   font-size: 12px;
-  color: #4a6a88;
-  background: rgba(47, 124, 246, 0.06);
+  color: var(--ev-text-secondary);
+  background: var(--ev-bg-tint);
   border: 1px solid transparent;
   border-radius: 14px;
   cursor: pointer;
@@ -477,16 +477,16 @@ const onDeletePeriod = async () => {
 }
 
 .day-pill:hover:not(:disabled):not(.active) {
-  background: rgba(47, 124, 246, 0.14);
+  background: var(--ev-bg-tint-strong);
 }
 
 .day-pill.active {
   color: #fff;
-  background: #2f7cf6;
+  background: var(--ev-primary);
 }
 
 .day-pill.empty {
-  color: #b7c7d6;
+  color: var(--ev-text-muted);
   background: rgba(138, 163, 187, 0.1);
   cursor: not-allowed;
 }
@@ -508,8 +508,8 @@ const onDeletePeriod = async () => {
   line-height: 15px;
   text-align: center;
   border-radius: 8px;
-  background: rgba(47, 124, 246, 0.14);
-  color: #2f7cf6;
+  background: var(--ev-bg-tint-strong);
+  color: var(--ev-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -534,21 +534,21 @@ const onDeletePeriod = async () => {
   width: 26px;
   height: 26px;
   padding: 0;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   background: transparent;
-  border: 1px solid rgba(47, 124, 246, 0.16);
+  border: 1px solid var(--ev-border-default);
   border-radius: 6px;
   cursor: pointer;
 }
 
 .more:hover {
-  color: #2f7cf6;
-  background: rgba(47, 124, 246, 0.08);
+  color: var(--ev-primary);
+  background: var(--ev-bg-tint);
 }
 
 .import-progress {
   font-size: 12px;
-  color: #2f7cf6;
+  color: var(--ev-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -564,7 +564,7 @@ const onDeletePeriod = async () => {
 .empty-hint {
   margin: 0;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .item-area {

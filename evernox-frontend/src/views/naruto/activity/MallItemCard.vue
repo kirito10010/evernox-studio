@@ -403,8 +403,8 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 12px;
   height: 100%;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.12);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-subtle);
   border-radius: 10px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -414,8 +414,8 @@ onBeforeUnmount(() => {
 }
 
 .item-card:hover {
-  border-color: rgba(47, 124, 246, 0.4);
-  box-shadow: 0 4px 14px rgba(47, 124, 246, 0.1);
+  border-color: var(--ev-border-hover);
+  box-shadow: 0 4px 14px rgba(var(--ev-primary-rgb), 0.12);
 }
 
 .item-icon {
@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(47, 124, 246, 0.06);
+  background: var(--ev-bg-tint);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
 .icon-fallback {
   font-size: 24px;
   font-weight: 700;
-  color: rgba(47, 124, 246, 0.5);
+  color: rgba(var(--ev-primary-rgb), 0.55);
 }
 
 .item-body {
@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   font-size: 14px;
   font-weight: 600;
-  color: #12304f;
+  color: var(--ev-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
 
 .price-currency {
   font-size: 11px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 /* 新版导出：一个商品可能有元宝 / 点券两种价格 */
@@ -488,37 +488,37 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 5px;
   padding: 2px 8px 2px 4px;
-  background: rgba(240, 245, 252, 0.95);
-  border: 1px solid rgba(47, 124, 246, 0.14);
+  background: var(--ev-bg-tint-strong);
+  border: 1px solid var(--ev-border-default);
   border-radius: 10px;
 }
 
 .currency-chip.gold {
-  background: rgba(255, 246, 224, 0.95);
-  border-color: rgba(216, 155, 22, 0.28);
+  background: rgba(216, 155, 22, 0.16);
+  border-color: rgba(216, 155, 22, 0.36);
 }
 
 .currency-chip.green {
-  background: rgba(232, 248, 238, 0.95);
-  border-color: rgba(58, 158, 99, 0.28);
+  background: rgba(58, 158, 99, 0.16);
+  border-color: rgba(58, 158, 99, 0.36);
 }
 
 .currency-chip.blue {
-  background: rgba(238, 244, 255, 0.95);
-  border-color: rgba(47, 124, 246, 0.22);
+  background: rgba(var(--ev-primary-rgb), 0.14);
+  border-color: rgba(var(--ev-primary-rgb), 0.3);
 }
 
 .currency-icon {
   width: 20px;
   height: 20px;
   object-fit: contain;
-  background: #fff;
+  background: var(--ev-bg-elevated);
   border-radius: 50%;
 }
 
 .price-sep {
   font-size: 11px;
-  color: #b9cbdc;
+  color: var(--ev-text-muted);
 }
 
 .item-tags {
@@ -530,19 +530,19 @@ onBeforeUnmount(() => {
 .tag {
   padding: 1px 8px;
   font-size: 11px;
-  color: #2f7cf6;
-  background: rgba(47, 124, 246, 0.1);
+  color: var(--ev-primary);
+  background: var(--ev-bg-tint-strong);
   border-radius: 10px;
 }
 
 .tag.slot {
-  color: #8aa3bb;
-  background: rgba(138, 163, 187, 0.14);
+  color: var(--ev-text-secondary);
+  background: rgba(138, 163, 187, 0.18);
 }
 
 .tag.quantity {
-  color: #2f855a;
-  background: rgba(58, 158, 99, 0.12);
+  color: #2f9e83;
+  background: rgba(52, 201, 163, 0.16);
 }
 
 .detail-hint {
@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
   gap: 4px;
   margin-top: 8px;
   font-size: 11px;
-  color: #2f7cf6;
+  color: var(--ev-primary);
   opacity: 0.75;
 }
 
@@ -562,8 +562,8 @@ onBeforeUnmount(() => {
   z-index: 3000;
   /* 不拦截鼠标事件：否则浮窗会盖住卡片触发 mouseleave 造成闪烁 */
   pointer-events: none;
-  background: #fff;
-  border: 1px solid rgba(47, 124, 246, 0.16);
+  background: var(--ev-bg-elevated);
+  border: 1px solid var(--ev-border-default);
   border-radius: 8px;
   box-shadow: 0 8px 28px rgba(18, 48, 79, 0.18);
 }
@@ -579,7 +579,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding-bottom: 8px;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(47, 124, 246, 0.12);
+  border-bottom: 1px solid var(--ev-border-subtle);
 }
 
 .head-avatar {
@@ -588,7 +588,7 @@ onBeforeUnmount(() => {
   height: 48px;
   object-fit: cover;
   border-radius: 8px;
-  background: rgba(47, 124, 246, 0.06);
+  background: var(--ev-bg-tint);
 }
 
 .head-text {
@@ -598,7 +598,7 @@ onBeforeUnmount(() => {
 .head-name {
   font-size: 15px;
   font-weight: 700;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .head-meta {
@@ -612,8 +612,8 @@ onBeforeUnmount(() => {
   padding: 0 6px;
   font-size: 11px;
   line-height: 16px;
-  color: #2f7cf6;
-  background: rgba(47, 124, 246, 0.1);
+  color: var(--ev-primary);
+  background: var(--ev-bg-tint-strong);
   border-radius: 8px;
 }
 
@@ -621,13 +621,13 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 12px;
   line-height: 1.65;
-  color: #4a6a88;
+  color: var(--ev-text-secondary);
 }
 
 .bonus-panel {
   margin-top: 10px;
   padding: 8px 10px;
-  background: rgba(47, 124, 246, 0.05);
+  background: var(--ev-bg-tint);
   border-radius: 8px;
 }
 
@@ -635,7 +635,7 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .bonus-grid {
@@ -652,12 +652,12 @@ onBeforeUnmount(() => {
 }
 
 .bonus-label {
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .bonus-value {
   font-weight: 600;
-  color: #2f7cf6;
+  color: var(--ev-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -665,7 +665,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px dashed rgba(47, 124, 246, 0.12);
+  border-bottom: 1px dashed var(--ev-border-subtle);
 }
 
 .skill:last-child {
@@ -680,7 +680,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: rgba(47, 124, 246, 0.06);
+  background: var(--ev-bg-tint);
   border-radius: 8px;
 }
 
@@ -693,7 +693,7 @@ onBeforeUnmount(() => {
 .skill-icon-fallback {
   font-size: 20px;
   font-weight: 700;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 
 .skill-body {
@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
 .skill-name {
   font-size: 13px;
   font-weight: 600;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .slot {
@@ -749,7 +749,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   margin: 4px 0 0;
   font-size: 11px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -757,7 +757,7 @@ onBeforeUnmount(() => {
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.65;
-  color: #4a6a88;
+  color: var(--ev-text-secondary);
 }
 
 .kw {
@@ -774,7 +774,7 @@ onBeforeUnmount(() => {
   margin-bottom: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #12304f;
+  color: var(--ev-text-primary);
 }
 
 .drop-list {
@@ -789,8 +789,8 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: 3px 8px;
   font-size: 12px;
-  color: #4a6a88;
-  background: rgba(47, 124, 246, 0.04);
+  color: var(--ev-text-secondary);
+  background: rgba(var(--ev-primary-rgb), 0.05);
   border-radius: 6px;
 }
 
@@ -814,6 +814,6 @@ onBeforeUnmount(() => {
 .detail-empty {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #8aa3bb;
+  color: var(--ev-text-muted);
 }
 </style>

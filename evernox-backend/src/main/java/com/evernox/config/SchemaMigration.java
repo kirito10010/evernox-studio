@@ -92,6 +92,11 @@ public class SchemaMigration implements ApplicationRunner {
                 "BIGINT NULL COMMENT '忍者ID（detail_type=ninja 时有值）'");
         addColumnIfMissing("hyol_mall_item", "detail_json",
                 "LONGTEXT NULL COMMENT '详情原始 JSON（保持导出结构，不改写字段名）'");
+
+        // 彩旗献礼 v2：新版导出明确了「元宝 / 点券」两种货币，
+        // price_options 存归一化后的 [{currency,price,icon}]，price/currency 仍保留作兜底展示。
+        addColumnIfMissing("hyol_flag_item", "price_options",
+                "LONGTEXT NULL COMMENT '价格选项 JSON：[{currency,price,icon}]'");
         // ===== 上面是登记区 =====
     }
 

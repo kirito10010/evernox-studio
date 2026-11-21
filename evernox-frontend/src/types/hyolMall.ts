@@ -30,9 +30,13 @@ export interface MallPeriod {
 
 /** 详情里的一条技能（奥义/普攻/追打/被动统一结构） */
 export interface MallSkill {
+  /** 技能ID（新版导出提供） */
+  skillId?: number
   /** 奥义 / 普攻 / 追打 / 被动 */
   slot: string
   name: string
+  /** 技能图标文件名（新版导出提供） */
+  icon?: string
   description?: string
   /** 带【】标记的说明，前端据此渲染高亮词 */
   marked?: string
@@ -79,10 +83,19 @@ export interface MallDetail {
   randomDrops?: MallDrop[]
 }
 
+/** 一个价格选项（新版导出明确了元宝/点券两种货币） */
+export interface PriceOption {
+  currency: string
+  price: number
+  /** 货币图标文件名 */
+  icon?: string
+}
+
 export interface MallItem {
   id: number
   periodId: number
-  dayDate: string
+  /** 归属日（商城特惠按天快照；彩旗献礼没有这个字段，故可选） */
+  dayDate?: string
   slot: number
   itemId: number
   name: string
@@ -90,6 +103,10 @@ export interface MallItem {
   iconId?: number
   price: number
   currency: string
+  /** 价格选项；旧格式数据为空 */
+  priceOptions?: PriceOption[]
+  /** 兑换一次获得数量（战场的召唤使用） */
+  quantity?: number
   dailyLimit: number
   startTime?: string
   endTime?: string

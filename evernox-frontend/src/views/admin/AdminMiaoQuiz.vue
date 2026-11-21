@@ -71,7 +71,7 @@
               {{ optionKeys[index] }}. {{ option }}
               <span v-if="isRemoved(row as MiaoQuestion, option)" class="removed-tag">已排除</span>
             </p>
-            <p><strong>答案：</strong>{{ (row as MiaoQuestion).answer || '待确认' }}</p>
+            <p><strong>答案：</strong>{{ validAnswerOf(row as MiaoQuestion) || '待确认' }}</p>
           </div>
         </template>
       </el-table-column>
@@ -93,14 +93,14 @@
       </el-table-column>
       <el-table-column label="答案" width="140">
         <template #default="{ row }">
-          <el-tag v-if="!(row as MiaoQuestion).answer" type="warning" size="small">待确认</el-tag>
-          <span v-else class="answer-text">{{ (row as MiaoQuestion).answer }}</span>
+          <el-tag v-if="!validAnswerOf(row as MiaoQuestion)" type="warning" size="small">待确认</el-tag>
+          <span v-else class="answer-text">{{ validAnswerOf(row as MiaoQuestion) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="排除项" width="180">
         <template #default="{ row }">
           <el-tag
-            v-for="option in (row as MiaoQuestion).removedOptions"
+            v-for="option in validRemovedOf(row as MiaoQuestion)"
             :key="option"
             type="info"
             size="small"
@@ -108,7 +108,7 @@
           >
             {{ option }}
           </el-tag>
-          <span v-if="!((row as MiaoQuestion).removedOptions || []).length" class="muted">—</span>
+          <span v-if="!validRemovedOf(row as MiaoQuestion).length" class="muted">—</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90">
@@ -289,6 +289,30 @@ const optionsOf = (q: MiaoQuestion) =>
 
 const isRemoved = (q: MiaoQuestion, option: string) => (q.removedOptions || []).includes(option)
 
+/**
+ * 只保留属于当前四个选项的排除项（去重、最多 3 个）。
+ * 历史串题数据里可能残留其他题目的排除项，读取时直接过滤，避免误导。
+ */
+const validRemovedOf = (q: MiaoQuestion): string[] => {
+  const choices = optionsOf(q)
+  const result: string[] = []
+  for (const option of q.removedOptions || []) {
+    const value = (option || '').trim()
+    if (value && choices.includes(value) && !result.includes(value)) {
+      result.push(value)
+    }
+    if (result.length >= 3) break
+  }
+  return result
+}
+
+/** 答案必须在四个选项内，且不能是被排除的选项 */
+const validAnswerOf = (q: MiaoQuestion): string => {
+  const answer = (q.answer || '').trim()
+  if (!answer) return ''
+  return optionsOf(q).includes(answer) && !validRemovedOf(q).includes(answer) ? answer : ''
+}
+
 /** 弹窗里可选的选项（排除项/答案都只能从已填写的四个选项里选） */
 const optionChoices = computed(() =>
   [form.optionA, form.optionB, form.optionC, form.optionD]
@@ -361,8 +385,9 @@ const openEdit = (row: MiaoQuestion) => {
   form.optionB = row.optionB
   form.optionC = row.optionC
   form.optionD = row.optionD
-  form.answer = row.answer
-  form.removedOptions = [...(row.removedOptions || [])]
+  // 显式过滤：不依赖 watch（同一行重复打开时 watch 不会触发）
+  form.answer = validAnswerOf(row)
+  form.removedOptions = validRemovedOf(row)
   form.image = row.image || ''
   dialogVisible.value = true
 }

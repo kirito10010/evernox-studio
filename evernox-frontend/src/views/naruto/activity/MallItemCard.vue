@@ -19,12 +19,35 @@
     <div class="item-body">
       <div class="item-name" :title="item.name">{{ item.name }}</div>
       <div class="item-price">
-        <span class="price-value">{{ item.price }}</span>
-        <span class="price-currency">{{ item.currency }}</span>
+        <template v-if="priceOptions.length">
+          <span
+            v-for="(option, index) in priceOptions"
+            :key="`${option.currency}-${index}`"
+            class="price-option"
+            :title="option.currency"
+          >
+            <span class="currency-chip" :class="currencyClass(option.currency)">
+              <img
+                v-if="option.icon"
+                :src="imageUrl(option.icon)"
+                class="currency-icon"
+                :alt="option.currency"
+                loading="lazy"
+              />
+              <span class="price-value">{{ option.price }}</span>
+            </span>
+            <span v-if="index < priceOptions.length - 1" class="price-sep">/</span>
+          </span>
+        </template>
+        <template v-else>
+          <span class="price-value">{{ item.price }}</span>
+          <span class="price-currency">{{ item.currency }}</span>
+        </template>
       </div>
       <div class="item-tags">
-        <span class="tag">每日限购 {{ item.dailyLimit }}</span>
-        <span class="tag slot">槽位 {{ item.slot }}</span>
+        <span class="tag">{{ limitLabel }} {{ item.dailyLimit }}</span>
+        <span v-if="showSlot" class="tag slot">槽位 {{ item.slot }}</span>
+        <span v-if="item.quantity && item.quantity > 1" class="tag quantity">×{{ item.quantity }}</span>
       </div>
       <div v-if="detailLabel" class="detail-hint">
         <el-icon><InfoFilled /></el-icon>
@@ -59,21 +82,33 @@
         <!-- 忍者碎片：只显示技能（「招募，升星X所需材料」那句不显示） -->
         <template v-if="isNinja">
           <div v-for="(skill, index) in skills" :key="index" class="skill">
-            <div class="skill-head">
-              <span class="slot" :class="slotClass(skill.slot)">{{ skill.slot }}</span>
-              <span class="skill-name">{{ skill.name }}</span>
+            <div class="skill-icon-wrap">
+              <img
+                v-if="skill.icon"
+                :src="imageUrl(skill.icon)"
+                class="skill-icon"
+                :alt="skill.name"
+                loading="lazy"
+              />
+              <span v-else class="skill-icon-fallback">{{ skill.slot.slice(0, 1) }}</span>
             </div>
-            <div v-if="skill.slot === '奥义'" class="skill-meta">
-              <span>冷却回合 {{ skill.cooldown ?? '—' }}</span>
-              <span>进场冷却 {{ skill.entryCooldown ?? '—' }}</span>
-              <span>消耗查克拉 {{ skill.chakra ?? '—' }}</span>
+            <div class="skill-body">
+              <div class="skill-head">
+                <span class="slot" :class="slotClass(skill.slot)">{{ skill.slot }}</span>
+                <span class="skill-name">{{ skill.name }}</span>
+              </div>
+              <div v-if="skill.slot === '奥义'" class="skill-meta">
+                <span>冷却回合 {{ skill.cooldown ?? '—' }}</span>
+                <span>进场冷却 {{ skill.entryCooldown ?? '—' }}</span>
+                <span>消耗查克拉 {{ skill.chakra ?? '—' }}</span>
+              </div>
+              <p class="skill-desc">
+                <template v-for="(segment, si) in segmentsOf(skill.marked || skill.description)" :key="si">
+                  <em v-if="segment.hl" class="kw">{{ segment.text }}</em>
+                  <span v-else>{{ segment.text }}</span>
+                </template>
+              </p>
             </div>
-            <p class="skill-desc">
-              <template v-for="(segment, si) in segmentsOf(skill.marked || skill.description)" :key="si">
-                <em v-if="segment.hl" class="kw">{{ segment.text }}</em>
-                <span v-else>{{ segment.text }}</span>
-              </template>
-            </p>
           </div>
           <p v-if="skills.length === 0" class="detail-empty">该忍者没有可展示的技能数据</p>
         </template>
@@ -142,7 +177,20 @@ interface Segment {
   hl: boolean
 }
 
-const props = defineProps<{ item: MallItem }>()
+const props = withDefaults(
+  defineProps<{
+    item: MallItem
+    /** 图标地址前缀；商城/彩旗/战场各用自己的图片目录 */
+    imageBase?: string
+    /** 限购文案：商城/彩旗是「每日限购」，战场是「限购」 */
+    limitLabel?: string
+    /** 战场的槽位没有展示意义，可隐藏 */
+    showSlot?: boolean
+    /** 图片缓存版本号：期数据重新导入后变化，强制刷新已缓存的图标 */
+    imageVersion?: string
+  }>(),
+  { imageBase: '', limitLabel: '每日限购', showSlot: true, imageVersion: '2' }
+)
 
 /** 忍者技能多，用宽浮窗；其余类型内容少，浮窗收窄 */
 const NINJA_TIP_WIDTH = 520
@@ -156,6 +204,14 @@ const iconFailed = ref(false)
 const avatarFailed = ref(false)
 
 const detail = computed(() => props.item.detail || null)
+const priceOptions = computed(() => props.item.priceOptions || [])
+
+/** 币种配色：元宝金色、点券绿色，其余走主题蓝 */
+const currencyClass = (currency: string): string => {
+  if (currency.includes('元宝')) return 'gold'
+  if (currency.includes('点券')) return 'green'
+  return 'blue'
+}
 const isNinja = computed(() => detail.value?.type === 'ninja')
 const isDrops = computed(() => detail.value?.type === 'drops')
 const isBeast = computed(() => detail.value?.type === 'beast')
@@ -186,8 +242,11 @@ const bonusItems = computed(() => {
   return entries.filter((entry) => entry.value !== undefined && entry.value !== null)
 })
 
-const imageUrl = (name: string): string =>
-  `${window.location.origin}/api/hyol/mall/image/${encodeURIComponent(name)}`
+const imageUrl = (name: string): string => {
+  const base = props.imageBase || '/api/hyol/mall/image'
+  const version = props.imageVersion ? `?v=${encodeURIComponent(props.imageVersion)}` : ''
+  return `${window.location.origin}${base}/${encodeURIComponent(name)}${version}`
+}
 
 /** 浮窗头图就是商品自身的图标（和卡片同一张），不依赖忍者图鉴 */
 const detailHeadImage = computed(() =>
@@ -416,6 +475,52 @@ onBeforeUnmount(() => {
   color: #8aa3bb;
 }
 
+/* 新版导出：一个商品可能有元宝 / 点券两种价格 */
+.price-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 货币图标放在浅色圆角胶囊里，避免深色游戏图标在白底上糊成一团 */
+.currency-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  background: rgba(240, 245, 252, 0.95);
+  border: 1px solid rgba(47, 124, 246, 0.14);
+  border-radius: 10px;
+}
+
+.currency-chip.gold {
+  background: rgba(255, 246, 224, 0.95);
+  border-color: rgba(216, 155, 22, 0.28);
+}
+
+.currency-chip.green {
+  background: rgba(232, 248, 238, 0.95);
+  border-color: rgba(58, 158, 99, 0.28);
+}
+
+.currency-chip.blue {
+  background: rgba(238, 244, 255, 0.95);
+  border-color: rgba(47, 124, 246, 0.22);
+}
+
+.currency-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.price-sep {
+  font-size: 11px;
+  color: #b9cbdc;
+}
+
 .item-tags {
   display: flex;
   flex-wrap: wrap;
@@ -433,6 +538,11 @@ onBeforeUnmount(() => {
 .tag.slot {
   color: #8aa3bb;
   background: rgba(138, 163, 187, 0.14);
+}
+
+.tag.quantity {
+  color: #2f855a;
+  background: rgba(58, 158, 99, 0.12);
 }
 
 .detail-hint {
@@ -552,12 +662,43 @@ onBeforeUnmount(() => {
 }
 
 .skill {
-  padding: 8px 0;
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
   border-bottom: 1px dashed rgba(47, 124, 246, 0.12);
 }
 
 .skill:last-child {
   border-bottom: none;
+}
+
+.skill-icon-wrap {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(47, 124, 246, 0.06);
+  border-radius: 8px;
+}
+
+.skill-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skill-icon-fallback {
+  font-size: 20px;
+  font-weight: 700;
+  color: #8aa3bb;
+}
+
+.skill-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .skill-head {
@@ -606,7 +747,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 4px 0 0 46px;
+  margin: 4px 0 0;
   font-size: 11px;
   color: #8aa3bb;
   font-variant-numeric: tabular-nums;

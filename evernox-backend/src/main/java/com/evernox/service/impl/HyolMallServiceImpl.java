@@ -2,24 +2,19 @@ package com.evernox.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.evernox.config.StorageConfig;
-import com.evernox.dto.HyolMallBonusResponse;
 import com.evernox.dto.HyolMallDayResponse;
-import com.evernox.dto.HyolMallDetailResponse;
-import com.evernox.dto.HyolMallDropResponse;
 import com.evernox.dto.HyolMallImportResponse;
 import com.evernox.dto.HyolMallItemResponse;
 import com.evernox.dto.HyolMallPeriodResponse;
-import com.evernox.dto.HyolMallSkillResponse;
 import com.evernox.entity.HyolMallItem;
 import com.evernox.entity.HyolMallPeriod;
 import com.evernox.exception.BusinessException;
 import com.evernox.repository.HyolMallItemRepository;
 import com.evernox.repository.HyolMallPeriodRepository;
 import com.evernox.service.HyolMallService;
-import com.evernox.util.ImageTypeValidator;
+import com.evernox.service.HyolShopItemParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,8 +24,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -39,12 +32,10 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * 火影忍者OL 活动详情 · 商城特惠实现。
@@ -69,28 +60,11 @@ public class HyolMallServiceImpl implements HyolMallService {
     private static final DateTimeFormatter DATE_MINUTE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter DATE_SLASH = DateTimeFormatter.ofPattern("yyyy/M/d H:mm");
 
-    private static final Pattern IMAGE_NAME =
-            Pattern.compile("^[0-9A-Za-z_\\-]{1,60}\\.(png|jpg|jpeg|webp|gif)$");
-    private static final long MAX_IMAGE_BYTES = 8L * 1024 * 1024;
-
-    private static final int MAX_NAME = 128;
-    private static final int MAX_DESCRIPTION = 512;
-    private static final int MAX_CURRENCY = 16;
-    /** 技能说明原文可能很长，DTO 里放宽（不落库，只在响应里出现） */
-    private static final int MAX_SKILL_TEXT = 2000;
-
-    /** 详情类型 */
-    private static final String DETAIL_NINJA = "ninja";
-    private static final String DETAIL_DROPS = "drops";
-    /** 通灵兽碎片：只有说明 + 需求碎片（如梦貘） */
-    private static final String DETAIL_BEAST = "beast";
-    /** 普通材料：只有说明 */
-    private static final String DETAIL_ITEM = "item";
-
     private final HyolMallPeriodRepository periodRepository;
     private final HyolMallItemRepository itemRepository;
     private final StorageConfig storageConfig;
     private final ObjectMapper objectMapper;
+    private final HyolShopItemParser itemParser;
 
     // ==================== 查询 ====================
 
@@ -235,7 +209,29 @@ public class HyolMallServiceImpl implements HyolMallService {
             throw new BusinessException("JSON 里缺少「当日窗口.开始」，无法判断属于哪一天");
         }
 
-        List<HyolMallItem> parsed = parseItems(root, dayDate);
+        LocalDateTime dayWindowStart = dayDate.atTime(DAY_START);
+        LocalDateTime dayWindowEnd = dayDate.plusDays(1).atTime(DAY_END);
+        List<HyolShopItemParser.ShopItem> shopItems =
+                itemParser.parseItems(root, "折扣价", dayWindowStart, dayWindowEnd);
+        List<HyolMallItem> parsed = new ArrayList<>();
+        for (HyolShopItemParser.ShopItem shopItem : shopItems) {
+            parsed.add(HyolMallItem.builder()
+                    .slot(shopItem.slot())
+                    .itemId(shopItem.itemId())
+                    .name(shopItem.name())
+                    .description(shopItem.description())
+                    .iconId(shopItem.iconId())
+                    .price(shopItem.price())
+                    .currency(shopItem.currency())
+                    .dailyLimit(shopItem.dailyLimit())
+                    .startTime(shopItem.startTime())
+                    .endTime(shopItem.endTime())
+                    .image(shopItem.image())
+                    .detailType(shopItem.detailType())
+                    .ninjaId(shopItem.ninjaId())
+                    .detailJson(shopItem.detailJson())
+                    .build());
+        }
         if (parsed.isEmpty()) {
             throw new BusinessException("JSON 里没有可识别的商品");
         }
@@ -267,13 +263,9 @@ public class HyolMallServiceImpl implements HyolMallService {
             created = false;
         }
 
-        Set<String> referenced = new HashSet<>();
-        for (HyolMallItem item : parsed) {
-            if (item.getImage() != null && !item.getImage().isEmpty()) {
-                referenced.add(item.getImage());
-            }
-        }
-        int imageCount = storeImages(images, referenced);
+        Set<String> referenced = itemParser.collectReferencedImages(root);
+        int imageCount = itemParser.storeImages(
+                images, referenced, storageConfig.getMallImagePath(), "商城特惠");
         int missingImages = 0;
         for (String name : referenced) {
             if (!Files.exists(storageConfig.getMallImagePath().resolve(name))) {
@@ -342,120 +334,6 @@ public class HyolMallServiceImpl implements HyolMallService {
         return null;
     }
 
-    private List<HyolMallItem> parseItems(JsonNode root, LocalDate dayDate) {
-        List<HyolMallItem> parsed = new ArrayList<>();
-        Set<Long> seen = new HashSet<>();
-        for (JsonNode node : root.path("商品")) {
-            long itemId = node.path("物品ID").asLong(0);
-            if (itemId <= 0 || !seen.add(itemId)) {
-                continue;
-            }
-            LocalDateTime start = readTime(node.path("开始").asText());
-            LocalDateTime end = readTime(node.path("结束").asText());
-            if (start == null) {
-                start = dayDate.atTime(DAY_START);
-            }
-            if (end == null) {
-                end = dayDate.plusDays(1).atTime(DAY_END);
-            }
-
-            // 详情分四类，优先级：忍者 > 掉落 > 通灵兽(需求碎片) > 普通材料
-            // 原始 JSON 原样入库，不改字段名
-            JsonNode ninjaNode = node.path("忍者");
-            JsonNode dropsNode = node.path("掉落");
-            boolean hasNinja = ninjaNode.isObject();
-            boolean hasDrops = dropsNode.isObject();
-            boolean hasBeast = node.hasNonNull("需求碎片");
-            String detailType;
-            Long ninjaId = null;
-            String detailJson = null;
-            if (hasNinja) {
-                detailType = DETAIL_NINJA;
-                long ninjaIdValue = ninjaNode.path("忍者ID").asLong(0);
-                ninjaId = ninjaIdValue > 0 ? ninjaIdValue : null;
-                detailJson = ninjaNode.toString();
-                if (hasDrops) {
-                    log.warn("商城特惠商品同时带「忍者」与「掉落」，按忍者处理，itemId={}", itemId);
-                }
-            } else if (hasDrops) {
-                detailType = DETAIL_DROPS;
-                detailJson = dropsNode.toString();
-            } else if (hasBeast) {
-                // 通灵兽碎片：详情就写在商品自身（需求碎片 + 属性加成 + 带【】的说明标记），拼一个小对象入库
-                detailType = DETAIL_BEAST;
-                ObjectNode beast = objectMapper.createObjectNode();
-                beast.put("需求碎片", node.path("需求碎片").asInt(0));
-                beast.put("说明", safeTrim(node.path("说明").asText()));
-                beast.put("说明标记", safeTrim(node.path("说明标记").asText()));
-                JsonNode beastHighlights = node.path("高亮");
-                if (beastHighlights.isArray()) {
-                    beast.set("高亮", beastHighlights);
-                }
-                JsonNode beastBonus = node.path("属性加成");
-                if (beastBonus.isObject()) {
-                    beast.set("属性加成", beastBonus);
-                }
-                detailJson = beast.toString();
-            } else {
-                // 普通材料：浮窗只显示「说明」，说明已在 description 列，不需要额外 JSON
-                detailType = DETAIL_ITEM;
-            }
-
-            parsed.add(HyolMallItem.builder()
-                    .slot(node.path("槽位").asInt(0))
-                    .itemId(itemId)
-                    .name(cut(safeTrim(node.path("名称").asText()), MAX_NAME))
-                    .description(cut(safeTrim(node.path("说明").asText()), MAX_DESCRIPTION))
-                    .iconId(node.path("图标ID").asLong(0))
-                    .price(node.path("折扣价").asInt(0))
-                    .currency(cut(defaultIfBlank(node.path("货币").asText(), "点券"), MAX_CURRENCY))
-                    .dailyLimit(node.path("每日限购").asInt(0))
-                    .startTime(start)
-                    .endTime(end)
-                    .image(baseName(node.path("图片").asText()))
-                    .detailType(detailType)
-                    .ninjaId(ninjaId)
-                    .detailJson(detailJson)
-                    .build());
-        }
-        return parsed;
-    }
-
-    /** 图片落盘：只保存数据里真正引用到的文件名，路径穿越/超大/非图片一律跳过 */
-    private int storeImages(List<MultipartFile> images, Set<String> referenced) {
-        if (images == null || images.isEmpty() || referenced.isEmpty()) {
-            return 0;
-        }
-        int stored = 0;
-        for (MultipartFile file : images) {
-            if (file == null || file.isEmpty()) {
-                continue;
-            }
-            String name = baseName(file.getOriginalFilename());
-            if (!referenced.contains(name) || !IMAGE_NAME.matcher(name).matches()) {
-                continue;
-            }
-            if (file.getSize() > MAX_IMAGE_BYTES) {
-                log.warn("商城特惠图片超过 8MB，已跳过: {}", name);
-                continue;
-            }
-            try {
-                byte[] bytes = file.getBytes();
-                if (!ImageTypeValidator.isSupportedImage(bytes)) {
-                    log.warn("商城特惠图片格式不支持，已跳过: {}", name);
-                    continue;
-                }
-                Path target = storageConfig.getMallImagePath().resolve(name);
-                Files.write(target, bytes,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                stored++;
-            } catch (IOException e) {
-                log.warn("商城特惠图片保存失败: {}, {}", name, e.getMessage());
-            }
-        }
-        return stored;
-    }
-
     // ==================== 组装 ====================
 
     private HyolMallPeriodResponse toPeriodResponse(HyolMallPeriod row, Map<LocalDate, Integer> dayCounter) {
@@ -521,196 +399,9 @@ public class HyolMallServiceImpl implements HyolMallService {
                 .startTime(row.getStartTime())
                 .endTime(row.getEndTime())
                 .image(row.getImage())
-                .detail(buildDetail(row))
+                .detail(itemParser.toDetail(row.getDetailType(), row.getNinjaId(),
+                        row.getDetailJson(), row.getDescription(), row.getName()))
                 .build();
-    }
-
-    // ==================== 详情归一化 ====================
-
-    /** 原始 JSON → 稳定的前端契约；解析失败退化成「只有说明」，不影响列表 */
-    private HyolMallDetailResponse buildDetail(HyolMallItem row) {
-        String type = safeTrim(row.getDetailType());
-        String description = safeTrim(row.getDescription());
-
-        // 本次改造前导入的老数据没有 detail_type：材料/普通道具按「物品说明」处理
-        if (type.isEmpty()) {
-            // 老数据里的通灵兽碎片无法还原「需求碎片」，重新导入即可补齐
-            if (description.isEmpty()) {
-                return null;
-            }
-            return HyolMallDetailResponse.builder()
-                    .type(DETAIL_ITEM)
-                    .description(description)
-                    .build();
-        }
-
-        // 普通材料不需要 JSON：说明就在 description 列
-        if (DETAIL_ITEM.equals(type)) {
-            return HyolMallDetailResponse.builder()
-                    .type(DETAIL_ITEM)
-                    .description(description)
-                    .build();
-        }
-
-        JsonNode detail;
-        try {
-            detail = objectMapper.readTree(row.getDetailJson());
-        } catch (IOException e) {
-            log.warn("商城特惠详情 JSON 解析失败，itemId={}，{}", row.getItemId(), e.getMessage());
-            return description.isEmpty() ? null : HyolMallDetailResponse.builder()
-                    .type(DETAIL_ITEM)
-                    .description(description)
-                    .build();
-        }
-        if (detail == null || !detail.isObject()) {
-            return description.isEmpty() ? null : HyolMallDetailResponse.builder()
-                    .type(DETAIL_ITEM)
-                    .description(description)
-                    .build();
-        }
-
-        if (DETAIL_NINJA.equals(type)) {
-            // 忍者浮窗只显示技能，不显示「招募，升星X所需材料」这句
-            return buildNinjaDetail(row, detail);
-        }
-        if (DETAIL_DROPS.equals(type)) {
-            return HyolMallDetailResponse.builder()
-                    .type(DETAIL_DROPS)
-                    .description(description)
-                    .marked(safeTrim(detail.path("说明标记").asText()))
-                    .fixedDrops(toDrops(detail.path("固定")))
-                    .randomDrops(toDrops(detail.path("随机")))
-                    .build();
-        }
-        if (DETAIL_BEAST.equals(type)) {
-            Integer needFragments = intOrNull(detail.path("需求碎片"));
-            String beastDesc = defaultIfBlank(detail.path("说明").asText(), description);
-            return HyolMallDetailResponse.builder()
-                    .type(DETAIL_BEAST)
-                    .description(beastDesc)
-                    .marked(defaultIfBlank(detail.path("说明标记").asText(), beastDesc))
-                    .needFragments(needFragments == null || needFragments <= 0 ? null : needFragments)
-                    .bonus(toBonus(detail.path("属性加成")))
-                    .build();
-        }
-        return description.isEmpty() ? null : HyolMallDetailResponse.builder()
-                .type(DETAIL_ITEM)
-                .description(description)
-                .build();
-    }
-
-    private HyolMallDetailResponse buildNinjaDetail(HyolMallItem row, JsonNode detail) {
-        List<HyolMallSkillResponse> skills = new ArrayList<>();
-
-        // 新格式：统一放在「技能列表」里，每条自带「槽位」（奥义/普攻/追打/触发/被动 都可能出现），
-        // 且顺序不固定（有的忍者「触发」在普攻后，有的在追打后），必须按数组原序渲染。
-        JsonNode skillList = detail.path("技能列表");
-        if (skillList.isArray()) {
-            for (JsonNode node : skillList) {
-                addSkill(skills, safeTrim(node.path("槽位").asText()), node);
-            }
-        } else {
-            // 老格式（2026-11-06 225633 及更早导出）：奥义/普攻/追打平铺 + 「被动」数组
-            addSkill(skills, "奥义", detail.path("奥义"));
-            addSkill(skills, "普攻", detail.path("普攻"));
-            addSkill(skills, "追打", detail.path("追打"));
-            for (JsonNode node : detail.path("被动")) {
-                addSkill(skills, "被动", node);
-            }
-        }
-
-        // 忍者名只用商品名去掉「碎片」。商城特惠不读忍者图鉴（图鉴以后要重做），
-        // 导出的「忍者ID」与图鉴 nid 体系也不一致，耦合只会显示成别的忍者。
-        return HyolMallDetailResponse.builder()
-                .type(DETAIL_NINJA)
-                .ninjaId(row.getNinjaId())
-                .ninjaName(fallbackNinjaName(row.getName()))
-                .skills(skills)
-                .fixedDrops(List.of())
-                .randomDrops(List.of())
-                .build();
-    }
-
-    /** 一条技能：空对象不补占位；槽位缺失时归到「其他」，不丢技能 */
-    private void addSkill(List<HyolMallSkillResponse> skills, String slot, JsonNode node) {
-        if (node == null || !node.isObject()) {
-            return;
-        }
-        String name = safeTrim(node.path("名称").asText());
-        if (name.isEmpty()) {
-            return;
-        }
-        skills.add(HyolMallSkillResponse.builder()
-                .slot(slot.isEmpty() ? "其他" : slot)
-                .name(cut(name, MAX_NAME))
-                .description(cut(safeTrim(node.path("说明").asText()), MAX_SKILL_TEXT))
-                .marked(cut(safeTrim(node.path("说明标记").asText()), MAX_SKILL_TEXT))
-                .highlights(readHighlights(node.path("高亮")))
-                .chakra(intOrNull(node.path("查克拉")))
-                .cooldown(intOrNull(node.path("冷却")))
-                .entryCooldown(intOrNull(node.path("进场冷却")))
-                .build());
-    }
-
-    private List<HyolMallDropResponse> toDrops(JsonNode node) {
-        List<HyolMallDropResponse> drops = new ArrayList<>();
-        if (node == null || !node.isArray()) {
-            return drops;
-        }
-        for (JsonNode item : node) {
-            String name = safeTrim(item.path("名称").asText());
-            if (name.isEmpty()) {
-                continue;
-            }
-            drops.add(HyolMallDropResponse.builder()
-                    .name(cut(name, MAX_NAME))
-                    .count(item.path("数量").asInt(1))
-                    .itemId(item.path("物品ID").asLong(0))
-                    .build());
-        }
-        return drops;
-    }
-
-    private static List<String> readHighlights(JsonNode node) {
-        List<String> highlights = new ArrayList<>();
-        if (node == null || !node.isArray()) {
-            return highlights;
-        }
-        for (JsonNode item : node) {
-            String keyword = safeTrim(item.asText());
-            if (!keyword.isEmpty()) {
-                highlights.add(keyword);
-            }
-        }
-        return highlights;
-    }
-
-    private static Integer intOrNull(JsonNode node) {
-        return node == null || node.isMissingNode() || node.isNull() ? null : node.asInt();
-    }
-
-    /** 通灵兽的属性加成：{"生命":30,"攻击":15,"防御":12,"忍术":15} → 英文键；缺字段留 null */
-    private static HyolMallBonusResponse toBonus(JsonNode node) {
-        if (node == null || !node.isObject() || node.isEmpty()) {
-            return null;
-        }
-        HyolMallBonusResponse bonus = HyolMallBonusResponse.builder()
-                .life(intOrNull(node.path("生命")))
-                .attack(intOrNull(node.path("攻击")))
-                .defense(intOrNull(node.path("防御")))
-                .ninjutsu(intOrNull(node.path("忍术")))
-                .build();
-        if (bonus.getLife() == null && bonus.getAttack() == null
-                && bonus.getDefense() == null && bonus.getNinjutsu() == null) {
-            return null;
-        }
-        return bonus;
-    }
-
-    /** 图鉴里查不到时：物品名去掉「碎片」（蝎[绯流琥]碎片 → 蝎[绯流琥]） */
-    private static String fallbackNinjaName(String itemName) {
-        String name = safeTrim(itemName);
-        return name.endsWith("碎片") ? name.substring(0, name.length() - 2) : name;
     }
 
     // ==================== 小工具 ====================
@@ -766,10 +457,5 @@ public class HyolMallServiceImpl implements HyolMallService {
     private static String defaultIfBlank(String raw, String fallback) {
         String value = safeTrim(raw);
         return value.isEmpty() ? fallback : value;
-    }
-
-    private static String cut(String raw, int max) {
-        String value = safeTrim(raw);
-        return value.length() <= max ? value : value.substring(0, max);
     }
 }

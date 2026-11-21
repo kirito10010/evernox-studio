@@ -40,6 +40,8 @@ public class StorageConfig {
     private static final String TOPIC_DIR = "topics";
     private static final String MIAO_IMAGE_DIR = "miao/images";
     private static final String MALL_IMAGE_DIR = "hyol-mall/images";
+    private static final String FLAG_IMAGE_DIR = "hyol-flag/images";
+    private static final String BATTLE_IMAGE_DIR = "hyol-battle/images";
     private static final String CODEX_DIR = "hyol-codex";
     private static final String CODEX_PORTRAIT_DIR = "hyol-codex/images/portraits";
     private static final String CODEX_HEAD_DIR = "hyol-codex/images/heads";
@@ -85,6 +87,10 @@ public class StorageConfig {
             Files.createDirectories(basePath.resolve(MIAO_IMAGE_DIR));
             // 商城特惠：商品图标，按物品ID命名
             Files.createDirectories(basePath.resolve(MALL_IMAGE_DIR));
+            // 彩旗献礼：商品图标，与商城特惠分开存，避免互相覆盖
+            Files.createDirectories(basePath.resolve(FLAG_IMAGE_DIR));
+            // 战场的召唤：商品与技能图标
+            Files.createDirectories(basePath.resolve(BATTLE_IMAGE_DIR));
             // 忍者图鉴：抓包导入后的数据集与立绘
             Files.createDirectories(basePath.resolve(CODEX_DIR));
             Files.createDirectories(basePath.resolve(CODEX_PORTRAIT_DIR));
@@ -171,6 +177,16 @@ public class StorageConfig {
     /** 商城特惠商品图标目录（文件名即物品ID.png） */
     public Path getMallImagePath() {
         return getDataPath().resolve(MALL_IMAGE_DIR);
+    }
+
+    /** 彩旗献礼商品图标目录 */
+    public Path getFlagImagePath() {
+        return getDataPath().resolve(FLAG_IMAGE_DIR);
+    }
+
+    /** 战场的召唤商品/技能图标目录 */
+    public Path getBattleImagePath() {
+        return getDataPath().resolve(BATTLE_IMAGE_DIR);
     }
 
     /** 忍者图鉴数据目录（ninjas.json / meta.json / images） */

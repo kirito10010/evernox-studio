@@ -19,10 +19,16 @@ import java.util.List;
 @AllArgsConstructor
 public class HyolMallSkillResponse {
 
+    /** 技能ID（新格式导出提供，旧数据为 null） */
+    private Long skillId;
+
     /** 奥义 / 普攻 / 追打 / 被动 */
     private String slot;
 
     private String name;
+
+    /** 技能图标文件名（新格式导出提供，旧数据为 null） */
+    private String icon;
 
     /** 原文说明 */
     private String description;

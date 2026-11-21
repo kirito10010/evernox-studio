@@ -218,7 +218,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         if (normalized.isEmpty()) {
             throw new BusinessException("问题不能为空");
         }
-        ensureNotDuplicate(normalized, null);
+        ensureNotDuplicate(normalized, normalizeImageName(request.getImage()), null);
         MiaoQuestion q = build(request, normalized, STATUS_PENDING);
         q.setCreatedBy(userId);
         questionRepository.insert(q);
@@ -276,7 +276,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         if (normalized.isEmpty()) {
             throw new BusinessException("问题不能为空");
         }
-        ensureNotDuplicate(normalized, null);
+        ensureNotDuplicate(normalized, normalizeImageName(request.getImage()), null);
         MiaoQuestion q = build(request, normalized, STATUS_APPROVED);
         questionRepository.insert(q);
         return toResponse(q, null);
@@ -290,7 +290,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         if (normalized.isEmpty()) {
             throw new BusinessException("问题不能为空");
         }
-        ensureNotDuplicate(normalized, id);
+        ensureNotDuplicate(normalized, normalizeImageName(request.getImage()), id);
         apply(q, request, normalized);
         questionRepository.updateById(q);
         return toResponse(q, null);
@@ -443,27 +443,49 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
                 }
             }
 
-            Cleaned cleaned = new Cleaned(question, new ArrayList<>(options), resolved.answer(),
-                    resolved.removed(), image);
-            Cleaned duplicate = unique.get(normalized);
+            Cleaned cleaned = new Cleaned(normalized, question, new ArrayList<>(options),
+                    resolved.answer(), resolved.removed(), image);
+            String key = questionKey(normalized, image);
+            Cleaned duplicate = unique.get(key);
             if (duplicate != null) {
-                duplicate.merge(cleaned);
+                // 同问题 + 同图但选项不一致：宁可跳过，也不要把另一套选项的排除项并进来
+                if (duplicate.options.equals(cleaned.options)) {
+                    duplicate.merge(cleaned);
+                } else {
+                    log.warn("喵问答同问题同图但选项不一致，已跳过合并: question={}, image={}",
+                            normalized, image);
+                }
                 skipped++;
                 continue;
             }
-            unique.put(normalized, cleaned);
+            unique.put(key, cleaned);
         }
 
         // 3. 入库：已存在的题目只做增量补全
         int imported = 0;
         int updated = 0;
-        for (Map.Entry<String, Cleaned> entry : unique.entrySet()) {
-            String normalized = entry.getKey();
-            Cleaned item = entry.getValue();
-            MiaoQuestion existing = questionRepository.selectOne(new LambdaQueryWrapper<MiaoQuestion>()
-                    .eq(MiaoQuestion::getNormalizedQuestion, normalized)
-                    .last("LIMIT 1"));
+        for (Cleaned item : unique.values()) {
+            // 身份 = 归一化问题 + 题图：看图题文案相同但图片不同，是两道不同的题
+            LambdaQueryWrapper<MiaoQuestion> existingWrapper = new LambdaQueryWrapper<MiaoQuestion>()
+                    .eq(MiaoQuestion::getNormalizedQuestion, item.normalized);
+            if (StringUtils.hasText(item.image)) {
+                existingWrapper.eq(MiaoQuestion::getImage, item.image);
+            } else {
+                existingWrapper.and(w -> w.isNull(MiaoQuestion::getImage).or().eq(MiaoQuestion::getImage, ""));
+            }
+            existingWrapper.last("LIMIT 1");
+            MiaoQuestion existing = questionRepository.selectOne(existingWrapper);
             if (existing != null) {
+                List<String> existOptions = List.of(
+                        safeTrim(existing.getOptionA()), safeTrim(existing.getOptionB()),
+                        safeTrim(existing.getOptionC()), safeTrim(existing.getOptionD()));
+                if (!existOptions.equals(item.options)) {
+                    // 身份相同但选项不同：历史数据可能已经串题，跳过更新避免继续污染
+                    log.warn("喵问答已有题目选项不一致，已跳过更新: question={}, image={}",
+                            item.normalized, item.image);
+                    skipped++;
+                    continue;
+                }
                 boolean changed = false;
                 List<String> existRemoved = parseRemoved(existing.getRemovedOptions());
                 List<String> mergedRemovedCandidates = new ArrayList<>(existRemoved);
@@ -496,7 +518,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
 
             MiaoQuestion question = MiaoQuestion.builder()
                     .question(item.question)
-                    .normalizedQuestion(normalized)
+                    .normalizedQuestion(item.normalized)
                     .optionA(item.options.get(0))
                     .optionB(item.options.get(1))
                     .optionC(item.options.get(2))
@@ -544,7 +566,7 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         if (normalized.isEmpty()) {
             throw new BusinessException("问题不能为空");
         }
-        ensureNotDuplicate(normalized, id);
+        ensureNotDuplicate(normalized, normalizeImageName(request.getImage()), id);
         apply(q, request, normalized);
         q.setStatus(STATUS_PENDING);
         questionRepository.updateById(q);
@@ -592,10 +614,22 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         return q;
     }
 
-    private void ensureNotDuplicate(String normalized, Long excludeId) {
-        Long count = questionRepository.selectCount(new LambdaQueryWrapper<MiaoQuestion>()
+    /**
+     * 查重身份 = 归一化问题 + 题图。
+     *
+     * <p>看图题文案往往完全相同（如「看局部猜人物」），只有图片不同就是不同的题；
+     * 只按文本查重会把多道看图题合并成一道。
+     */
+    private void ensureNotDuplicate(String normalized, String image, Long excludeId) {
+        LambdaQueryWrapper<MiaoQuestion> wrapper = new LambdaQueryWrapper<MiaoQuestion>()
                 .eq(MiaoQuestion::getNormalizedQuestion, normalized)
-                .ne(excludeId != null, MiaoQuestion::getId, excludeId));
+                .ne(excludeId != null, MiaoQuestion::getId, excludeId);
+        if (StringUtils.hasText(image)) {
+            wrapper.eq(MiaoQuestion::getImage, image);
+        } else {
+            wrapper.and(w -> w.isNull(MiaoQuestion::getImage).or().eq(MiaoQuestion::getImage, ""));
+        }
+        Long count = questionRepository.selectCount(wrapper);
         if (count != null && count > 0) {
             throw new BusinessException("该题目已存在");
         }
@@ -734,7 +768,8 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
      * 排除项与答案的统一校正规则：
      *  - 排除项只保留属于四个选项的值，去重，最多 3 个；
      *  - 答案如果落在排除项里，一定错了 → 清空；
-     *  - 没有答案但排除项已有 3 个 → 剩下那个一定是答案，自动补上。
+     *  - **不自动反推答案**：排除项可能来自串题的脏数据，3 个排除项≠可信答案，
+     *    没有答案就留空，交给用户投票确认。
      */
     private static Resolved resolveOptions(List<String> options, List<String> removedCandidates,
                                            String answerCandidate) {
@@ -745,9 +780,6 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         }
         if (!answer.isEmpty() && removed.contains(answer)) {
             answer = "";
-        }
-        if (answer.isEmpty() && removed.size() >= MAX_REMOVED_OPTIONS) {
-            answer = options.stream().filter(o -> !removed.contains(o)).findFirst().orElse("");
         }
         return new Resolved(removed, answer);
     }
@@ -820,16 +852,23 @@ public class MiaoQuestionServiceImpl implements MiaoQuestionService {
         }
     }
 
+    /** 导入身份：归一化问题 + 题图（无图用空串）。只看文案会把多道看图题合成一道 */
+    private static String questionKey(String normalized, String image) {
+        return normalized + "\u0000" + (image == null ? "" : image.toLowerCase(Locale.ROOT));
+    }
+
     /** 导入过程中清洗后的题目，批内重复时合并答案/排除项/图片 */
     private static final class Cleaned {
+        private final String normalized;
         private final String question;
         private final List<String> options;
         private String answer;
         private List<String> removed;
         private String image;
 
-        private Cleaned(String question, List<String> options,
+        private Cleaned(String normalized, String question, List<String> options,
                         String answer, List<String> removed, String image) {
+            this.normalized = normalized;
             this.question = question;
             this.options = options;
             this.answer = answer;

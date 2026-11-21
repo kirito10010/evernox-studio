@@ -9,7 +9,9 @@ import com.evernox.service.HyolMallService;
 import com.evernox.util.ImageTypeValidator;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 火影忍者OL 活动详情 · 商城特惠控制器
@@ -56,7 +60,9 @@ public class HyolMallController {
 
     /** 商品图标：<img> 直接引用，无鉴权头，需公开 */
     @GetMapping("/image/{filename}")
-    public ResponseEntity<byte[]> image(@PathVariable String filename) {
+    public ResponseEntity<byte[]> image(
+            @PathVariable String filename,
+            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         // 防路径穿越
         if (filename == null || filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
             return ResponseEntity.badRequest().build();
@@ -66,12 +72,24 @@ public class HyolMallController {
             return ResponseEntity.notFound().build();
         }
         try {
+            long lastModified = Files.getLastModifiedTime(file).toMillis();
+            long size = Files.size(file);
+            String etag = "\"" + Long.toHexString(lastModified) + "-" + Long.toHexString(size) + "\"";
+            CacheControl cache = CacheControl.maxAge(0, TimeUnit.SECONDS).mustRevalidate();
+            if (etag.equals(ifNoneMatch)) {
+                return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                        .eTag(etag)
+                        .cacheControl(cache)
+                        .build();
+            }
             byte[] bytes = Files.readAllBytes(file);
             String mime = ImageTypeValidator.detectMimeType(bytes);
             MediaType mediaType = mime != null ? MediaType.parseMediaType(mime) : mediaTypeOf(filename);
             return ResponseEntity.ok()
                     .contentType(mediaType)
-                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400, must-revalidate")
+                    .eTag(etag)
+                    .lastModified(lastModified)
+                    .cacheControl(cache)
                     .body(bytes);
         } catch (IOException e) {
             return ResponseEntity.status(500).build();

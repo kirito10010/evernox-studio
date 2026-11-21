@@ -165,16 +165,14 @@
           />
           <el-button type="primary" :disabled="!selectedOrgId" @click="generate">一键生成</el-button>
           <el-upload
+            ref="excelUploadRef"
             :auto-upload="false"
             accept=".xlsx"
             :show-file-list="false"
-            :on-change="onFileChange"
+            :on-change="onExcelFileChange"
           >
-            <el-button :disabled="!selectedOrgId">选择 Excel</el-button>
+            <el-button type="success" :disabled="!selectedOrgId" :loading="importing">导入数据</el-button>
           </el-upload>
-          <el-button type="success" :disabled="!uploadFile || !selectedOrgId" :loading="importing" @click="doImport">
-            导入数据
-          </el-button>
           <el-upload
             ref="renegadeUploadRef"
             :auto-upload="false"
@@ -204,7 +202,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button type="danger" :disabled="!selectedOrgId || !selectedWeek" @click="deleteWeek">删除本周</el-button>
+          <el-button type="danger" :disabled="!selectedOrgId || !selectedWeek" @click="openDeleteWeek">删除本周</el-button>
           <el-input v-model="recordKeyword" placeholder="搜索玩家名" clearable style="width: 180px" />
           <el-button link type="primary" @click="importHelpVisible = true">导入说明</el-button>
         </div>
@@ -633,11 +631,37 @@
         <el-button type="primary" :loading="savingRecord" @click="saveRecord">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 删除整周确认：倒计时防误触，周次大字显示 -->
+    <el-dialog
+      v-model="deleteWeekVisible"
+      title="删除整周记录"
+      width="460px"
+      @closed="stopDeleteCountdown"
+    >
+      <div class="danger-confirm">
+        <el-icon class="danger-icon"><WarningFilled /></el-icon>
+        <div class="danger-title">此操作不可恢复</div>
+        <p class="danger-desc">将永久删除该组织以下周次的全部成员记录，积分与礼包分配会一并清除：</p>
+        <div class="danger-week">{{ selectedWeek || '未选择周' }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="closeDeleteWeek">取消</el-button>
+        <el-button
+          type="danger"
+          :disabled="deleteWeekCountdown > 0"
+          :loading="deletingWeek"
+          @click="confirmDeleteWeek"
+        >
+          {{ deleteWeekCountdown > 0 ? `确认删除（${deleteWeekCountdown}s）` : '确认删除' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, onMounted, watch } from 'vue'
+import { computed, reactive, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import dayjs from 'dayjs'
@@ -1304,7 +1328,7 @@ const handleSortChange = ({ prop, order }: { prop: string | null; order: 'ascend
   sortState.prop = prop || 'totalPoints'
   sortState.order = order || 'descending'
 }
-const uploadFile = ref<File | null>(null)
+const excelUploadRef = ref<UploadInstance | null>(null)
 const importing = ref(false)
 const generateDate = ref('')
 const importResultVisible = ref(false)
@@ -1340,35 +1364,38 @@ const computeSunday = (dateStr: string): string => {
 
 const generate = async () => {
   if (!selectedOrgId.value) return
-  const target = generateDate.value ? computeSunday(generateDate.value) : undefined
-  const label = target ? `${target} 当周` : '本周（本周周日）'
-  await ElMessageBox.confirm(`将为该组织${label}生成记录`, '一键生成', { type: 'info' })
+  const target = computeSunday(generateDate.value || dayjs().format('YYYY-MM-DD'))
+  await ElMessageBox.confirm(`将为该组织 ${target} 当周生成记录`, '一键生成', { type: 'info' })
   const res = await generateOrgRecords(selectedOrgId.value, target)
   ElMessage.success(`已生成 ${res.data} 条记录`)
   await loadWeeks()
+  // 生成后直接切到刚生成的那一周，省去手动下拉切换
+  if (weeks.value.includes(target)) {
+    selectedWeek.value = target
+  }
   await loadRecords()
 }
-const onFileChange = (file: UploadFile) => {
-  uploadFile.value = file.raw ?? null
-}
-const doImport = async () => {
-  if (!selectedOrgId.value) return
-  if (!uploadFile.value) {
-    ElMessage.warning('请先选择 Excel 文件')
+/** 选择 Excel 后立即导入，不再需要额外的「导入数据」步骤 */
+const onExcelFileChange = async (file: UploadFile) => {
+  const raw = file.raw
+  if (!raw) return
+  if (!selectedOrgId.value) {
+    ElMessage.warning('请先选择组织')
+    excelUploadRef.value?.clearFiles()
     return
   }
   importing.value = true
   try {
-    const res = await importOrgExcel(uploadFile.value, selectedOrgId.value, selectedWeek.value || undefined)
+    const res = await importOrgExcel(raw, selectedOrgId.value, selectedWeek.value || undefined)
     importResult.importedNames = res.data.importedNames ?? []
     importResult.unmatchedNames = res.data.unmatchedNames ?? []
     importResult.emptyNames = res.data.emptyNames ?? []
     importResultVisible.value = true
-    uploadFile.value = null
     await loadWeeks()
     await loadRecords()
   } finally {
     importing.value = false
+    excelUploadRef.value?.clearFiles()
   }
 }
 const calculate = async () => {
@@ -1387,15 +1414,50 @@ const handleSetPackage = async (row: OrgWeekRecord, val: number | undefined) => 
   }
   await loadRecords()
 }
-const deleteWeek = async () => {
-  if (!selectedOrgId.value || !selectedWeek.value) return
-  await ElMessageBox.confirm(`确定删除整周（${selectedWeek.value}）记录？`, '提示', { type: 'warning' })
-  await deleteOrgWeek(selectedOrgId.value, selectedWeek.value)
-  ElMessage.success('删除成功')
-  selectedWeek.value = ''
-  await loadWeeks()
-  await loadRecords()
+// 删除整周：独立弹窗 + 5 秒倒计时，避免误点直接删库
+const deleteWeekVisible = ref(false)
+const deleteWeekCountdown = ref(0)
+const deletingWeek = ref(false)
+let deleteWeekTimer: ReturnType<typeof setInterval> | null = null
+
+const stopDeleteCountdown = () => {
+  if (deleteWeekTimer) {
+    clearInterval(deleteWeekTimer)
+    deleteWeekTimer = null
+  }
 }
+const openDeleteWeek = () => {
+  if (!selectedOrgId.value || !selectedWeek.value) return
+  stopDeleteCountdown()
+  deleteWeekCountdown.value = 5
+  deleteWeekVisible.value = true
+  deleteWeekTimer = setInterval(() => {
+    deleteWeekCountdown.value -= 1
+    if (deleteWeekCountdown.value <= 0) stopDeleteCountdown()
+  }, 1000)
+}
+const closeDeleteWeek = () => {
+  deleteWeekVisible.value = false
+  stopDeleteCountdown()
+}
+const confirmDeleteWeek = async () => {
+  if (deleteWeekCountdown.value > 0) return
+  if (!selectedOrgId.value || !selectedWeek.value) return
+  const week = selectedWeek.value
+  deletingWeek.value = true
+  try {
+    await deleteOrgWeek(selectedOrgId.value, week)
+    ElMessage.success(`已删除 ${week} 整周记录`)
+    closeDeleteWeek()
+    selectedWeek.value = ''
+    await loadWeeks()
+    await loadRecords()
+  } finally {
+    deletingWeek.value = false
+  }
+}
+
+onBeforeUnmount(stopDeleteCountdown)
 
 // ==================== 周记录手动编辑 ====================
 const recordEditVisible = ref(false)
@@ -1539,6 +1601,42 @@ onMounted(async () => {
       font-size: 13px;
       font-weight: 600;
       color: var(--ev-primary);
+    }
+  }
+
+  .danger-confirm {
+    text-align: center;
+    padding: 4px 0 8px;
+
+    .danger-icon {
+      font-size: 40px;
+      color: var(--el-color-danger);
+      margin-bottom: 6px;
+    }
+
+    .danger-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--el-color-danger);
+      margin-bottom: 10px;
+    }
+
+    .danger-desc {
+      font-size: 13px;
+      color: var(--ev-text-secondary);
+      line-height: 1.7;
+      margin: 0 0 16px;
+    }
+
+    .danger-week {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--el-color-danger);
+      background: var(--el-color-danger-light-9);
+      border: 1px dashed var(--el-color-danger);
+      border-radius: 10px;
+      padding: 14px 0;
     }
   }
 

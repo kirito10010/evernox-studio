@@ -18,6 +18,8 @@
     </div>
 
     <MallDiscount v-if="activeActivity === 'mall'" />
+    <FlagOffering v-else-if="activeActivity === 'flag'" />
+    <BattleSummon v-else-if="activeActivity === 'battle-summon'" />
     <el-empty v-else :description="`「${activeName}」资料整理中`" />
   </div>
 </template>
@@ -25,6 +27,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import MallDiscount from './activity/MallDiscount.vue'
+import FlagOffering from './activity/FlagOffering.vue'
+import BattleSummon from './activity/BattleSummon.vue'
 
 interface ActivityOption {
   key: string
@@ -35,10 +39,11 @@ interface ActivityOption {
 
 const activities: ActivityOption[] = [
   { key: 'mall', name: '商城特惠', ready: true },
+  { key: 'flag', name: '彩旗献礼', ready: true },
+  { key: 'battle-summon', name: '战场的召唤', ready: true },
   { key: 'carnival', name: '超级嘉年华', ready: false },
   { key: 'shopping-festival', name: '木叶购物节', ready: false },
   { key: 'auction', name: '拍卖会', ready: false },
-  { key: 'battle-summon', name: '战场的召唤', ready: false },
 ]
 
 const activeActivity = ref('mall')

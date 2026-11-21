@@ -93,6 +93,16 @@ public class SecurityConfig {
                 // 商城特惠写操作（导入 / 删除）只给管理员：与控制器 @PreAuthorize 形成纵深
                 .requestMatchers(HttpMethod.POST, "/hyol/mall/import").hasRole("admin")
                 .requestMatchers(HttpMethod.DELETE, "/hyol/mall/**").hasRole("admin")
+                // 活动详情 · 彩旗献礼：与商城特惠一致，只读公开、写操作限 admin
+                .requestMatchers(HttpMethod.GET, "/hyol/flag/periods", "/hyol/flag/items").permitAll()
+                .requestMatchers("/hyol/flag/image/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/hyol/flag/import").hasRole("admin")
+                .requestMatchers(HttpMethod.DELETE, "/hyol/flag/**").hasRole("admin")
+                // 活动详情 · 战场的召唤：与彩旗献礼一致，只读公开、写操作限 admin
+                .requestMatchers(HttpMethod.GET, "/hyol/battle/periods", "/hyol/battle/items").permitAll()
+                .requestMatchers("/hyol/battle/image/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/hyol/battle/import").hasRole("admin")
+                .requestMatchers(HttpMethod.DELETE, "/hyol/battle/**").hasRole("admin")
                 .requestMatchers(HttpMethod.GET, "/quiz/search", "/quiz/unanswered").permitAll()
                 // 喵问答：搜题、待确认面板与题图都是匿名可读
                 .requestMatchers(HttpMethod.GET, "/miao/search", "/miao/unanswered").permitAll()
